@@ -1363,7 +1363,7 @@ export const Planning: React.FC = () => {
       >
         <SyncModal />
       </Modal>
-    </div>
+
       {/* Modal d'export */}
       <Modal
         isOpen={isExportModalOpen}
@@ -1373,6 +1373,7 @@ export const Planning: React.FC = () => {
       >
         <ExportModal />
       </Modal>
+    </div>
 
   );
 };
