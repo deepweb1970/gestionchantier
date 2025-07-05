@@ -3,8 +3,8 @@ import { Plus, Edit, Trash2, Camera, MapPin, Filter, Download, Clock, Users, Upl
 import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
 import { chantierService } from '../../services/chantierService';
 import { clientService } from '../../services/clientService';
-import { saisieHeureService } from '../../services/saisieHeureService';
-import { ouvrierService } from '../../services/ouvrierService';
+import { saisieHeureService } from '../../services/saisieHeureService'; 
+import { ouvrierService } from '../../services/ouvrierService'; 
 import { Chantier, Photo } from '../../types';
 import { Modal } from '../Common/Modal';
 import { Button } from '../Common/Button';
@@ -63,7 +63,7 @@ export const Chantiers: React.FC = () => {
   // Fonction pour calculer les heures totales d'un chantier
   const getChantierTotalHours = (chantierId: string) => {
     if (!saisiesHeures) return { totalHeures: 0, heuresValidees: 0 };
-    
+
     const saisiesChantier = saisiesHeures.filter(saisie => saisie.chantier_id === chantierId);
     const totalHeures = saisiesChantier.reduce((sum, saisie) => sum + (saisie.heures_total || 0), 0);
     const heuresValidees = saisiesChantier
@@ -76,7 +76,7 @@ export const Chantiers: React.FC = () => {
   // Fonction pour obtenir le nombre d'ouvriers uniques sur un chantier
   const getChantierWorkersCount = (chantierId: string) => {
     if (!saisiesHeures) return 0;
-    
+
     const saisiesChantier = saisiesHeures.filter(saisie => saisie.chantier_id === chantierId);
     const uniqueWorkers = new Set(saisiesChantier.map(saisie => saisie.ouvrier_id));
     return uniqueWorkers.size;
@@ -85,7 +85,7 @@ export const Chantiers: React.FC = () => {
   // Fonction pour calculer le coût de main d'œuvre d'un chantier
   const getChantierLaborCost = (chantierId: string) => {
     if (!saisiesHeures || !ouvriers) return 0;
-    
+
     const saisiesChantier = saisiesHeures.filter(saisie => saisie.chantier_id === chantierId);
     return saisiesChantier.reduce((sum, saisie) => {
       const ouvrier = ouvriers.find(o => o.id === saisie.ouvrier_id);
@@ -99,43 +99,43 @@ export const Chantiers: React.FC = () => {
   // Fonction pour mettre à jour automatiquement l'avancement du chantier en fonction des heures travaillées
   const calculateChantierProgress = (chantier: Chantier) => {
     if (!saisiesHeures || !chantier.budget) return chantier.avancement;
-    
+
     const { totalHeures } = getChantierTotalHours(chantier.id);
     const laborCost = getChantierLaborCost(chantier.id);
-    
+
     // Calcul basé sur le coût de main d'oeuvre par rapport au budget
     if (chantier.budget > 0) {
       // On considère que le coût de main d'oeuvre représente environ 40% du budget total
       const estimatedTotalLaborCost = chantier.budget * 0.4;
       if (estimatedTotalLaborCost > 0) {
         const progressByLabor = Math.min(100, Math.round((laborCost / estimatedTotalLaborCost) * 100));
-        
+
         // Si le chantier est déjà marqué comme terminé, on garde 100%
         if (chantier.statut === 'termine') {
           return 100;
         }
-        
+
         // Si le chantier est en pause, on ne met pas à jour l'avancement automatiquement
         if (chantier.statut === 'pause') {
           return chantier.avancement;
         }
-        
+
         // Pour les chantiers actifs ou planifiés, on met à jour l'avancement
         return progressByLabor;
       }
     }
-    
+
     return chantier.avancement;
   };
 
   // Mettre à jour l'avancement des chantiers en fonction des heures travaillées
   useEffect(() => {
     if (!chantiers || !saisiesHeures || !ouvriers) return;
-    
+
     const updateChantierProgress = async () => {
       for (const chantier of chantiers) {
         const calculatedProgress = calculateChantierProgress(chantier);
-        
+
         // Si l'avancement calculé est différent de l'avancement actuel, mettre à jour
         if (calculatedProgress !== chantier.avancement) {
           try {
@@ -146,7 +146,7 @@ export const Chantiers: React.FC = () => {
         }
       }
     };
-    
+
     updateChantierProgress();
   }, [chantiers, saisiesHeures, ouvriers]);
 
