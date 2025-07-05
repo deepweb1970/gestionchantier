@@ -1,6 +1,6 @@
 # Application de Gestion de Chantier
 
-Une application complète de gestion de chantiers de construction avec base de données Supabase.
+Une application complète de gestion de chantiers de construction avec base de données Supabase. Développée avec React, TypeScript et Tailwind CSS.
 
 ## 🏗️ Fonctionnalités
 
@@ -62,14 +62,17 @@ Une application complète de gestion de chantiers de construction avec base de d
 
 ### **1. Prérequis**
 ```bash
-Node.js 18+
-npm ou yarn
-Compte Supabase
+Node.js 18+ et npm
+Compte Supabase (gratuit)
+Git (optionnel)
 ```
 
 ### **2. Configuration Supabase**
 1. Créer un projet sur [supabase.com](https://supabase.com)
-2. Exécuter les migrations SQL dans l'éditeur SQL
+2. Exécuter les migrations SQL dans l'éditeur SQL de Supabase
+   - `supabase/migrations/create_schema.sql`
+   - `supabase/migrations/insert_initial_data.sql`
+   - `supabase/migrations/create_rls_policies.sql`
 3. Récupérer l'URL et la clé anonyme du projet
 
 ### **3. Installation des dépendances**
@@ -79,10 +82,11 @@ npm install
 
 ### **4. Configuration environnement**
 ```bash
-cp .env.example .env
+# Copier le fichier d'exemple
+cp .env.example .env.local
 ```
 
-Remplir le fichier `.env` :
+Remplir le fichier `.env.local` avec vos informations Supabase :
 ```env
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
@@ -97,17 +101,23 @@ npm run dev
 
 ### **1. Schéma Principal**
 ```bash
-# Exécuter dans l'éditeur SQL Supabase
-supabase/migrations/create_complete_schema.sql
+# Exécuter dans l'ordre dans l'éditeur SQL Supabase
+supabase/migrations/create_schema.sql
 ```
 
 ### **2. Données Initiales**
 ```bash
 # Insérer les données de test
-supabase/migrations/insert_initial_data.sql
+supabase/migrations/insert_initial_data.sql  
 ```
 
-### **3. Vérification**
+### **3. Politiques de sécurité**
+```bash
+# Configurer les politiques RLS
+supabase/migrations/create_rls_policies.sql
+```
+
+### **4. Vérification**
 ```sql
 -- Vérifier les tables créées
 SELECT table_name FROM information_schema.tables 
@@ -228,17 +238,17 @@ const chantier = await ChantierService.create(newChantier);
 
 ## 🚀 Déploiement
 
-### **Build Production**
+### **1. Build Production**
 ```bash
 npm run build
 ```
 
-### **Hébergement Recommandé**
+### **2. Hébergement Recommandé**
 - **Frontend** : Vercel, Netlify
 - **Base de données** : Supabase (inclus)
 - **Stockage fichiers** : Supabase Storage
 
-### **Variables d'Environnement**
+### **3. Variables d'Environnement**
 ```env
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
@@ -259,18 +269,18 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 
 ## 🛠️ Technologies
 
-### **Frontend**
+### **Frontend (Client)**
 - **React 18** + TypeScript
 - **Tailwind CSS** pour le styling
 - **Lucide React** pour les icônes
 - **Vite** comme bundler
 
-### **Backend**
+### **Backend (Serveur)**
 - **Supabase** (PostgreSQL + API REST)
 - **Row Level Security** (RLS)
 - **Triggers** et fonctions automatiques
 
-### **Outils**
+### **Outils de développement**
 - **ESLint** pour la qualité du code
 - **PostCSS** + Autoprefixer
 - **Git** pour le versioning
@@ -279,9 +289,10 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 
 ## 📞 Support
 
-Pour toute question ou problème :
+Pour toute question ou problème, vous pouvez :
 1. Vérifier la documentation Supabase
 2. Consulter les logs d'erreur
 3. Tester les requêtes dans l'éditeur SQL
+4. Ouvrir une issue sur le dépôt GitHub
 
-**Base de données complète et prête pour la production ! 🎉**
+**Application complète et prête pour la production ! 🎉**
