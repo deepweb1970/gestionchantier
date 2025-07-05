@@ -208,11 +208,8 @@ export const Chantiers: React.FC = () => {
     }));
 
     // Mettre à jour le chantier avec les nouvelles photos
-    setChantiers(chantiers.map(c => 
-      c.id === selectedChantier.id 
-        ? { ...c, photos: [...c.photos, ...uploadedPhotos] }
-        : c
-    ));
+    // Refresh data from Supabase to get updated photos
+    refresh();
 
     // Réinitialiser le formulaire
     setNewPhotos([]);
@@ -224,11 +221,8 @@ export const Chantiers: React.FC = () => {
     if (!selectedChantier) return;
     
     if (confirm('Êtes-vous sûr de vouloir supprimer cette photo ?')) {
-      setChantiers(chantiers.map(c => 
-        c.id === selectedChantier.id 
-          ? { ...c, photos: c.photos.filter(p => p.id !== photoId) }
-          : c
-      ));
+      // Refresh data from Supabase after photo deletion
+      refresh();
       
       // Mettre à jour selectedChantier pour refléter les changements
       setSelectedChantier({
@@ -241,16 +235,8 @@ export const Chantiers: React.FC = () => {
   const updatePhotoDescription = (photoId: string, newDescription: string) => {
     if (!selectedChantier) return;
 
-    setChantiers(chantiers.map(c => 
-      c.id === selectedChantier.id 
-        ? { 
-            ...c, 
-            photos: c.photos.map(p => 
-              p.id === photoId ? { ...p, description: newDescription } : p
-            )
-          }
-        : c
-    ));
+    // Refresh data from Supabase after photo description update
+    refresh();
 
     setSelectedChantier({
       ...selectedChantier,
