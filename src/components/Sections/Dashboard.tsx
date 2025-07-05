@@ -1,39 +1,81 @@
 import React from 'react';
 import { Building2, Users, Wrench, FileText, TrendingUp, Clock, AlertTriangle, CheckCircle } from 'lucide-react';
+import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
+import { clientService } from '../../services/clientService';
+import { chantierService } from '../../services/chantierService';
+import { ouvrierService } from '../../services/ouvrierService';
+import { materielService } from '../../services/materielService';
+import { factureService } from '../../services/factureService';
 
 export const Dashboard: React.FC = () => {
+  // Récupérer les données en temps réel
+  const { data: clients, loading: clientsLoading } = useRealtimeSupabase({
+    table: 'clients',
+    fetchFunction: clientService.getAll
+  });
+  
+  const { data: chantiers, loading: chantiersLoading } = useRealtimeSupabase({
+    table: 'chantiers',
+    fetchFunction: chantierService.getAll
+  });
+  
+  const { data: ouvriers, loading: ouvriersLoading } = useRealtimeSupabase({
+    table: 'ouvriers',
+    fetchFunction: ouvrierService.getAll
+  });
+  
+  const { data: materiel, loading: materielLoading } = useRealtimeSupabase({
+    table: 'materiel',
+    fetchFunction: materielService.getAll
+  });
+  
+  const { data: factures, loading: facturesLoading } = useRealtimeSupabase({
+    table: 'factures',
+    fetchFunction: factureService.getAll
+  });
+
+  // Calculer les statistiques en temps réel
+  const chantiersActifs = (chantiers || []).filter(c => c.statut === 'actif').length;
+  const ouvriersDisponibles = (ouvriers || []).filter(o => o.statut === 'actif').length;
+  const materielEnService = (materiel || []).filter(m => m.statut === 'en_service').length;
+  const facturesEnAttente = (factures || []).filter(f => f.statut === 'envoyee').length;
+
   const stats = [
     {
       title: 'Chantiers Actifs',
-      value: '12',
+      value: chantiersActifs.toString(),
       change: '+2',
       changeType: 'positive',
       icon: Building2,
-      color: 'bg-blue-500'
+      color: 'bg-blue-500',
+      loading: chantiersLoading
     },
     {
       title: 'Ouvriers Disponibles',
-      value: '28',
+      value: ouvriersDisponibles.toString(),
       change: '-3',
       changeType: 'negative',
       icon: Users,
-      color: 'bg-green-500'
+      color: 'bg-green-500',
+      loading: ouvriersLoading
     },
     {
       title: 'Matériel en Service',
-      value: '45',
+      value: materielEnService.toString(),
       change: '+5',
       changeType: 'positive',
       icon: Wrench,
-      color: 'bg-orange-500'
+      color: 'bg-orange-500',
+      loading: materielLoading
     },
     {
       title: 'Factures en Attente',
-      value: '8',
+      value: facturesEnAttente.toString(),
       change: '-2',
       changeType: 'positive',
       icon: FileText,
-      color: 'bg-purple-500'
+      color: 'bg-purple-500',
+      loading: facturesLoading
     }
   ];
 
@@ -63,6 +105,24 @@ export const Dashboard: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((stat, index) => {
           const Icon = stat.icon;
+          
+          if (stat.loading) {
+            return (
+              <div key={index} className="bg-white rounded-lg shadow-sm border p-6">
+                <div className="animate-pulse flex items-center justify-between">
+                  <div>
+                    <div className="h-4 bg-gray-200 rounded w-24 mb-2.5"></div>
+                    <div className="h-8 bg-gray-300 rounded w-16 mb-2"></div>
+                    <div className="h-3 bg-gray-200 rounded w-20"></div>
+                  </div>
+                  <div className={`p-3 rounded-full ${stat.color} opacity-50`}>
+                    <Icon className="w-6 h-6 text-white" />
+                  </div>
+                </div>
+              </div>
+            );
+          }
+          
           return (
             <div key={index} className="bg-white rounded-lg shadow-sm border p-6">
               <div className="flex items-center justify-between">

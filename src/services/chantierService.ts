@@ -72,7 +72,7 @@ const toPhoto = (row: PhotoRow): Photo => ({
 });
 
 export const chantierService = {
-  async getAll(): Promise<Chantier[]> {
+  getAll: async (): Promise<Chantier[]> => {
     // Récupérer les chantiers avec les clients et les photos
     const { data, error } = await supabase
       .from('chantiers')
@@ -105,7 +105,7 @@ export const chantierService = {
     });
   },
   
-  async getById(id: string): Promise<Chantier | null> {
+  getById: async (id: string): Promise<Chantier | null> => {
     const { data, error } = await supabase
       .from('chantiers')
       .select(`
@@ -141,7 +141,7 @@ export const chantierService = {
     return chantier;
   },
   
-  async create(chantier: Omit<Chantier, 'id' | 'photos'>, clientId: string): Promise<Chantier> {
+  create: async (chantier: Omit<Chantier, 'id' | 'photos'>, clientId: string): Promise<Chantier> => {
     const { data, error } = await supabase
       .from('chantiers')
       .insert(toChantierInsert(chantier, clientId))
@@ -156,7 +156,7 @@ export const chantierService = {
     return toChantier(data);
   },
   
-  async update(id: string, chantier: Partial<Omit<Chantier, 'id' | 'photos'>>, clientId?: string): Promise<Chantier> {
+  update: async (id: string, chantier: Partial<Omit<Chantier, 'id' | 'photos'>>, clientId?: string): Promise<Chantier> => {
     const { data, error } = await supabase
       .from('chantiers')
       .update(toChantierUpdate(chantier, clientId))
@@ -172,7 +172,7 @@ export const chantierService = {
     return toChantier(data);
   },
   
-  async delete(id: string): Promise<void> {
+  delete: async (id: string): Promise<void> => {
     const { error } = await supabase
       .from('chantiers')
       .delete()
@@ -185,7 +185,7 @@ export const chantierService = {
   },
   
   // Méthodes pour les photos
-  async addPhoto(chantierId: string, photo: Omit<Photo, 'id'>): Promise<Photo> {
+  addPhoto: async (chantierId: string, photo: Omit<Photo, 'id'>): Promise<Photo> => {
     const { data, error } = await supabase
       .from('photos')
       .insert({
@@ -208,7 +208,7 @@ export const chantierService = {
     return toPhoto(data);
   },
   
-  async deletePhoto(photoId: string): Promise<void> {
+  deletePhoto: async (photoId: string): Promise<void> => {
     const { error } = await supabase
       .from('photos')
       .delete()
@@ -220,7 +220,7 @@ export const chantierService = {
     }
   },
   
-  async updatePhoto(photoId: string, updates: Partial<Omit<Photo, 'id'>>): Promise<Photo> {
+  updatePhoto: async (photoId: string, updates: Partial<Omit<Photo, 'id'>>): Promise<Photo> => {
     const updateData: any = {};
     
     if (updates.description !== undefined) updateData.description = updates.description;

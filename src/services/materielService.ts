@@ -56,7 +56,7 @@ const toMaterielUpdate = (materiel: Partial<Omit<Materiel, 'id'>>): MaterielUpda
 };
 
 export const materielService = {
-  async getAll(): Promise<Materiel[]> {
+  getAll: async (): Promise<Materiel[]> => {
     const { data, error } = await supabase
       .from('materiel')
       .select('*')
@@ -70,7 +70,7 @@ export const materielService = {
     return (data || []).map(toMateriel);
   },
   
-  async getById(id: string): Promise<Materiel | null> {
+  getById: async (id: string): Promise<Materiel | null> => {
     const { data, error } = await supabase
       .from('materiel')
       .select('*')
@@ -88,7 +88,7 @@ export const materielService = {
     return data ? toMateriel(data) : null;
   },
   
-  async create(materiel: Omit<Materiel, 'id'>): Promise<Materiel> {
+  create: async (materiel: Omit<Materiel, 'id'>): Promise<Materiel> => {
     const { data, error } = await supabase
       .from('materiel')
       .insert(toMaterielInsert(materiel))
@@ -103,7 +103,7 @@ export const materielService = {
     return toMateriel(data);
   },
   
-  async update(id: string, materiel: Partial<Omit<Materiel, 'id'>>): Promise<Materiel> {
+  update: async (id: string, materiel: Partial<Omit<Materiel, 'id'>>): Promise<Materiel> => {
     const { data, error } = await supabase
       .from('materiel')
       .update(toMaterielUpdate(materiel))
@@ -119,7 +119,7 @@ export const materielService = {
     return toMateriel(data);
   },
   
-  async delete(id: string): Promise<void> {
+  delete: async (id: string): Promise<void> => {
     const { error } = await supabase
       .from('materiel')
       .delete()
@@ -131,7 +131,7 @@ export const materielService = {
     }
   },
   
-  async getByStatut(statut: Materiel['statut']): Promise<Materiel[]> {
+  getByStatut: async (statut: Materiel['statut']): Promise<Materiel[]> => {
     const { data, error } = await supabase
       .from('materiel')
       .select('*')
@@ -146,7 +146,7 @@ export const materielService = {
     return (data || []).map(toMateriel);
   },
   
-  async getByLocalisation(localisation: string): Promise<Materiel[]> {
+  getByLocalisation: async (localisation: string): Promise<Materiel[]> => {
     const { data, error } = await supabase
       .from('materiel')
       .select('*')

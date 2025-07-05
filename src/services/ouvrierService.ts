@@ -64,7 +64,7 @@ const toDocument = (row: DocumentRow): Document => ({
 });
 
 export const ouvrierService = {
-  async getAll(): Promise<Ouvrier[]> {
+  getAll: async (): Promise<Ouvrier[]> => {
     // Récupérer les ouvriers avec leurs documents
     const { data, error } = await supabase
       .from('ouvriers')
@@ -91,7 +91,7 @@ export const ouvrierService = {
     });
   },
   
-  async getById(id: string): Promise<Ouvrier | null> {
+  getById: async (id: string): Promise<Ouvrier | null> => {
     const { data, error } = await supabase
       .from('ouvriers')
       .select(`
@@ -121,7 +121,7 @@ export const ouvrierService = {
     return ouvrier;
   },
   
-  async create(ouvrier: Omit<Ouvrier, 'id' | 'documents'>): Promise<Ouvrier> {
+  create: async (ouvrier: Omit<Ouvrier, 'id' | 'documents'>): Promise<Ouvrier> => {
     const { data, error } = await supabase
       .from('ouvriers')
       .insert(toOuvrierInsert(ouvrier))
@@ -136,7 +136,7 @@ export const ouvrierService = {
     return toOuvrier(data);
   },
   
-  async update(id: string, ouvrier: Partial<Omit<Ouvrier, 'id' | 'documents'>>): Promise<Ouvrier> {
+  update: async (id: string, ouvrier: Partial<Omit<Ouvrier, 'id' | 'documents'>>): Promise<Ouvrier> => {
     const { data, error } = await supabase
       .from('ouvriers')
       .update(toOuvrierUpdate(ouvrier))
@@ -152,7 +152,7 @@ export const ouvrierService = {
     return toOuvrier(data);
   },
   
-  async delete(id: string): Promise<void> {
+  delete: async (id: string): Promise<void> => {
     const { error } = await supabase
       .from('ouvriers')
       .delete()
@@ -165,7 +165,7 @@ export const ouvrierService = {
   },
   
   // Méthodes pour les documents
-  async addDocument(ouvrierId: string, document: Omit<Document, 'id' | 'dateUpload'>): Promise<Document> {
+  addDocument: async (ouvrierId: string, document: Omit<Document, 'id' | 'dateUpload'>): Promise<Document> => {
     const { data, error } = await supabase
       .from('documents')
       .insert({
@@ -185,7 +185,7 @@ export const ouvrierService = {
     return toDocument(data);
   },
   
-  async deleteDocument(documentId: string): Promise<void> {
+  deleteDocument: async (documentId: string): Promise<void> => {
     const { error } = await supabase
       .from('documents')
       .delete()
@@ -197,7 +197,7 @@ export const ouvrierService = {
     }
   },
   
-  async getByStatut(statut: Ouvrier['statut']): Promise<Ouvrier[]> {
+  getByStatut: async (statut: Ouvrier['statut']): Promise<Ouvrier[]> => {
     const { data, error } = await supabase
       .from('ouvriers')
       .select(`

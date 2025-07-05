@@ -48,7 +48,7 @@ const toClientUpdate = (client: Partial<Omit<Client, 'id' | 'projets'>>): Client
 };
 
 export const clientService = {
-  async getAll(): Promise<Client[]> {
+  getAll: async (): Promise<Client[]> => {
     const { data, error } = await supabase
       .from('clients')
       .select('*')
@@ -62,7 +62,7 @@ export const clientService = {
     return (data || []).map(toClient);
   },
   
-  async getById(id: string): Promise<Client | null> {
+  getById: async (id: string): Promise<Client | null> => {
     const { data, error } = await supabase
       .from('clients')
       .select('*')
@@ -80,7 +80,7 @@ export const clientService = {
     return data ? toClient(data) : null;
   },
   
-  async create(client: Omit<Client, 'id' | 'projets'>): Promise<Client> {
+  create: async (client: Omit<Client, 'id' | 'projets'>): Promise<Client> => {
     const { data, error } = await supabase
       .from('clients')
       .insert(toClientInsert(client))
@@ -95,7 +95,7 @@ export const clientService = {
     return toClient(data);
   },
   
-  async update(id: string, client: Partial<Omit<Client, 'id' | 'projets'>>): Promise<Client> {
+  update: async (id: string, client: Partial<Omit<Client, 'id' | 'projets'>>): Promise<Client> => {
     const { data, error } = await supabase
       .from('clients')
       .update(toClientUpdate(client))
@@ -111,7 +111,7 @@ export const clientService = {
     return toClient(data);
   },
   
-  async delete(id: string): Promise<void> {
+  delete: async (id: string): Promise<void> => {
     const { error } = await supabase
       .from('clients')
       .delete()

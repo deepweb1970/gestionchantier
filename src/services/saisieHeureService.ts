@@ -61,7 +61,7 @@ const toSaisieHeureUpdate = (saisie: Partial<SimpleSaisieHeure>): SaisieHeureUpd
 };
 
 export const saisieHeureService = {
-  async getAll(): Promise<SaisieHeure[]> {
+  getAll: async (): Promise<SaisieHeure[]> => {
     const { data, error } = await supabase
       .from('saisies_heures')
       .select(`
@@ -80,7 +80,7 @@ export const saisieHeureService = {
     return (data || []).map(toSaisieHeure);
   },
   
-  async getById(id: string): Promise<SaisieHeure | null> {
+  getById: async (id: string): Promise<SaisieHeure | null> => {
     const { data, error } = await supabase
       .from('saisies_heures')
       .select(`
@@ -103,7 +103,7 @@ export const saisieHeureService = {
     return data ? toSaisieHeure(data) : null;
   },
   
-  async create(saisie: SimpleSaisieHeure): Promise<SaisieHeure> {
+  create: async (saisie: SimpleSaisieHeure): Promise<SaisieHeure> => {
     const { data, error } = await supabase
       .from('saisies_heures')
       .insert(toSaisieHeureInsert(saisie))
@@ -118,7 +118,7 @@ export const saisieHeureService = {
     return toSaisieHeure(data);
   },
   
-  async update(id: string, saisie: Partial<SimpleSaisieHeure>): Promise<SaisieHeure> {
+  update: async (id: string, saisie: Partial<SimpleSaisieHeure>): Promise<SaisieHeure> => {
     const { data, error } = await supabase
       .from('saisies_heures')
       .update(toSaisieHeureUpdate(saisie))
@@ -134,7 +134,7 @@ export const saisieHeureService = {
     return toSaisieHeure(data);
   },
   
-  async delete(id: string): Promise<void> {
+  delete: async (id: string): Promise<void> => {
     const { error } = await supabase
       .from('saisies_heures')
       .delete()
@@ -146,7 +146,7 @@ export const saisieHeureService = {
     }
   },
   
-  async validateMany(ids: string[]): Promise<void> {
+  validateMany: async (ids: string[]): Promise<void> => {
     const { error } = await supabase
       .from('saisies_heures')
       .update({ valide: true })
@@ -158,7 +158,7 @@ export const saisieHeureService = {
     }
   },
   
-  async getByOuvrier(ouvrierId: string): Promise<SaisieHeure[]> {
+  getByOuvrier: async (ouvrierId: string): Promise<SaisieHeure[]> => {
     const { data, error } = await supabase
       .from('saisies_heures')
       .select(`
@@ -178,7 +178,7 @@ export const saisieHeureService = {
     return (data || []).map(toSaisieHeure);
   },
   
-  async getByChantier(chantierId: string): Promise<SaisieHeure[]> {
+  getByChantier: async (chantierId: string): Promise<SaisieHeure[]> => {
     const { data, error } = await supabase
       .from('saisies_heures')
       .select(`

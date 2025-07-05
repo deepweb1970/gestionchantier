@@ -1,37 +1,34 @@
 import React, { useState } from 'react';
 import { Plus, Edit, Trash2, Clock, Download, Filter, Search, Calendar, CheckCircle, X, User, Building2, Wrench, AlertTriangle, FileText, Check } from 'lucide-react';
-import { useSupabase } from '../../hooks/useSupabase';
+import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
 import { saisieHeureService } from '../../services/saisieHeureService';
+import { ouvrierService } from '../../services/ouvrierService';
+import { chantierService } from '../../services/chantierService';
+import { materielService } from '../../services/materielService';
 import { SaisieHeure, Ouvrier, Chantier, Materiel, SimpleSaisieHeure } from '../../types';
 import { Modal } from '../Common/Modal';
 import { Button } from '../Common/Button';
 import { ExportModal } from '../Common/ExportModal';
 
 export const SaisieHeures: React.FC = () => {
-  const { data: saisies, loading: saisiesLoading, error: saisiesError, refresh: refreshSaisies } = useSupabase<SaisieHeure>({
+  const { data: saisies, loading: saisiesLoading, error: saisiesError, refresh: refreshSaisies } = useRealtimeSupabase<SaisieHeure>({
     table: 'saisies_heures',
-    columns: `
-      *,
-      ouvriers(id, nom, prenom, qualification),
-      chantiers(id, nom),
-      materiel(id, nom, marque, modele)
-    `,
-    orderBy: { column: 'date', ascending: false }
+    fetchFunction: saisieHeureService.getAll
   });
   
-  const { data: ouvriers, loading: ouvriersLoading } = useSupabase<Ouvrier>({
+  const { data: ouvriers, loading: ouvriersLoading } = useRealtimeSupabase<Ouvrier>({
     table: 'ouvriers',
-    orderBy: { column: 'nom' }
+    fetchFunction: ouvrierService.getAll
   });
   
-  const { data: chantiers, loading: chantiersLoading } = useSupabase<Chantier>({
+  const { data: chantiers, loading: chantiersLoading } = useRealtimeSupabase<Chantier>({
     table: 'chantiers',
-    orderBy: { column: 'nom' }
+    fetchFunction: chantierService.getAll
   });
   
-  const { data: materiel, loading: materielLoading } = useSupabase<Materiel>({
+  const { data: materiel, loading: materielLoading } = useRealtimeSupabase<Materiel>({
     table: 'materiel',
-    orderBy: { column: 'nom' }
+    fetchFunction: materielService.getAll
   });
   
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -181,11 +178,13 @@ export const SaisieHeures: React.FC = () => {
 
     try {
       if (editingSaisie) {
-        await saisieHeureService.update(editingSaisie.id, saisieData);
+        const updatedSaisie = await saisieHeureService.update(editingSaisie.id, saisieData);
+        console.log('Saisie mise à jour:', updatedSaisie);
       } else {
-        await saisieHeureService.create(saisieData);
+        const newSaisie = await saisieHeureService.create(saisieData);
+        console.log('Nouvelle saisie créée:', newSaisie);
       }
-      refreshSaisies();
+      // Le refresh est automatique grâce à l'abonnement en temps réel
       setIsModalOpen(false);
       setEditingSaisie(null);
     } catch (error) {
@@ -206,7 +205,7 @@ export const SaisieHeures: React.FC = () => {
   const confirmValidation = async () => {
     try {
       await saisieHeureService.validateMany(selectedSaisies);
-      refreshSaisies();
+      // Le refresh est automatique grâce à l'abonnement en temps réel
       setIsValidationModalOpen(false);
       setSelectedSaisies([]);
     } catch (error) {
@@ -731,7 +730,7 @@ export const SaisieHeures: React.FC = () => {
             {filteredSaisies.length === 0 && !saisiesLoading && (
               <tfoot>
                 <tr>
-                  <td colSpan={8} className="px-6 py-10 text-center text-gray-500">
+                  <td colSpan={8} className="px-6 py-10 text-center text-gray-500 bg-gray-50">
                     Aucune saisie d'heures trouvée
                   </td>
                 </tr>

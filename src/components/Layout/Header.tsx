@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Menu, Bell, User, Search, Database, History, Download } from 'lucide-react';
+import { Menu, Bell, User, Search, Database, History, Download, Wifi, WifiOff } from 'lucide-react';
 import { GlobalSearch } from '../Common/GlobalSearch';
 import { NotificationCenter } from '../Common/NotificationCenter';
 import { BackupSystem } from '../Common/BackupSystem';
@@ -12,6 +12,7 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ onMenuToggle, onNavigate }) => {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [isBackupOpen, setIsBackupOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -24,6 +25,20 @@ export const Header: React.FC<HeaderProps> = ({ onMenuToggle, onNavigate }) => {
     }
   };
 
+  // Gestion du statut en ligne/hors ligne
+  React.useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
   const handleNavigate = (section: string, id?: string) => {
     if (onNavigate) {
       onNavigate(section, id);
@@ -32,7 +47,16 @@ export const Header: React.FC<HeaderProps> = ({ onMenuToggle, onNavigate }) => {
 
   return (
     <>
+      {/* Indicateur de statut en ligne/hors ligne */}
+      {!isOnline && (
+        <div className="bg-red-500 text-white text-center py-2 text-sm">
+          Mode hors ligne - Les modifications seront synchronisées lors de la reconnexion
+        </div>
+      )}
+
       <header className="bg-white shadow-sm border-b px-4 py-3" onKeyDown={handleKeyDown}>
+        
+
         <div className="flex items-center justify-between">
           <div className="flex items-center">
             <button
@@ -58,6 +82,13 @@ export const Header: React.FC<HeaderProps> = ({ onMenuToggle, onNavigate }) => {
           </div>
           
           <div className="flex items-center space-x-2">
+            {/* Indicateur de connexion */}
+            <div className="mr-2">
+              {isOnline ? 
+                <Wifi className="w-5 h-5 text-green-500" title="Connecté" /> : 
+                <WifiOff className="w-5 h-5 text-red-500" title="Déconnecté" />
+              }
+            </div>
             {/* Bouton Historique */}
             <button 
               onClick={() => setIsHistoryOpen(true)}

@@ -71,7 +71,7 @@ const toFactureItemInsert = (item: Omit<FactureItem, 'id'>, factureId: string): 
 });
 
 export const factureService = {
-  async getAll(): Promise<Facture[]> {
+  getAll: async (): Promise<Facture[]> => {
     // Récupérer les factures avec les items
     const { data, error } = await supabase
       .from('factures')
@@ -98,7 +98,7 @@ export const factureService = {
     });
   },
   
-  async getById(id: string): Promise<Facture | null> {
+  getById: async (id: string): Promise<Facture | null> => {
     const { data, error } = await supabase
       .from('factures')
       .select(`
@@ -128,7 +128,7 @@ export const factureService = {
     return facture;
   },
   
-  async create(facture: Omit<Facture, 'id'>, items: Omit<FactureItem, 'id'>[]): Promise<Facture> {
+  create: async (facture: Omit<Facture, 'id'>, items: Omit<FactureItem, 'id'>[]): Promise<Facture> => {
     // Créer la facture
     const { data: factureData, error: factureError } = await supabase
       .from('factures')
@@ -161,7 +161,7 @@ export const factureService = {
     return this.getById(factureData.id) as Promise<Facture>;
   },
   
-  async update(id: string, facture: Partial<Omit<Facture, 'id' | 'items'>>): Promise<Facture> {
+  update: async (id: string, facture: Partial<Omit<Facture, 'id' | 'items'>>): Promise<Facture> => {
     const { data, error } = await supabase
       .from('factures')
       .update(toFactureUpdate(facture))
@@ -178,7 +178,7 @@ export const factureService = {
     return this.getById(data.id) as Promise<Facture>;
   },
   
-  async delete(id: string): Promise<void> {
+  delete: async (id: string): Promise<void> => {
     // Les items seront supprimés automatiquement grâce à la contrainte ON DELETE CASCADE
     const { error } = await supabase
       .from('factures')
@@ -192,7 +192,7 @@ export const factureService = {
   },
   
   // Méthodes pour les items de facture
-  async addItem(factureId: string, item: Omit<FactureItem, 'id'>): Promise<FactureItem> {
+  addItem: async (factureId: string, item: Omit<FactureItem, 'id'>): Promise<FactureItem> => {
     const { data, error } = await supabase
       .from('facture_items')
       .insert(toFactureItemInsert(item, factureId))
@@ -207,7 +207,7 @@ export const factureService = {
     return toFactureItem(data);
   },
   
-  async updateItem(itemId: string, updates: Partial<Omit<FactureItem, 'id'>>): Promise<FactureItem> {
+  updateItem: async (itemId: string, updates: Partial<Omit<FactureItem, 'id'>>): Promise<FactureItem> => {
     const updateData: any = {};
     
     if (updates.description !== undefined) updateData.description = updates.description;
@@ -230,7 +230,7 @@ export const factureService = {
     return toFactureItem(data);
   },
   
-  async deleteItem(itemId: string): Promise<void> {
+  deleteItem: async (itemId: string): Promise<void> => {
     const { error } = await supabase
       .from('facture_items')
       .delete()
@@ -242,7 +242,7 @@ export const factureService = {
     }
   },
   
-  async getByClient(clientId: string): Promise<Facture[]> {
+  getByClient: async (clientId: string): Promise<Facture[]> => {
     const { data, error } = await supabase
       .from('factures')
       .select(`
@@ -269,7 +269,7 @@ export const factureService = {
     });
   },
   
-  async getByChantier(chantierId: string): Promise<Facture[]> {
+  getByChantier: async (chantierId: string): Promise<Facture[]> => {
     const { data, error } = await supabase
       .from('factures')
       .select(`
@@ -296,7 +296,7 @@ export const factureService = {
     });
   },
   
-  async getByStatut(statut: Facture['statut']): Promise<Facture[]> {
+  getByStatut: async (statut: Facture['statut']): Promise<Facture[]> => {
     const { data, error } = await supabase
       .from('factures')
       .select(`
