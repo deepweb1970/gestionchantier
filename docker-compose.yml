@@ -1,0 +1,94 @@
+version: '3.8'
+
+services:
+  # Application principale
+  app:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: gestion-chantier-app
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+    volumes:
+      - ./dist:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - app-network
+    depends_on:
+      - nginx-proxy
+
+  # Reverse proxy avec SSL automatique
+  nginx-proxy:
+    image: nginxproxymanager/nginx-proxy-manager:latest
+    container_name: nginx-proxy-manager
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "81:81"  # Interface d'administration
+    volumes:
+      - ./data/nginx-proxy:/data
+      - ./data/letsencrypt:/etc/letsencrypt
+    networks:
+      - app-network
+    environment:
+      - DISABLE_IPV6=true
+
+  # Monitoring avec Portainer (optionnel)
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./data/portainer:/data
+    networks:
+      - app-network
+
+  # Monitoring système avec Netdata (optionnel)
+  netdata:
+    image: netdata/netdata:latest
+    container_name: netdata
+    restart: unless-stopped
+    ports:
+      - "19999:19999"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - apparmor:unconfined
+    networks:
+      - app-network
+
+  # Sauvegarde automatique
+  backup:
+    image: alpine:latest
+    container_name: backup-service
+    restart: unless-stopped
+    volumes:
+      - ./:/app:ro
+      - ./backups:/backups
+    networks:
+      - app-network
+    command: >
+      sh -c "
+        apk add --no-cache dcron &&
+        echo '0 2 * * * cd /app && tar -czf /backups/backup_$$(date +%Y%m%d_%H%M%S).tar.gz dist data' > /etc/crontabs/root &&
+        echo '0 3 * * 0 find /backups -name \"backup_*.tar.gz\" -mtime +7 -delete' >> /etc/crontabs/root &&
+        crond -f
+      "
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  nginx-proxy-data:
+  letsencrypt-data:
+  portainer-data:
