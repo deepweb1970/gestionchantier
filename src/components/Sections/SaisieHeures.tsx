@@ -45,6 +45,22 @@ export const SaisieHeures: React.FC = () => {
   const [dateFilter, setDateFilter] = useState('all');
   const [validationFilter, setValidationFilter] = useState('all');
 
+  const getOuvrier = (ouvrierId: string): Ouvrier | undefined => {
+    if (!ouvriers) return undefined;
+    return ouvriers.find(o => o.id === ouvrierId);
+  };
+
+  const getChantier = (chantierId: string): Chantier | undefined => {
+    if (!chantiers) return undefined;
+    return chantiers.find(c => c.id === chantierId);
+  };
+
+  const getMateriel = (materielId?: string): Materiel | undefined => {
+    if (!materielId) return undefined;
+    if (!materiel) return undefined;
+    return materiel.find(m => m.id === materielId);
+  };
+
   const filteredSaisies = (saisies || []).filter(saisie => {
     const ouvrier = getOuvrier(saisie.ouvrierId);
     const chantier = getChantier(saisie.chantierId);
@@ -82,22 +98,6 @@ export const SaisieHeures: React.FC = () => {
     
     return matchesSearch && matchesOuvrier && matchesChantier && matchesDate && matchesValidation;
   });
-
-  const getOuvrier = (ouvrierId: string): Ouvrier | undefined => {
-    if (!ouvriers) return undefined;
-    return ouvriers.find(o => o.id === ouvrierId);
-  };
-
-  const getChantier = (chantierId: string): Chantier | undefined => {
-    if (!chantiers) return undefined;
-    return chantiers.find(c => c.id === chantierId);
-  };
-
-  const getMateriel = (materielId?: string): Materiel | undefined => {
-    if (!materielId) return undefined;
-    if (!materiel) return undefined;
-    return materiel.find(m => m.id === materielId);
-  };
 
   const calculateHours = (heureDebut: string, heureFin: string): number => {
     const [debutHours, debutMinutes] = heureDebut.split(':').map(Number);
