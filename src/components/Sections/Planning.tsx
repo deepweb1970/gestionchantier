@@ -235,6 +235,11 @@ export const Planning: React.FC = () => {
     setIsModalOpen(false);
     setEditingEvent(null);
     setSelectedDate(null);
+    
+    // Force refresh of the UI
+    setTimeout(() => {
+      setEvents([...events]);
+    }, 100);
   };
 
   const duplicateEvent = (event: PlanningEvent) => {
@@ -244,6 +249,11 @@ export const Planning: React.FC = () => {
       titre: `${event.titre} (Copie)`
     };
     setEvents([...events, newEvent]);
+    
+    // Force refresh of the UI
+    setTimeout(() => {
+      setEvents([...events]);
+    }, 100);
   };
 
   const bulkDelete = () => {

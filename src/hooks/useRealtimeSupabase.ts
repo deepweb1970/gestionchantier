@@ -64,6 +64,11 @@ export function useRealtimeSupabase<T>({
         console.log(`Suppression dans ${table}, rechargement des données`);
         fetchData();
       })
+      // Listen for form refresh events
+      .on('broadcast', { event: 'form_refresh' }, () => {
+        console.log(`Événement de rafraîchissement reçu pour ${table}`);
+        fetchData();
+      })
       .subscribe();
 
     setChannel(realtimeChannel);

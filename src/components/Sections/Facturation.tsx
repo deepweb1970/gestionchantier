@@ -175,6 +175,11 @@ export const Facturation: React.FC = () => {
     setIsModalOpen(false);
     setEditingFacture(null);
     setItems([]);
+    
+    // Force refresh of the UI
+    setTimeout(() => {
+      setFactures([...factures]);
+    }, 100);
   };
 
   const markAsPaid = () => {
@@ -187,6 +192,11 @@ export const Facturation: React.FC = () => {
     ));
     setIsPaymentModalOpen(false);
     setSelectedFacture(null);
+    
+    // Force refresh of the UI
+    setTimeout(() => {
+      setFactures([...factures]);
+    }, 100);
   };
 
   const getOverdueInvoices = () => {

@@ -66,6 +66,8 @@ export const MaterielSection: React.FC = () => {
     if (confirm('Êtes-vous sûr de vouloir supprimer ce matériel ?')) {
       try {
         await materielService.delete(id);
+        // Force refresh immediately
+        refresh();
         refresh();
       } catch (error) {
         console.error('Erreur lors de la suppression:', error);
@@ -97,6 +99,10 @@ export const MaterielSection: React.FC = () => {
         const newMateriel = await materielService.create(materielData);
         console.log('Nouveau matériel créé:', newMateriel);
       }
+      
+      // Force refresh immediately
+      refresh();
+      
       // Le refresh est automatique grâce à l'abonnement en temps réel
       setIsModalOpen(false);
       setEditingMateriel(null);

@@ -32,6 +32,8 @@ export const Ouvriers: React.FC = () => {
     if (confirm('Êtes-vous sûr de vouloir supprimer cet ouvrier ?')) {
       try {
         await ouvrierService.delete(id);
+        // Force refresh immediately
+        refresh();
         refresh();
       } catch (error) {
         console.error('Erreur lors de la suppression:', error);
@@ -62,6 +64,10 @@ export const Ouvriers: React.FC = () => {
         const newOuvrier = await ouvrierService.create(ouvrierData);
         console.log('Nouvel ouvrier créé:', newOuvrier);
       }
+      
+      // Force refresh immediately
+      refresh();
+      
       // Le refresh est automatique grâce à l'abonnement en temps réel
       setIsModalOpen(false);
       setEditingOuvrier(null);

@@ -10,10 +10,9 @@ import { Modal } from '../Common/Modal';
 import { Button } from '../Common/Button';
 import { ExportModal } from '../Common/ExportModal';
 import { PointageDigital } from './PointageDigital';
-import { useState as usePointageState } from 'react';
 
 export const SaisieHeures: React.FC = () => {
-  const [showPointageDigital, setShowPointageDigital] = usePointageState(false);
+  const [showPointageDigital, setShowPointageDigital] = useState(false);
   const { data: saisies, loading: saisiesLoading, error: saisiesError, refresh: refreshSaisies } = useRealtimeSupabase<SaisieHeure>({
     table: 'saisies_heures',
     fetchFunction: saisieHeureService.getAll
@@ -166,6 +165,8 @@ export const SaisieHeures: React.FC = () => {
     if (confirm('Êtes-vous sûr de vouloir supprimer cette saisie d\'heures ?')) {
       try {
         await saisieHeureService.delete(id);
+        // Refresh data immediately
+        refreshSaisies();
         refreshSaisies();
       } catch (error) {
         console.error('Erreur lors de la suppression:', error);
@@ -200,6 +201,9 @@ export const SaisieHeures: React.FC = () => {
         const newSaisie = await saisieHeureService.create(saisieData);
         console.log('Nouvelle saisie créée:', newSaisie);
       }
+      
+      // Refresh data immediately
+      refreshSaisies();
       // Le refresh est automatique grâce à l'abonnement en temps réel
       setIsModalOpen(false);
       setEditingSaisie(null);
@@ -221,6 +225,8 @@ export const SaisieHeures: React.FC = () => {
   const confirmValidation = async () => {
     try {
       await saisieHeureService.validateMany(selectedSaisies);
+      // Refresh data immediately
+      refreshSaisies();
       // Le refresh est automatique grâce à l'abonnement en temps réel
       setIsValidationModalOpen(false);
       setSelectedSaisies([]);

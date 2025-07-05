@@ -83,6 +83,8 @@ export const Clients: React.FC = () => {
     if (confirm('Êtes-vous sûr de vouloir supprimer ce client ?')) {
       try {
         await clientService.delete(id);
+        // Force refresh immediately
+        refresh();
         refresh();
       } catch (error) {
         console.error('Erreur lors de la suppression:', error);
@@ -111,6 +113,10 @@ export const Clients: React.FC = () => {
         const newClient = await clientService.create(clientData);
         console.log('Nouveau client créé:', newClient);
       }
+      
+      // Force refresh immediately
+      refresh();
+      
       // Le refresh est automatique grâce à l'abonnement en temps réel
       setIsModalOpen(false);
       setEditingClient(null);
