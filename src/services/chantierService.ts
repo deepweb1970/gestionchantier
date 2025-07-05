@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase';
 import type { Chantier, Photo } from '../types';
 import type { Database } from '../types/supabase';
+import { clientService } from './clientService';
 
 type ChantierRow = Database['public']['Tables']['chantiers']['Row'];
 type ChantierInsert = Database['public']['Tables']['chantiers']['Insert'];
@@ -141,7 +142,7 @@ export const chantierService = {
     return chantier;
   },
   
-  create: async (chantier: Omit<Chantier, 'id' | 'photos'>, clientId: string): Promise<Chantier> => {
+  create: async (chantier: Omit<Chantier, 'id' | 'client' | 'photos'>, clientId: string): Promise<Chantier> => {
     const { data, error } = await supabase
       .from('chantiers')
       .insert(toChantierInsert(chantier, clientId))
@@ -156,7 +157,7 @@ export const chantierService = {
     return toChantier(data);
   },
   
-  update: async (id: string, chantier: Partial<Omit<Chantier, 'id' | 'photos'>>, clientId?: string): Promise<Chantier> => {
+  update: async (id: string, chantier: Partial<Omit<Chantier, 'id' | 'client' | 'photos'>>, clientId?: string): Promise<Chantier> => {
     const { data, error } = await supabase
       .from('chantiers')
       .update(toChantierUpdate(chantier, clientId))
