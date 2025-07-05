@@ -1,18 +1,24 @@
 import React, { useState } from 'react';
 import { Plus, Edit, Trash2, User, Phone, Mail, Download } from 'lucide-react';
-import { mockOuvriers } from '../../data/mockData';
+import { useSupabase } from '../../hooks/useSupabase';
+import { ouvrierService } from '../../services/ouvrierService';
 import { Ouvrier } from '../../types';
 import { Modal } from '../Common/Modal';
 import { Button } from '../Common/Button';
 import { StatusBadge } from '../Common/StatusBadge';
 
 export const Ouvriers: React.FC = () => {
-  const [ouvriers, setOuvriers] = useState<Ouvrier[]>(mockOuvriers);
+  const { data: ouvriers, loading, error, refresh } = useSupabase<Ouvrier>({
+    table: 'ouvriers',
+    columns: '*',
+    orderBy: { column: 'nom' }
+  });
+  
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingOuvrier, setEditingOuvrier] = useState<Ouvrier | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const filteredOuvriers = ouvriers.filter(ouvrier =>
+  const filteredOuvriers = (ouvriers || []).filter(ouvrier =>
     ouvrier.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
     ouvrier.prenom.toLowerCase().includes(searchTerm.toLowerCase()) ||
     ouvrier.qualification.toLowerCase().includes(searchTerm.toLowerCase())
@@ -23,15 +29,20 @@ export const Ouvriers: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Êtes-vous sûr de vouloir supprimer cet ouvrier ?')) {
-      setOuvriers(ouvriers.filter(o => o.id !== id));
+      try {
+        await ouvrierService.delete(id);
+        refresh();
+      } catch (error) {
+        console.error('Erreur lors de la suppression:', error);
+        alert('Erreur lors de la suppression de l\'ouvrier');
+      }
     }
   };
 
-  const handleSave = (formData: FormData) => {
+  const handleSave = async (formData: FormData) => {
     const ouvrierData = {
-      id: editingOuvrier?.id || Date.now().toString(),
       nom: formData.get('nom') as string,
       prenom: formData.get('prenom') as string,
       email: formData.get('email') as string,
@@ -41,18 +52,22 @@ export const Ouvriers: React.FC = () => {
       dateEmbauche: formData.get('dateEmbauche') as string,
       statut: formData.get('statut') as Ouvrier['statut'],
       tauxHoraire: parseInt(formData.get('tauxHoraire') as string),
-      adresse: formData.get('adresse') as string,
-      documents: editingOuvrier?.documents || [],
+      adresse: formData.get('adresse') as string
     };
 
-    if (editingOuvrier) {
-      setOuvriers(ouvriers.map(o => o.id === editingOuvrier.id ? ouvrierData : o));
-    } else {
-      setOuvriers([...ouvriers, ouvrierData]);
+    try {
+      if (editingOuvrier) {
+        await ouvrierService.update(editingOuvrier.id, ouvrierData);
+      } else {
+        await ouvrierService.create(ouvrierData);
+      }
+      refresh();
+      setIsModalOpen(false);
+      setEditingOuvrier(null);
+    } catch (error) {
+      console.error('Erreur lors de l\'enregistrement:', error);
+      alert('Erreur lors de l\'enregistrement de l\'ouvrier');
     }
-    
-    setIsModalOpen(false);
-    setEditingOuvrier(null);
   };
 
   const OuvrierForm = () => (
@@ -205,103 +220,126 @@ export const Ouvriers: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-lg shadow-sm border">
-        <div className="p-4 border-b">
-          <input
-            type="text"
-            placeholder="Rechercher un ouvrier..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
+        {loading ? (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Chargement des données...</p>
+          </div>
+        ) : error ? (
+          <div className="text-center py-8 text-red-500">
+            <p>Erreur lors du chargement des données</p>
+            <p className="text-sm">{error.message}</p>
+          </div>
+        ) : (
+          <>
+            <div className="p-4 border-b">
+              <input
+                type="text"
+                placeholder="Rechercher un ouvrier..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Ouvrier
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Contact
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Qualification
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Statut
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Taux horaire
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredOuvriers.map((ouvrier) => (
-                <tr key={ouvrier.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0 h-10 w-10">
-                        <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center">
-                          <User className="h-5 w-5 text-white" />
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Ouvrier
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Contact
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Qualification
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Statut
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Taux horaire
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredOuvriers.map((ouvrier) => (
+                    <tr key={ouvrier.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0 h-10 w-10">
+                            <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center">
+                              <User className="h-5 w-5 text-white" />
+                            </div>
+                          </div>
+                          <div className="ml-4">
+                            <div className="text-sm font-medium text-gray-900">
+                              {ouvrier.prenom} {ouvrier.nom}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              Embauché le {new Date(ouvrier.dateEmbauche).toLocaleDateString()}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                      <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">
-                          {ouvrier.prenom} {ouvrier.nom}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <div className="flex items-center space-x-2">
+                          <Mail className="w-4 h-4 text-gray-400" />
+                          <span>{ouvrier.email}</span>
                         </div>
+                        <div className="flex items-center space-x-2 mt-1">
+                          <Phone className="w-4 h-4 text-gray-400" />
+                          <span>{ouvrier.telephone}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{ouvrier.qualification}</div>
                         <div className="text-sm text-gray-500">
-                          Embauché le {new Date(ouvrier.dateEmbauche).toLocaleDateString()}
+                          {ouvrier.certifications.length} certification(s)
                         </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <div className="flex items-center space-x-2">
-                      <Mail className="w-4 h-4 text-gray-400" />
-                      <span>{ouvrier.email}</span>
-                    </div>
-                    <div className="flex items-center space-x-2 mt-1">
-                      <Phone className="w-4 h-4 text-gray-400" />
-                      <span>{ouvrier.telephone}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{ouvrier.qualification}</div>
-                    <div className="text-sm text-gray-500">
-                      {ouvrier.certifications.length} certification(s)
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <StatusBadge status={ouvrier.statut} type="ouvrier" />
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {ouvrier.tauxHoraire} €/h
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => handleEdit(ouvrier)}
-                        className="text-blue-600 hover:text-blue-900"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(ouvrier.id)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <StatusBadge status={ouvrier.statut} type="ouvrier" />
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {ouvrier.tauxHoraire} €/h
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => handleEdit(ouvrier)}
+                            className="text-blue-600 hover:text-blue-900"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(ouvrier.id)}
+                            className="text-red-600 hover:text-red-900"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                {filteredOuvriers.length === 0 && (
+                  <tfoot>
+                    <tr>
+                      <td colSpan={6} className="px-6 py-10 text-center text-gray-500">
+                        Aucun ouvrier trouvé
+                      </td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+          </>
+        )}
       </div>
 
       <Modal
@@ -313,7 +351,7 @@ export const Ouvriers: React.FC = () => {
         title={editingOuvrier ? 'Modifier l\'ouvrier' : 'Nouvel ouvrier'}
         size="lg"
       >
-        <OuvrierForm />
+        {!loading && <OuvrierForm />}
       </Modal>
     </div>
   );

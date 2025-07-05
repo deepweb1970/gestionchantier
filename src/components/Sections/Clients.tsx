@@ -1,13 +1,32 @@
 import React, { useState } from 'react';
 import { Plus, Edit, Trash2, User, Building, Phone, Mail, FileText, MessageSquare, Calendar, Download, Filter, Search, Eye, Send } from 'lucide-react';
-import { mockClients, mockChantiers, mockFactures } from '../../data/mockData';
+import { useSupabase } from '../../hooks/useSupabase';
+import { clientService } from '../../services/clientService';
+import { chantierService } from '../../services/chantierService';
+import { factureService } from '../../services/factureService';
 import { Client, Chantier, Facture } from '../../types';
 import { Modal } from '../Common/Modal';
 import { Button } from '../Common/Button';
 import { StatusBadge } from '../Common/StatusBadge';
 
 export const Clients: React.FC = () => {
-  const [clients, setClients] = useState<Client[]>(mockClients);
+  const { data: clients, loading, error, refresh } = useSupabase<Client>({
+    table: 'clients',
+    orderBy: { column: 'nom' }
+  });
+  
+  const { data: chantiers } = useSupabase<Chantier>({
+    table: 'chantiers',
+    columns: '*',
+    orderBy: { column: 'nom' }
+  });
+  
+  const { data: factures } = useSupabase<Facture>({
+    table: 'factures',
+    columns: '*',
+    orderBy: { column: 'date_emission', ascending: false }
+  });
+  
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isCommunicationModalOpen, setIsCommunicationModalOpen] = useState(false);
@@ -39,7 +58,7 @@ export const Clients: React.FC = () => {
     }
   ]);
 
-  const filteredClients = clients.filter(client => {
+  const filteredClients = (clients || []).filter(client => {
     const matchesSearch = client.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          client.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          client.contactPrincipal.toLowerCase().includes(searchTerm.toLowerCase());
@@ -62,15 +81,20 @@ export const Clients: React.FC = () => {
     setIsCommunicationModalOpen(true);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Êtes-vous sûr de vouloir supprimer ce client ?')) {
-      setClients(clients.filter(c => c.id !== id));
+      try {
+        await clientService.delete(id);
+        refresh();
+      } catch (error) {
+        console.error('Erreur lors de la suppression:', error);
+        alert('Erreur lors de la suppression du client');
+      }
     }
   };
 
-  const handleSave = (formData: FormData) => {
+  const handleSave = async (formData: FormData) => {
     const clientData = {
-      id: editingClient?.id || Date.now().toString(),
       nom: formData.get('nom') as string,
       type: formData.get('type') as Client['type'],
       email: formData.get('email') as string,
@@ -78,18 +102,22 @@ export const Clients: React.FC = () => {
       adresse: formData.get('adresse') as string,
       siret: formData.get('siret') as string || undefined,
       contactPrincipal: formData.get('contactPrincipal') as string,
-      notes: formData.get('notes') as string,
-      projets: editingClient?.projets || [],
+      notes: formData.get('notes') as string
     };
 
-    if (editingClient) {
-      setClients(clients.map(c => c.id === editingClient.id ? clientData : c));
-    } else {
-      setClients([...clients, clientData]);
+    try {
+      if (editingClient) {
+        await clientService.update(editingClient.id, clientData);
+      } else {
+        await clientService.create(clientData);
+      }
+      refresh();
+      setIsModalOpen(false);
+      setEditingClient(null);
+    } catch (error) {
+      console.error('Erreur lors de l\'enregistrement:', error);
+      alert('Erreur lors de l\'enregistrement du client');
     }
-    
-    setIsModalOpen(false);
-    setEditingClient(null);
   };
 
   const handleSendMessage = () => {
@@ -111,11 +139,13 @@ export const Clients: React.FC = () => {
   };
 
   const getClientProjects = (clientId: string): Chantier[] => {
-    return mockChantiers.filter(chantier => chantier.client === clients.find(c => c.id === clientId)?.nom);
+    if (!chantiers) return [];
+    return chantiers.filter(chantier => chantier.client_id === clientId);
   };
 
   const getClientInvoices = (clientId: string): Facture[] => {
-    return mockFactures.filter(facture => facture.clientId === clientId);
+    if (!factures) return [];
+    return factures.filter(facture => facture.client_id === clientId);
   };
 
   const getClientCommunications = (clientId: string) => {
@@ -448,140 +478,163 @@ export const Clients: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-lg shadow-sm border">
-        <div className="p-4 border-b">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <input
-                type="text"
-                placeholder="Rechercher un client..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div className="flex items-center space-x-2">
-              <Filter className="w-4 h-4 text-gray-500" />
-              <select
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="all">Tous les types</option>
-                <option value="particulier">Particuliers</option>
-                <option value="entreprise">Entreprises</option>
-              </select>
-            </div>
+        {loading ? (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Chargement des données...</p>
           </div>
-        </div>
+        ) : error ? (
+          <div className="text-center py-8 text-red-500">
+            <p>Erreur lors du chargement des données</p>
+            <p className="text-sm">{error.message}</p>
+          </div>
+        ) : (
+          <>
+            <div className="p-4 border-b">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <input
+                    type="text"
+                    placeholder="Rechercher un client..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Filter className="w-4 h-4 text-gray-500" />
+                  <select
+                    value={typeFilter}
+                    onChange={(e) => setTypeFilter(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="all">Tous les types</option>
+                    <option value="particulier">Particuliers</option>
+                    <option value="entreprise">Entreprises</option>
+                  </select>
+                </div>
+              </div>
+            </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Client
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Contact
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Type
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Projets
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredClients.map((client) => {
-                const projects = getClientProjects(client.id);
-                return (
-                  <tr key={client.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0 h-10 w-10">
-                          <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                            client.type === 'entreprise' ? 'bg-purple-500' : 'bg-blue-500'
-                          }`}>
-                            {client.type === 'entreprise' ? 
-                              <Building className="h-5 w-5 text-white" /> : 
-                              <User className="h-5 w-5 text-white" />
-                            }
-                          </div>
-                        </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">{client.nom}</div>
-                          <div className="text-sm text-gray-500">{client.contactPrincipal}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <div className="flex items-center space-x-2">
-                        <Mail className="w-4 h-4 text-gray-400" />
-                        <span>{client.email}</span>
-                      </div>
-                      <div className="flex items-center space-x-2 mt-1">
-                        <Phone className="w-4 h-4 text-gray-400" />
-                        <span>{client.telephone}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        client.type === 'entreprise' 
-                          ? 'bg-purple-100 text-purple-800' 
-                          : 'bg-blue-100 text-blue-800'
-                      }`}>
-                        {client.type === 'entreprise' ? 'Entreprise' : 'Particulier'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <div className="flex items-center">
-                        <span className="font-medium">{projects.length}</span>
-                        <span className="text-gray-500 ml-1">projet(s)</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => handleViewDetails(client)}
-                          className="text-green-600 hover:text-green-900"
-                          title="Voir détails"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleCommunication(client)}
-                          className="text-purple-600 hover:text-purple-900"
-                          title="Communication"
-                        >
-                          <MessageSquare className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleEdit(client)}
-                          className="text-blue-600 hover:text-blue-900"
-                          title="Modifier"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(client.id)}
-                          className="text-red-600 hover:text-red-900"
-                          title="Supprimer"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Client
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Contact
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Type
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Projets
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredClients.map((client) => {
+                    const projects = getClientProjects(client.id);
+                    return (
+                      <tr key={client.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0 h-10 w-10">
+                              <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                                client.type === 'entreprise' ? 'bg-purple-500' : 'bg-blue-500'
+                              }`}>
+                                {client.type === 'entreprise' ? 
+                                  <Building className="h-5 w-5 text-white" /> : 
+                                  <User className="h-5 w-5 text-white" />
+                                }
+                              </div>
+                            </div>
+                            <div className="ml-4">
+                              <div className="text-sm font-medium text-gray-900">{client.nom}</div>
+                              <div className="text-sm text-gray-500">{client.contactPrincipal}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          <div className="flex items-center space-x-2">
+                            <Mail className="w-4 h-4 text-gray-400" />
+                            <span>{client.email}</span>
+                          </div>
+                          <div className="flex items-center space-x-2 mt-1">
+                            <Phone className="w-4 h-4 text-gray-400" />
+                            <span>{client.telephone}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            client.type === 'entreprise' 
+                              ? 'bg-purple-100 text-purple-800' 
+                              : 'bg-blue-100 text-blue-800'
+                          }`}>
+                            {client.type === 'entreprise' ? 'Entreprise' : 'Particulier'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          <div className="flex items-center">
+                            <span className="font-medium">{projects.length}</span>
+                            <span className="text-gray-500 ml-1">projet(s)</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={() => handleViewDetails(client)}
+                              className="text-green-600 hover:text-green-900"
+                              title="Voir détails"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleCommunication(client)}
+                              className="text-purple-600 hover:text-purple-900"
+                              title="Communication"
+                            >
+                              <MessageSquare className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleEdit(client)}
+                              className="text-blue-600 hover:text-blue-900"
+                              title="Modifier"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(client.id)}
+                              className="text-red-600 hover:text-red-900"
+                              title="Supprimer"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                {filteredClients.length === 0 && (
+                  <tfoot>
+                    <tr>
+                      <td colSpan={5} className="px-6 py-10 text-center text-gray-500">
+                        Aucun client trouvé
+                      </td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Modal de création/modification */}
@@ -594,7 +647,7 @@ export const Clients: React.FC = () => {
         title={editingClient ? 'Modifier le client' : 'Nouveau client'}
         size="lg"
       >
-        <ClientForm />
+        {!loading && <ClientForm />}
       </Modal>
 
       {/* Modal de détails */}
@@ -607,7 +660,7 @@ export const Clients: React.FC = () => {
         title={`Détails - ${selectedClient?.nom}`}
         size="xl"
       >
-        <ClientDetailModal />
+        {selectedClient && <ClientDetailModal />}
       </Modal>
 
       {/* Modal de communication */}
@@ -621,7 +674,7 @@ export const Clients: React.FC = () => {
         title={`Communication - ${selectedClient?.nom}`}
         size="lg"
       >
-        <CommunicationModal />
+        {selectedClient && <CommunicationModal />}
       </Modal>
     </div>
   );

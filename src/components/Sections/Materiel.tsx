@@ -1,18 +1,34 @@
 import React, { useState } from 'react';
 import { Plus, Edit, Trash2, Wrench, Calendar, Download, Euro, Clock, TrendingUp, Calculator } from 'lucide-react';
-import { mockMateriel, mockSaisiesHeures, mockChantiers } from '../../data/mockData';
+import { useSupabase } from '../../hooks/useSupabase';
+import { materielService } from '../../services/materielService';
 import { Materiel } from '../../types';
 import { Modal } from '../Common/Modal';
 import { Button } from '../Common/Button';
 import { StatusBadge } from '../Common/StatusBadge';
 
 export const MaterielSection: React.FC = () => {
-  const [materiel, setMateriel] = useState<Materiel[]>(mockMateriel);
+  const { data: materiel, loading, error, refresh } = useSupabase<Materiel>({
+    table: 'materiel',
+    orderBy: { column: 'nom' }
+  });
+  
+  const { data: chantiers } = useSupabase({
+    table: 'chantiers',
+    columns: 'id, nom, client_id',
+    orderBy: { column: 'nom' }
+  });
+  
+  const { data: saisiesHeures } = useSupabase({
+    table: 'saisies_heures',
+    columns: 'id, materiel_id, heures_total, ouvrier_id',
+  });
+  
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMateriel, setEditingMateriel] = useState<Materiel | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const filteredMateriel = materiel.filter(item =>
+  const filteredMateriel = (materiel || []).filter(item =>
     item.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.marque.toLowerCase().includes(searchTerm.toLowerCase())
@@ -20,10 +36,9 @@ export const MaterielSection: React.FC = () => {
 
   // Fonction pour calculer les heures d'utilisation d'un matériel
   const getMaterielUsageHours = (materielId: string) => {
-    const saisiesMateriel = mockSaisiesHeures.filter(saisie => saisie.materielId === materielId);
-    return saisiesMateriel.reduce((sum, saisie) => 
-      sum + saisie.heuresNormales + saisie.heuresSupplementaires, 0
-    );
+    if (!saisiesHeures) return 0;
+    const saisiesMateriel = saisiesHeures.filter(saisie => saisie.materiel_id === materielId);
+    return saisiesMateriel.reduce((sum, saisie) => sum + (saisie.heures_total || 0), 0);
   };
 
   // Fonction pour calculer le revenu généré par un matériel
@@ -41,20 +56,25 @@ export const MaterielSection: React.FC = () => {
     return maxPossibleHours > 0 ? (usageHours / maxPossibleHours) * 100 : 0;
   };
 
-  const handleEdit = (item: Materiel) => {
+  const handleEdit = async (item: Materiel) => {
     setEditingMateriel(item);
     setIsModalOpen(true);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Êtes-vous sûr de vouloir supprimer ce matériel ?')) {
-      setMateriel(materiel.filter(m => m.id !== id));
+      try {
+        await materielService.delete(id);
+        refresh();
+      } catch (error) {
+        console.error('Erreur lors de la suppression:', error);
+        alert('Erreur lors de la suppression du matériel');
+      }
     }
   };
 
-  const handleSave = (formData: FormData) => {
+  const handleSave = async (formData: FormData) => {
     const materielData = {
-      id: editingMateriel?.id || Date.now().toString(),
       nom: formData.get('nom') as string,
       type: formData.get('type') as string,
       marque: formData.get('marque') as string,
@@ -68,14 +88,19 @@ export const MaterielSection: React.FC = () => {
       tarifHoraire: parseFloat(formData.get('tarifHoraire') as string) || undefined,
     };
 
-    if (editingMateriel) {
-      setMateriel(materiel.map(m => m.id === editingMateriel.id ? materielData : m));
-    } else {
-      setMateriel([...materiel, materielData]);
+    try {
+      if (editingMateriel) {
+        await materielService.update(editingMateriel.id, materielData);
+      } else {
+        await materielService.create(materielData);
+      }
+      refresh();
+      setIsModalOpen(false);
+      setEditingMateriel(null);
+    } catch (error) {
+      console.error('Erreur lors de l\'enregistrement:', error);
+      alert('Erreur lors de l\'enregistrement du matériel');
     }
-    
-    setIsModalOpen(false);
-    setEditingMateriel(null);
   };
 
   const MaterielForm = () => (
@@ -224,14 +249,14 @@ export const MaterielSection: React.FC = () => {
               <option value="">Aucune localisation</option>
               <option value="Dépôt principal">Dépôt principal</option>
               <option value="Atelier">Atelier</option>
-              {mockChantiers.map(chantier => (
+              {(chantiers || []).map(chantier => (
                 <option key={chantier.id} value={chantier.nom}>
-                  {chantier.nom} - {chantier.client}
+                  {chantier.nom}
                 </option>
               ))}
             </select>
             <p className="text-xs text-gray-500 mt-1">
-              {mockChantiers.length} chantier(s) disponible(s)
+              {chantiers?.length || 0} chantier(s) disponible(s)
             </p>
           </div>
         </div>
@@ -281,11 +306,11 @@ export const MaterielSection: React.FC = () => {
   );
 
   // Calcul des statistiques globales
-  const totalRevenue = materiel.reduce((sum, item) => sum + getMaterielRevenue(item), 0);
-  const averageUtilization = materiel.length > 0 
-    ? materiel.reduce((sum, item) => sum + getMaterielUtilizationRate(item.id), 0) / materiel.length 
+  const totalRevenue = (materiel || []).reduce((sum, item) => sum + getMaterielRevenue(item), 0);
+  const averageUtilization = (materiel || []).length > 0 
+    ? (materiel || []).reduce((sum, item) => sum + getMaterielUtilizationRate(item.id), 0) / (materiel || []).length 
     : 0;
-  const billableMateriel = materiel.filter(item => item.tarifHoraire && item.tarifHoraire > 0).length;
+  const billableMateriel = (materiel || []).filter(item => item.tarifHoraire && item.tarifHoraire > 0).length;
 
   return (
     <div className="space-y-6">
@@ -309,7 +334,7 @@ export const MaterielSection: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Total Matériel</p>
-              <p className="text-2xl font-bold text-gray-900">{materiel.length}</p>
+              <p className="text-2xl font-bold text-gray-900">{materiel?.length || 0}</p>
             </div>
             <div className="p-3 rounded-full bg-orange-500">
               <Wrench className="w-6 h-6 text-white" />
@@ -322,7 +347,7 @@ export const MaterielSection: React.FC = () => {
             <div>
               <p className="text-sm font-medium text-gray-600">Matériel Facturable</p>
               <p className="text-2xl font-bold text-green-600">{billableMateriel}</p>
-              <p className="text-xs text-gray-500">sur {materiel.length} total</p>
+              <p className="text-xs text-gray-500">sur {materiel?.length || 0} total</p>
             </div>
             <div className="p-3 rounded-full bg-green-500">
               <Euro className="w-6 h-6 text-white" />
@@ -358,144 +383,167 @@ export const MaterielSection: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-lg shadow-sm border">
-        <div className="p-4 border-b">
-          <input
-            type="text"
-            placeholder="Rechercher du matériel..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
+        {loading ? (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Chargement des données...</p>
+          </div>
+        ) : error ? (
+          <div className="text-center py-8 text-red-500">
+            <p>Erreur lors du chargement des données</p>
+            <p className="text-sm">{error.message}</p>
+          </div>
+        ) : (
+          <>
+            <div className="p-4 border-b">
+              <input
+                type="text"
+                placeholder="Rechercher du matériel..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Matériel
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Marque/Modèle
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Statut
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Valeur / Tarif
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Utilisation
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Maintenance
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredMateriel.map((item) => {
-                const usageHours = getMaterielUsageHours(item.id);
-                const revenue = getMaterielRevenue(item);
-                const utilizationRate = getMaterielUtilizationRate(item.id);
-                
-                return (
-                  <tr key={item.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0 h-10 w-10">
-                          <div className="h-10 w-10 rounded-full bg-orange-500 flex items-center justify-center">
-                            <Wrench className="h-5 w-5 text-white" />
-                          </div>
-                        </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">{item.nom}</div>
-                          <div className="text-sm text-gray-500">{item.type}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <div>{item.marque}</div>
-                      <div className="text-gray-500">{item.modele}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <StatusBadge status={item.statut} type="materiel" />
-                      {item.localisation && (
-                        <div className="text-xs text-gray-500 mt-1 flex items-center">
-                          <span className="inline-block w-2 h-2 bg-blue-500 rounded-full mr-1"></span>
-                          {item.localisation}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="space-y-1">
-                        <div className="text-sm">
-                          <span className="font-medium text-gray-900">{item.valeur.toLocaleString()} €</span>
-                          <span className="text-gray-500 text-xs ml-1">valeur</span>
-                        </div>
-                        {item.tarifHoraire ? (
-                          <div className="text-sm">
-                            <span className="font-medium text-green-600">{item.tarifHoraire} €/h</span>
-                            <span className="text-gray-500 text-xs ml-1">tarif</span>
-                          </div>
-                        ) : (
-                          <div className="text-xs text-gray-400">Non facturable</div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="space-y-1">
-                        <div className="flex items-center text-sm">
-                          <Clock className="w-4 h-4 mr-1 text-blue-500" />
-                          <span className="font-medium text-gray-900">{usageHours.toFixed(1)}h</span>
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {utilizationRate.toFixed(1)}% utilisation
-                        </div>
-                        {item.tarifHoraire && revenue > 0 && (
-                          <div className="text-xs">
-                            <span className="font-medium text-green-600">{revenue.toLocaleString()}€</span>
-                            <span className="text-gray-500 ml-1">généré</span>
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {item.prochaineMaintenance ? (
-                        <div className="flex items-center">
-                          <Calendar className="w-4 h-4 mr-1 text-gray-400" />
-                          {new Date(item.prochaineMaintenance).toLocaleDateString()}
-                        </div>
-                      ) : (
-                        <span className="text-gray-400">Non programmée</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => handleEdit(item)}
-                          className="text-blue-600 hover:text-blue-900"
-                          title="Modifier"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(item.id)}
-                          className="text-red-600 hover:text-red-900"
-                          title="Supprimer"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Matériel
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Marque/Modèle
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Statut
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Valeur / Tarif
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Utilisation
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Maintenance
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredMateriel.map((item) => {
+                    const usageHours = getMaterielUsageHours(item.id);
+                    const revenue = getMaterielRevenue(item);
+                    const utilizationRate = getMaterielUtilizationRate(item.id);
+                    
+                    return (
+                      <tr key={item.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0 h-10 w-10">
+                              <div className="h-10 w-10 rounded-full bg-orange-500 flex items-center justify-center">
+                                <Wrench className="h-5 w-5 text-white" />
+                              </div>
+                            </div>
+                            <div className="ml-4">
+                              <div className="text-sm font-medium text-gray-900">{item.nom}</div>
+                              <div className="text-sm text-gray-500">{item.type}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          <div>{item.marque}</div>
+                          <div className="text-gray-500">{item.modele}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <StatusBadge status={item.statut} type="materiel" />
+                          {item.localisation && (
+                            <div className="text-xs text-gray-500 mt-1 flex items-center">
+                              <span className="inline-block w-2 h-2 bg-blue-500 rounded-full mr-1"></span>
+                              {item.localisation}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="space-y-1">
+                            <div className="text-sm">
+                              <span className="font-medium text-gray-900">{item.valeur.toLocaleString()} €</span>
+                              <span className="text-gray-500 text-xs ml-1">valeur</span>
+                            </div>
+                            {item.tarifHoraire ? (
+                              <div className="text-sm">
+                                <span className="font-medium text-green-600">{item.tarifHoraire} €/h</span>
+                                <span className="text-gray-500 text-xs ml-1">tarif</span>
+                              </div>
+                            ) : (
+                              <div className="text-xs text-gray-400">Non facturable</div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="space-y-1">
+                            <div className="flex items-center text-sm">
+                              <Clock className="w-4 h-4 mr-1 text-blue-500" />
+                              <span className="font-medium text-gray-900">{usageHours.toFixed(1)}h</span>
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {utilizationRate.toFixed(1)}% utilisation
+                            </div>
+                            {item.tarifHoraire && revenue > 0 && (
+                              <div className="text-xs">
+                                <span className="font-medium text-green-600">{revenue.toLocaleString()}€</span>
+                                <span className="text-gray-500 ml-1">généré</span>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {item.prochaineMaintenance ? (
+                            <div className="flex items-center">
+                              <Calendar className="w-4 h-4 mr-1 text-gray-400" />
+                              {new Date(item.prochaineMaintenance).toLocaleDateString()}
+                            </div>
+                          ) : (
+                            <span className="text-gray-400">Non programmée</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={() => handleEdit(item)}
+                              className="text-blue-600 hover:text-blue-900"
+                              title="Modifier"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(item.id)}
+                              className="text-red-600 hover:text-red-900"
+                              title="Supprimer"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                {filteredMateriel.length === 0 && (
+                  <tfoot>
+                    <tr>
+                      <td colSpan={7} className="px-6 py-10 text-center text-gray-500">
+                        Aucun matériel trouvé
+                      </td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+          </>
+        )}
       </div>
 
       <Modal
@@ -507,7 +555,7 @@ export const MaterielSection: React.FC = () => {
         title={editingMateriel ? 'Modifier le matériel' : 'Nouveau matériel'}
         size="lg"
       >
-        <MaterielForm />
+        {!loading && <MaterielForm />}
       </Modal>
     </div>
   );
