@@ -107,6 +107,20 @@ export interface SaisieHeure {
   parametresId?: string;
 }
 
+// Version simplifiée de SaisieHeure avec heures totales
+export interface SimpleSaisieHeure {
+  id: string;
+  ouvrierId: string;
+  chantierId: string;
+  materielId?: string;
+  date: string;
+  heureDebut: string;
+  heureFin: string;
+  heuresTotal: number;
+  description: string;
+  valide: boolean;
+}
+
 export interface Utilisateur {
   id: string;
   nom: string;

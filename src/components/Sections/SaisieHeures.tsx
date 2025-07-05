@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Plus, Edit, Trash2, Clock, Download, Filter, Search, Calendar, CheckCircle, X, User, Building2, Wrench, AlertTriangle, FileText, Check } from 'lucide-react';
 import { mockSaisiesHeures, mockOuvriers, mockChantiers, mockMateriel } from '../../data/mockData';
-import { SaisieHeure, Ouvrier, Chantier, Materiel } from '../../types';
+import { SaisieHeure, Ouvrier, Chantier, Materiel, SimpleSaisieHeure } from '../../types';
 import { Modal } from '../Common/Modal';
 import { Button } from '../Common/Button';
 import { ExportModal } from '../Common/ExportModal';
@@ -70,7 +70,7 @@ export const SaisieHeures: React.FC = () => {
     return mockMateriel.find(m => m.id === materielId);
   };
 
-  const calculateHours = (heureDebut: string, heureFin: string): { heuresNormales: number, heuresSupplementaires: number } => {
+  const calculateHours = (heureDebut: string, heureFin: string): number => {
     const [debutHours, debutMinutes] = heureDebut.split(':').map(Number);
     const [finHours, finMinutes] = heureFin.split(':').map(Number);
     
@@ -78,12 +78,25 @@ export const SaisieHeures: React.FC = () => {
     const finMinutesTotal = finHours * 60 + finMinutes;
     
     const totalMinutes = finMinutesTotal - debutMinutesTotal;
-    const totalHeures = totalMinutes / 60;
+    return totalMinutes / 60;
+  };
+
+  // Conversion d'une saisie existante vers le format simplifié
+  const convertToSimpleSaisie = (saisie: SaisieHeure): SimpleSaisieHeure => {
+    const heuresTotal = saisie.heuresNormales + saisie.heuresSupplementaires + (saisie.heuresExceptionnelles || 0);
     
-    let heuresNormales = Math.min(totalHeures, 8);
-    let heuresSupplementaires = Math.max(0, totalHeures - 8);
-    
-    return { heuresNormales, heuresSupplementaires };
+    return {
+      id: saisie.id,
+      ouvrierId: saisie.ouvrierId,
+      chantierId: saisie.chantierId,
+      materielId: saisie.materielId,
+      date: saisie.date,
+      heureDebut: saisie.heureDebut,
+      heureFin: saisie.heureFin,
+      heuresTotal: heuresTotal,
+      description: saisie.description,
+      valide: saisie.valide
+    };
   };
 
   const handleEdit = (saisie: SaisieHeure) => {
@@ -100,9 +113,9 @@ export const SaisieHeures: React.FC = () => {
   const handleSave = (formData: FormData) => {
     const heureDebut = formData.get('heureDebut') as string;
     const heureFin = formData.get('heureFin') as string;
-    const { heuresNormales, heuresSupplementaires } = calculateHours(heureDebut, heureFin);
+    const heuresTotal = calculateHours(heureDebut, heureFin);
     
-    const saisieData: SaisieHeure = {
+    const saisieData: SimpleSaisieHeure = {
       id: editingSaisie?.id || Date.now().toString(),
       ouvrierId: formData.get('ouvrierId') as string,
       chantierId: formData.get('chantierId') as string,
@@ -110,16 +123,40 @@ export const SaisieHeures: React.FC = () => {
       date: formData.get('date') as string,
       heureDebut,
       heureFin,
-      heuresNormales,
-      heuresSupplementaires,
+      heuresTotal,
       description: formData.get('description') as string,
       valide: editingSaisie?.valide || false
     };
 
     if (editingSaisie) {
-      setSaisies(saisies.map(s => s.id === editingSaisie.id ? saisieData : s));
+      // Convertir les saisies existantes au nouveau format
+      setSaisies(saisies.map(s => {
+        if (s.id === editingSaisie.id) {
+          return {
+            ...s,
+            ouvrierId: saisieData.ouvrierId,
+            chantierId: saisieData.chantierId,
+            materielId: saisieData.materielId,
+            date: saisieData.date,
+            heureDebut: saisieData.heureDebut,
+            heureFin: saisieData.heureFin,
+            heuresNormales: saisieData.heuresTotal, // Toutes les heures sont maintenant "normales"
+            heuresSupplementaires: 0, // Plus d'heures supplémentaires
+            heuresExceptionnelles: 0, // Plus d'heures exceptionnelles
+            description: saisieData.description,
+            valide: saisieData.valide
+          };
+        }
+        return s;
+      }));
     } else {
-      setSaisies([...saisies, saisieData]);
+      // Ajouter une nouvelle saisie au format existant pour compatibilité
+      setSaisies([...saisies, {
+        ...saisieData,
+        heuresNormales: saisieData.heuresTotal, // Toutes les heures sont maintenant "normales"
+        heuresSupplementaires: 0, // Plus d'heures supplémentaires
+        heuresExceptionnelles: 0 // Plus d'heures exceptionnelles
+      }]);
     }
     
     setIsModalOpen(false);
@@ -164,7 +201,7 @@ export const SaisieHeures: React.FC = () => {
 
   const getTotalHours = () => {
     return filteredSaisies.reduce((total, saisie) => {
-      return total + saisie.heuresNormales + saisie.heuresSupplementaires;
+      return total + saisie.heuresNormales + saisie.heuresSupplementaires + (saisie.heuresExceptionnelles || 0);
     }, 0);
   };
 
@@ -172,7 +209,7 @@ export const SaisieHeures: React.FC = () => {
     return filteredSaisies
       .filter(saisie => saisie.valide)
       .reduce((total, saisie) => {
-        return total + saisie.heuresNormales + saisie.heuresSupplementaires;
+        return total + saisie.heuresNormales + saisie.heuresSupplementaires + (saisie.heuresExceptionnelles || 0);
       }, 0);
   };
 
@@ -180,7 +217,7 @@ export const SaisieHeures: React.FC = () => {
     return filteredSaisies
       .filter(saisie => !saisie.valide)
       .reduce((total, saisie) => {
-        return total + saisie.heuresNormales + saisie.heuresSupplementaires;
+        return total + saisie.heuresNormales + saisie.heuresSupplementaires + (saisie.heuresExceptionnelles || 0);
       }, 0);
   };
 
@@ -286,16 +323,14 @@ export const SaisieHeures: React.FC = () => {
         </div>
 
         {/* Aperçu du calcul des heures */}
-        <div className="bg-gray-50 p-4 rounded-lg">
-          <h4 className="text-sm font-medium text-gray-700 mb-2">Aperçu du calcul des heures</h4>
-          <p className="text-sm text-gray-600">
-            Les heures seront calculées automatiquement selon les paramètres de l'entreprise :
-          </p>
-          <ul className="text-sm text-gray-600 list-disc list-inside mt-2">
-            <li>Heures normales : jusqu'à 8h par jour</li>
-            <li>Heures supplémentaires : au-delà de 8h par jour (majoration 25%)</li>
-            <li>Heures exceptionnelles : au-delà de 10h par jour (majoration 50%)</li>
-          </ul>
+        <div className="bg-blue-50 p-4 rounded-lg">
+          <h4 className="text-sm font-medium text-blue-700 mb-2">Calcul des heures</h4>
+          <div className="flex items-center">
+            <Clock className="w-5 h-5 text-blue-500 mr-2" />
+            <p className="text-sm text-blue-600">
+              Les heures sont maintenant calculées en heures totales, sans distinction entre heures normales et supplémentaires.
+            </p>
+          </div>
         </div>
       </div>
       
@@ -312,7 +347,8 @@ export const SaisieHeures: React.FC = () => {
 
   const ValidationModal = () => {
     const selectedSaisiesData = saisies.filter(s => selectedSaisies.includes(s.id));
-    const totalHeures = selectedSaisiesData.reduce((total, s) => total + s.heuresNormales + s.heuresSupplementaires, 0);
+    const totalHeures = selectedSaisiesData.reduce((total, s) => 
+      total + s.heuresNormales + s.heuresSupplementaires + (s.heuresExceptionnelles || 0), 0);
     
     return (
       <div className="space-y-6">
@@ -349,7 +385,7 @@ export const SaisieHeures: React.FC = () => {
                         {chantier?.nom} - {new Date(saisie.date).toLocaleDateString()}
                       </div>
                       <div className="text-sm text-gray-500">
-                        {saisie.heuresNormales + saisie.heuresSupplementaires} heures
+                        {saisie.heuresNormales + saisie.heuresSupplementaires + (saisie.heuresExceptionnelles || 0)} heures
                       </div>
                     </div>
                     <button
@@ -583,18 +619,11 @@ export const SaisieHeures: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="space-y-1">
-                        <div className="text-sm">
-                          <span className="font-medium text-gray-900">{saisie.heuresNormales}h</span>
-                          <span className="text-gray-500 text-xs ml-1">normales</span>
-                        </div>
-                        {saisie.heuresSupplementaires > 0 && (
-                          <div className="text-sm">
-                            <span className="font-medium text-orange-600">{saisie.heuresSupplementaires}h</span>
-                            <span className="text-gray-500 text-xs ml-1">supplémentaires</span>
-                          </div>
-                        )}
                         <div className="text-sm font-medium">
-                          {(saisie.heuresNormales + saisie.heuresSupplementaires).toFixed(1)}h total
+                          {(saisie.heuresNormales + saisie.heuresSupplementaires + (saisie.heuresExceptionnelles || 0)).toFixed(1)}h total
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {saisie.heureDebut} - {saisie.heureFin}
                         </div>
                       </div>
                     </td>
@@ -697,11 +726,8 @@ export const SaisieHeures: React.FC = () => {
             Ouvrier: `${ouvrier?.prenom} ${ouvrier?.nom}`,
             Chantier: chantier?.nom,
             Matériel: materiel?.nom || '-',
-            'Heure début': saisie.heureDebut,
-            'Heure fin': saisie.heureFin,
-            'Heures normales': saisie.heuresNormales,
-            'Heures supplémentaires': saisie.heuresSupplementaires,
-            'Total heures': saisie.heuresNormales + saisie.heuresSupplementaires,
+            'Horaires': `${saisie.heureDebut} - ${saisie.heureFin}`,
+            'Total heures': saisie.heuresNormales + saisie.heuresSupplementaires + (saisie.heuresExceptionnelles || 0),
             Description: saisie.description,
             Statut: saisie.valide ? 'Validée' : 'En attente'
           };
