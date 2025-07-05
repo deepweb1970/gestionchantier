@@ -9,6 +9,7 @@ import { SaisieHeure, Ouvrier, Chantier, Materiel, SimpleSaisieHeure } from '../
 import { Modal } from '../Common/Modal';
 import { Button } from '../Common/Button';
 import { ExportModal } from '../Common/ExportModal';
+import { PointageDigital } from './PointageDigital';
 
 export const SaisieHeures: React.FC = () => {
   const { data: saisies, loading: saisiesLoading, error: saisiesError, refresh: refreshSaisies } = useRealtimeSupabase<SaisieHeure>({
@@ -518,6 +519,8 @@ export const SaisieHeures: React.FC = () => {
       </div>
 
       {/* Statistiques */}
+      <PointageDigital />
+      
       {saisiesLoading ? (
         <div className="text-center py-8">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>

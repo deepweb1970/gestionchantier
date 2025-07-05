@@ -31,7 +31,7 @@ const toSaisieHeureInsert = (saisie: SimpleSaisieHeure): SaisieHeureInsert => ({
   date: saisie.date,
   heure_debut: saisie.heureDebut,
   heure_fin: saisie.heureFin,
-  heures_normales: saisie.heuresTotal, // Toutes les heures sont maintenant "normales"
+  heures_normales: saisie.heuresTotal, // Pour compatibilité avec l'ancien système
   heures_supplementaires: 0, // Plus d'heures supplémentaires
   heures_exceptionnelles: 0, // Plus d'heures exceptionnelles
   heures_total: saisie.heuresTotal, // Nouveau champ pour le total
