@@ -44,6 +44,7 @@ export const SaisieHeures: React.FC = () => {
   const [dateRangeStart, setDateRangeStart] = useState('');
   const [dateRangeEnd, setDateRangeEnd] = useState('');
   const [isDateRangeFilterActive, setIsDateRangeFilterActive] = useState(false);
+  const [isFilterExpanded, setIsFilterExpanded] = useState(false);
 
   const getOuvrier = (ouvrierId: string): Ouvrier | undefined => {
     if (!ouvriers) return undefined;
@@ -584,7 +585,10 @@ export const SaisieHeures: React.FC = () => {
                 </div>
                 <button
                   type="button"
-                  onClick={toggleDateRangeFilter}
+                  onClick={() => {
+                    toggleDateRangeFilter();
+                    setIsFilterExpanded(true);
+                  }}
                   className={`px-3 py-2 border rounded-md flex items-center ${
                     isDateRangeFilterActive 
                       ? 'bg-blue-100 border-blue-300 text-blue-700' 
@@ -596,6 +600,15 @@ export const SaisieHeures: React.FC = () => {
                   <span className="hidden sm:inline">Plage de dates</span>
                 </button>
               </div>
+
+              <button
+                type="button"
+                onClick={() => setIsFilterExpanded(!isFilterExpanded)}
+                className="mt-2 text-sm text-blue-600 hover:text-blue-800 flex items-center"
+              >
+                {isFilterExpanded ? 'Masquer les filtres avancés' : 'Afficher les filtres avancés'}
+                <span className="ml-1">{isFilterExpanded ? '▲' : '▼'}</span>
+              </button>
               
               {isDateRangeFilterActive && (
                 <div className="mt-2 flex gap-2 items-center">
@@ -620,53 +633,72 @@ export const SaisieHeures: React.FC = () => {
                 </div>
               )}
             </div>
-            <div className="flex items-center space-x-2">
-              <Filter className="w-4 h-4 text-gray-500" />
-              <select
-                value={ouvrierFilter}
-                onChange={(e) => setOuvrierFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[180px]"
-              >
-                <option value="all">Tous les ouvriers</option>
-                {ouvriers?.sort((a, b) => a.nom.localeCompare(b.nom)).map(ouvrier => (
-                  <option key={ouvrier.id} value={ouvrier.id}>
-                    {ouvrier.prenom} {ouvrier.nom}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={chantierFilter}
-                onChange={(e) => setChantierFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[180px]"
-              >
-                <option value="all">Tous les chantiers</option>
-                {chantiers?.sort((a, b) => a.nom.localeCompare(b.nom)).map(chantier => (
-                  <option key={chantier.id} value={chantier.id}>
-                    {chantier.nom}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={dateFilter}
-                onChange={(e) => setDateFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
-                disabled={isDateRangeFilterActive}
-              >
-                <option value="all">Toutes les dates</option>
-                <option value="today">Aujourd'hui</option>
-                <option value="this_week">Cette semaine</option>
-                <option value="this_month">Ce mois</option>
-              </select>
-              <select
-                value={validationFilter}
-                onChange={(e) => setValidationFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
-              >
-                <option value="all">Tous les statuts</option>
-                <option value="valide">Validées</option>
-                <option value="non_valide">Non validées</option>
-              </select>
-            </div>
+            
+            {isFilterExpanded && (
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Ouvrier</label>
+                  <select
+                    value={ouvrierFilter}
+                    onChange={(e) => setOuvrierFilter(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="all">Tous les ouvriers</option>
+                    {ouvriers?.sort((a, b) => 
+                      `${a.nom} ${a.prenom}`.localeCompare(`${b.nom} ${b.prenom}`)
+                    ).map(ouvrier => (
+                      <option key={ouvrier.id} value={ouvrier.id}>
+                        {ouvrier.prenom} {ouvrier.nom}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Chantier</label>
+                  <select
+                    value={chantierFilter}
+                    onChange={(e) => setChantierFilter(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="all">Tous les chantiers</option>
+                    {chantiers?.sort((a, b) => a.nom.localeCompare(b.nom)).map(chantier => (
+                      <option key={chantier.id} value={chantier.id}>
+                        {chantier.nom}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Période</label>
+                  <select
+                    value={dateFilter}
+                    onChange={(e) => setDateFilter(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={isDateRangeFilterActive}
+                  >
+                    <option value="all">Toutes les dates</option>
+                    <option value="today">Aujourd'hui</option>
+                    <option value="this_week">Cette semaine</option>
+                    <option value="this_month">Ce mois</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Statut</label>
+                  <select
+                    value={validationFilter}
+                    onChange={(e) => setValidationFilter(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="all">Tous les statuts</option>
+                    <option value="valide">Validées</option>
+                    <option value="non_valide">Non validées</option>
+                  </select>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
