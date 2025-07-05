@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Calendar, Clock, Users, Wrench, AlertTriangle, CheckCircle, Filter, Search, Download, Settings, ChevronLeft, ChevronRight, MapPin, Bell, FolderSync as Sync, Eye, Copy, RefreshCw, User, Building2, Zap, BookOpen, Coffee, X } from 'lucide-react';
+import { Plus, Edit, Trash2, Calendar, Clock, Users, Wrench, AlertTriangle, CheckCircle, Filter, Search, Download, Settings, ChevronLeft, ChevronRight, MapPin, Bell, FolderSync as Sync, Eye, Copy, RefreshCw, User, Building2, Zap, BookOpen, Coffee, X, Printer, Share2, ArrowUpDown, CalendarDays, CalendarClock } from 'lucide-react';
 import { mockPlanningEvents, mockOuvriers, mockChantiers, mockMateriel } from '../../data/mockData';
 import { PlanningEvent, Ouvrier, Chantier, Materiel } from '../../types';
 import { Modal } from '../Common/Modal';
@@ -31,6 +31,7 @@ export const Planning: React.FC = () => {
   const [isConflictModalOpen, setIsConflictModalOpen] = useState(false);
   const [isResourceModalOpen, setIsResourceModalOpen] = useState(false);
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<PlanningEvent | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -40,6 +41,8 @@ export const Planning: React.FC = () => {
   const [draggedEvent, setDraggedEvent] = useState<PlanningEvent | null>(null);
   const [selectedEvents, setSelectedEvents] = useState<string[]>([]);
   const [showConflicts, setShowConflicts] = useState(true);
+  const [showWeekends, setShowWeekends] = useState(true);
+  const [showCompletedEvents, setShowCompletedEvents] = useState(true);
 
   const eventColors = {
     chantier: 'bg-blue-500',
@@ -682,6 +685,113 @@ export const Planning: React.FC = () => {
     </div>
   );
 
+  const ExportModal = () => (
+    <div className="space-y-6">
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="flex items-center">
+          <Calendar className="w-5 h-5 text-blue-600 mr-2" />
+          <p className="text-sm text-blue-800">
+            Exportez votre planning dans différents formats
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
+              <Printer className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h4 className="font-medium text-gray-900">Imprimer</h4>
+              <p className="text-sm text-gray-600">Version imprimable du planning</p>
+            </div>
+          </div>
+          <Button size="sm">
+            <Printer className="w-4 h-4 mr-2" />
+            Imprimer
+          </Button>
+        </div>
+
+        <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
+              <Download className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h4 className="font-medium text-gray-900">Excel</h4>
+              <p className="text-sm text-gray-600">Fichier Excel avec tous les événements</p>
+            </div>
+          </div>
+          <Button size="sm">
+            <Download className="w-4 h-4 mr-2" />
+            Excel
+          </Button>
+        </div>
+
+        <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center">
+              <CalendarDays className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h4 className="font-medium text-gray-900">iCalendar</h4>
+              <p className="text-sm text-gray-600">Format .ics pour Google Calendar, Outlook, etc.</p>
+            </div>
+          </div>
+          <Button size="sm">
+            <Download className="w-4 h-4 mr-2" />
+            iCal
+          </Button>
+        </div>
+
+        <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center">
+              <Share2 className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h4 className="font-medium text-gray-900">Partager</h4>
+              <p className="text-sm text-gray-600">Envoyer par email ou générer un lien</p>
+            </div>
+          </div>
+          <Button size="sm">
+            <Share2 className="w-4 h-4 mr-2" />
+            Partager
+          </Button>
+        </div>
+      </div>
+
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <h4 className="font-medium text-gray-900 mb-2">Options d'export</h4>
+        <div className="space-y-3">
+          <label className="flex items-center">
+            <input type="checkbox" defaultChecked className="mr-2" />
+            <span className="text-sm text-gray-700">Inclure les événements passés</span>
+          </label>
+          <label className="flex items-center">
+            <input type="checkbox" defaultChecked className="mr-2" />
+            <span className="text-sm text-gray-700">Inclure les détails des ressources</span>
+          </label>
+          <label className="flex items-center">
+            <input type="checkbox" className="mr-2" />
+            <span className="text-sm text-gray-700">Uniquement les événements sélectionnés</span>
+          </label>
+        </div>
+      </div>
+
+      <div className="flex justify-end space-x-3">
+        <Button variant="secondary" onClick={() => setIsExportModalOpen(false)}>
+          Fermer
+        </Button>
+        <Button onClick={() => setIsExportModalOpen(false)}>
+          <Download className="w-4 h-4 mr-2" />
+          Exporter
+        </Button>
+      </div>
+    </div>
+  );
+
   const renderMonthView = () => {
     const year = calendarView.date.getFullYear();
     const month = calendarView.date.getMonth();
@@ -929,6 +1039,10 @@ export const Planning: React.FC = () => {
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-800">Planning</h1>
         <div className="flex space-x-3">
+          <Button onClick={() => setIsExportModalOpen(true)} variant="secondary">
+            <Download className="w-4 h-4 mr-2" />
+            Exporter
+          </Button>
           <Button onClick={() => setIsResourceModalOpen(true)} variant="secondary">
             <Users className="w-4 h-4 mr-2" />
             Ressources
@@ -944,10 +1058,6 @@ export const Planning: React.FC = () => {
           <Button onClick={() => setIsModalOpen(true)}>
             <Plus className="w-4 h-4 mr-2" />
             Nouvel Événement
-          </Button>
-          <Button variant="secondary" onClick={exportCalendar}>
-            <Download className="w-4 h-4 mr-2" />
-            Exporter
           </Button>
         </div>
       </div>
@@ -1011,7 +1121,7 @@ export const Planning: React.FC = () => {
       <div className="bg-white rounded-lg shadow-sm border p-4">
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center space-y-4 lg:space-y-0">
           <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-3">
               <button
                 onClick={() => navigateCalendar('prev')}
                 className="p-2 hover:bg-gray-100 rounded-full"
@@ -1031,16 +1141,30 @@ export const Planning: React.FC = () => {
               </button>
             </div>
             
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setCalendarView({ ...calendarView, date: new Date() })}
-            >
-              Aujourd'hui
-            </Button>
+            <div className="flex space-x-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setCalendarView({ ...calendarView, date: new Date() })}
+              >
+                Aujourd'hui
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  // Go to next week
+                  const nextWeek = new Date(calendarView.date);
+                  nextWeek.setDate(nextWeek.getDate() + 7);
+                  setCalendarView({ ...calendarView, date: nextWeek });
+                }}
+              >
+                Semaine suivante
+              </Button>
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-4">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center space-x-2">
               <Search className="w-4 h-4 text-gray-500" />
               <input
@@ -1067,7 +1191,7 @@ export const Planning: React.FC = () => {
               </select>
             </div>
 
-            <div className="flex bg-gray-100 rounded-lg p-1">
+            <div className="flex bg-gray-100 rounded-lg p-1 mr-1">
               {(['month', 'week', 'day'] as const).map(viewType => (
                 <button
                   key={viewType}
@@ -1083,6 +1207,19 @@ export const Planning: React.FC = () => {
               ))}
             </div>
 
+            <button
+              onClick={() => setIsFilterExpanded(!isFilterExpanded)}
+              className="p-2 hover:bg-gray-100 rounded-full"
+              title="Plus de filtres"
+            >
+              <ArrowUpDown className="w-4 h-4 text-gray-600" />
+            </button>
+          </div>
+        </div>
+        
+        {/* Filtres étendus */}
+        {isFilterExpanded && (
+          <div className="mt-4 pt-4 border-t grid grid-cols-1 md:grid-cols-3 gap-4">
             <label className="flex items-center space-x-2">
               <input
                 type="checkbox"
@@ -1090,10 +1227,30 @@ export const Planning: React.FC = () => {
                 onChange={(e) => setShowConflicts(e.target.checked)}
                 className="rounded"
               />
-              <span className="text-sm text-gray-700">Afficher conflits</span>
+              <span className="text-sm text-gray-700">Afficher les conflits</span>
+            </label>
+            
+            <label className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                checked={showWeekends}
+                onChange={(e) => setShowWeekends(e.target.checked)}
+                className="rounded"
+              />
+              <span className="text-sm text-gray-700">Afficher les week-ends</span>
+            </label>
+            
+            <label className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                checked={showCompletedEvents}
+                onChange={(e) => setShowCompletedEvents(e.target.checked)}
+                className="rounded"
+              />
+              <span className="text-sm text-gray-700">Afficher les événements passés</span>
             </label>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Légende */}
@@ -1139,6 +1296,28 @@ export const Planning: React.FC = () => {
         {calendarView.type === 'month' && renderMonthView()}
         {calendarView.type === 'week' && renderWeekView()}
         {calendarView.type === 'day' && renderDayView()}
+        
+        {/* Légende flottante */}
+        <div className="fixed bottom-4 right-4 bg-white rounded-lg shadow-lg border p-3 text-xs text-gray-600 flex items-center space-x-3">
+          <div className="flex items-center">
+            <CalendarClock className="w-4 h-4 mr-1 text-blue-500" />
+            <span>{new Date().toLocaleDateString()}</span>
+          </div>
+          <div>|</div>
+          <div className="flex items-center">
+            <Clock className="w-4 h-4 mr-1 text-green-500" />
+            <span>{events.length} événements</span>
+          </div>
+          {conflicts.length > 0 && (
+            <>
+              <div>|</div>
+              <div className="flex items-center text-red-500">
+                <AlertTriangle className="w-4 h-4 mr-1" />
+                <span>{conflicts.length} conflits</span>
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Modal de création/modification */}
@@ -1185,5 +1364,15 @@ export const Planning: React.FC = () => {
         <SyncModal />
       </Modal>
     </div>
+      {/* Modal d'export */}
+      <Modal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        title="Exporter le Planning"
+        size="lg"
+      >
+        <ExportModal />
+      </Modal>
+
   );
 };

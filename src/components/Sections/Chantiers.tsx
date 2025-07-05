@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Camera, MapPin, Filter, Download, Clock, Users, Upload, X, Eye, Calendar, Tag } from 'lucide-react';
+import { Plus, Edit, Trash2, Camera, MapPin, Filter, Download, Clock, Users, Upload, X, Eye, Calendar, Tag, Image, ImagePlus, Layers, Search, Share2, ArrowUpDown, SlidersHorizontal } from 'lucide-react';
 import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
 import { chantierService } from '../../services/chantierService';
 import { clientService } from '../../services/clientService';
@@ -42,6 +42,11 @@ export const Chantiers: React.FC = () => {
   const [newPhotos, setNewPhotos] = useState<File[]>([]);
   const [photoDescription, setPhotoDescription] = useState('');
   const [photoCategory, setPhotoCategory] = useState('avancement');
+
+  // État pour le mode d'affichage des photos
+  const [photoViewMode, setPhotoViewMode] = useState<'grid' | 'carousel' | 'list'>('grid');
+  const [photoSortBy, setPhotoSortBy] = useState<'date' | 'category'>('date');
+  const [photoFilter, setPhotoFilter] = useState('');
 
   const photoCategories = [
     { value: 'avancement', label: 'État d\'avancement', color: 'bg-blue-500' },
@@ -436,6 +441,24 @@ export const Chantiers: React.FC = () => {
   const PhotoManagementModal = () => {
     if (!selectedChantier) return null;
 
+    // Filtrer et trier les photos
+    const filteredPhotos = selectedChantier.photos
+      .filter(photo => 
+        photoFilter === '' || 
+        photo.description.toLowerCase().includes(photoFilter.toLowerCase()) ||
+        (photo.category && photo.category.includes(photoFilter.toLowerCase()))
+      )
+      .sort((a, b) => {
+        if (photoSortBy === 'date') {
+          return new Date(b.date).getTime() - new Date(a.date).getTime();
+        } else {
+          // Tri par catégorie
+          const catA = a.category || 'avancement';
+          const catB = b.category || 'avancement';
+          return catA.localeCompare(catB);
+        }
+      });
+
     return (
       <div className="space-y-6">
         {/* Upload de nouvelles photos */}
@@ -523,15 +546,65 @@ export const Chantiers: React.FC = () => {
         {/* Photos existantes */}
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-800">
-              Photos du chantier ({selectedChantier.photos.length})
-            </h3>
-            <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-500">Grouper par:</span>
-              <select className="px-2 py-1 border border-gray-300 rounded text-sm">
-                <option value="date">Date</option>
-                <option value="category">Catégorie</option>
-              </select>
+            <div className="flex items-center">
+              <h3 className="text-lg font-semibold text-gray-800 mr-2">
+                Photos du chantier ({selectedChantier.photos.length})
+              </h3>
+              <span className="text-sm text-gray-500">
+                {filteredPhotos.length !== selectedChantier.photos.length && 
+                  `(${filteredPhotos.length} affichées)`}
+              </span>
+            </div>
+            <div className="flex items-center space-x-3">
+              {/* Recherche */}
+              <div className="relative">
+                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Rechercher..."
+                  value={photoFilter}
+                  onChange={(e) => setPhotoFilter(e.target.value)}
+                  className="pl-8 pr-3 py-1 border border-gray-300 rounded text-sm w-40"
+                />
+              </div>
+              
+              {/* Options d'affichage */}
+              <div className="flex bg-gray-100 rounded-lg p-1">
+                <button
+                  onClick={() => setPhotoViewMode('grid')}
+                  className={`p-1 rounded ${photoViewMode === 'grid' ? 'bg-white shadow-sm' : ''}`}
+                  title="Vue grille"
+                >
+                  <Layers className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setPhotoViewMode('carousel')}
+                  className={`p-1 rounded ${photoViewMode === 'carousel' ? 'bg-white shadow-sm' : ''}`}
+                  title="Vue carousel"
+                >
+                  <Image className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setPhotoViewMode('list')}
+                  className={`p-1 rounded ${photoViewMode === 'list' ? 'bg-white shadow-sm' : ''}`}
+                  title="Vue liste"
+                >
+                  <ArrowUpDown className="w-4 h-4" />
+                </button>
+              </div>
+              
+              {/* Options de tri */}
+              <div className="flex items-center space-x-1">
+                <SlidersHorizontal className="w-4 h-4 text-gray-500" />
+                <select 
+                  className="px-2 py-1 border border-gray-300 rounded text-sm"
+                  value={photoSortBy}
+                  onChange={(e) => setPhotoSortBy(e.target.value as 'date' | 'category')}
+                >
+                  <option value="date">Trier par date</option>
+                  <option value="category">Trier par catégorie</option>
+                </select>
+              </div>
             </div>
           </div>
 
@@ -542,52 +615,174 @@ export const Chantiers: React.FC = () => {
               <p className="text-sm text-gray-400">Ajoutez des photos pour suivre l'avancement</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {selectedChantier.photos.map(photo => {
-                const categoryInfo = getCategoryInfo(photo.category || 'avancement');
-                return (
-                  <div key={photo.id} className="bg-white border rounded-lg overflow-hidden hover:shadow-md transition-shadow">
-                    <div className="relative">
-                      <img
-                        src={photo.url}
-                        alt={photo.description}
-                        className="w-full h-48 object-cover cursor-pointer"
-                        onClick={() => handlePhotoView(photo, selectedChantier)}
-                      />
-                      <div className="absolute top-2 left-2">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${categoryInfo.color}`}>
-                          {categoryInfo.label}
-                        </span>
+            <>
+              {photoViewMode === 'grid' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredPhotos.map(photo => {
+                    const categoryInfo = getCategoryInfo(photo.category || 'avancement');
+                    return (
+                      <div key={photo.id} className="bg-white border rounded-lg overflow-hidden hover:shadow-md transition-shadow">
+                        <div className="relative">
+                          <img
+                            src={photo.url}
+                            alt={photo.description}
+                            className="w-full h-48 object-cover cursor-pointer"
+                            onClick={() => handlePhotoView(photo, selectedChantier)}
+                          />
+                          <div className="absolute top-2 left-2">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${categoryInfo.color}`}>
+                              {categoryInfo.label}
+                            </span>
+                          </div>
+                          <div className="absolute top-2 right-2">
+                            <button
+                              onClick={() => deletePhoto(photo.id)}
+                              className="bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-600"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="p-3">
+                          <div className="flex items-center text-xs text-gray-500 mb-2">
+                            <Calendar className="w-3 h-3 mr-1" />
+                            {new Date(photo.date).toLocaleDateString()}
+                          </div>
+                          <input
+                            type="text"
+                            value={photo.description}
+                            onChange={(e) => updatePhotoDescription(photo.id, e.target.value)}
+                            className="w-full text-sm border-none p-0 focus:outline-none focus:ring-1 focus:ring-blue-500 rounded"
+                            placeholder="Description..."
+                          />
+                          {photo.filename && (
+                            <p className="text-xs text-gray-400 mt-1 truncate">{photo.filename}</p>
+                          )}
+                        </div>
                       </div>
-                      <div className="absolute top-2 right-2">
-                        <button
-                          onClick={() => deletePhoto(photo.id)}
-                          className="bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-600"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
+                    );
+                  })}
+                </div>
+              )}
+              
+              {photoViewMode === 'carousel' && (
+                <div className="relative bg-gray-900 rounded-lg overflow-hidden">
+                  {filteredPhotos.length > 0 && (
+                    <>
+                      <div className="relative">
+                        <img 
+                          src={filteredPhotos[0].url} 
+                          alt={filteredPhotos[0].description}
+                          className="w-full h-96 object-contain mx-auto"
+                        />
+                        <div className="absolute top-4 left-4">
+                          <span className={`px-3 py-1 rounded-full text-sm font-medium text-white ${getCategoryInfo(filteredPhotos[0].category || 'avancement').color}`}>
+                            {getCategoryInfo(filteredPhotos[0].category || 'avancement').label}
+                          </span>
+                        </div>
+                        <div className="absolute bottom-4 left-0 right-0 bg-black bg-opacity-50 text-white p-4">
+                          <p className="font-medium">{filteredPhotos[0].description}</p>
+                          <p className="text-sm text-gray-300">{new Date(filteredPhotos[0].date).toLocaleDateString()}</p>
+                        </div>
                       </div>
-                    </div>
-                    <div className="p-3">
-                      <div className="flex items-center text-xs text-gray-500 mb-2">
-                        <Calendar className="w-3 h-3 mr-1" />
-                        {new Date(photo.date).toLocaleDateString()}
+                      
+                      <div className="flex overflow-x-auto py-4 px-2 bg-gray-800 gap-2">
+                        {filteredPhotos.map((photo, index) => (
+                          <div 
+                            key={photo.id} 
+                            className={`flex-shrink-0 w-20 h-20 cursor-pointer ${index === 0 ? 'ring-2 ring-blue-500' : ''}`}
+                            onClick={() => {
+                              // Move this photo to the first position
+                              const newPhotos = [...filteredPhotos];
+                              const [selectedPhoto] = newPhotos.splice(index, 1);
+                              newPhotos.unshift(selectedPhoto);
+                              // This is just for UI update in this demo
+                              setPhotoFilter(photoFilter + ' ');
+                              setTimeout(() => setPhotoFilter(photoFilter), 10);
+                            }}
+                          >
+                            <img 
+                              src={photo.url} 
+                              alt={photo.description}
+                              className="w-full h-full object-cover rounded"
+                            />
+                          </div>
+                        ))}
                       </div>
-                      <input
-                        type="text"
-                        value={photo.description}
-                        onChange={(e) => updatePhotoDescription(photo.id, e.target.value)}
-                        className="w-full text-sm border-none p-0 focus:outline-none focus:ring-1 focus:ring-blue-500 rounded"
-                        placeholder="Description..."
-                      />
-                      {photo.filename && (
-                        <p className="text-xs text-gray-400 mt-1 truncate">{photo.filename}</p>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                    </>
+                  )}
+                </div>
+              )}
+              
+              {photoViewMode === 'list' && (
+                <div className="overflow-hidden border rounded-lg">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Photo</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Catégorie</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {filteredPhotos.map(photo => {
+                        const categoryInfo = getCategoryInfo(photo.category || 'avancement');
+                        return (
+                          <tr key={photo.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="w-16 h-16 relative">
+                                <img 
+                                  src={photo.url} 
+                                  alt={photo.description}
+                                  className="w-full h-full object-cover rounded cursor-pointer"
+                                  onClick={() => handlePhotoView(photo, selectedChantier)}
+                                />
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <input
+                                type="text"
+                                value={photo.description}
+                                onChange={(e) => updatePhotoDescription(photo.id, e.target.value)}
+                                className="w-full text-sm border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500"
+                              />
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${categoryInfo.color}`}>
+                                {categoryInfo.label}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {new Date(photo.date).toLocaleDateString()}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                              <div className="flex space-x-2">
+                                <button
+                                  onClick={() => handlePhotoView(photo, selectedChantier)}
+                                  className="text-blue-600 hover:text-blue-900"
+                                  title="Voir"
+                                >
+                                  <Eye className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => deletePhoto(photo.id)}
+                                  className="text-red-600 hover:text-red-900"
+                                  title="Supprimer"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -671,16 +866,22 @@ export const Chantiers: React.FC = () => {
           <Button
             variant="secondary"
             onClick={() => setIsPhotoViewerOpen(false)}
+            size="sm"
           >
             Fermer
           </Button>
           <div className="flex space-x-2">
-            <Button variant="secondary">
+            <Button variant="secondary" size="sm">
               <Download className="w-4 h-4 mr-2" />
               Télécharger
             </Button>
+            <Button variant="secondary" size="sm">
+              <Share2 className="w-4 h-4 mr-2" />
+              Partager
+            </Button>
             <Button
               variant="danger"
+              size="sm"
               onClick={() => {
                 deletePhoto(selectedPhoto.id);
                 setIsPhotoViewerOpen(false);
@@ -702,7 +903,11 @@ export const Chantiers: React.FC = () => {
         <div className="flex space-x-3">
           <Button onClick={() => setIsModalOpen(true)} disabled={loading}>
             <Plus className="w-4 h-4 mr-2" />
-            Nouveau Chantier
+            Nouveau chantier
+          </Button>
+          <Button onClick={() => handlePhotoManagement(filteredChantiers[0])} disabled={loading || filteredChantiers.length === 0} variant="success">
+            <ImagePlus className="w-4 h-4 mr-2" />
+            Gérer les photos
           </Button>
           <Button variant="secondary">
             <Download className="w-4 h-4 mr-2" />
