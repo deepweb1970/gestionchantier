@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Edit, Trash2, Clock, Download, Filter, Search, Calendar, CheckCircle, X, User, Building2, Wrench, AlertTriangle, FileText, Check } from 'lucide-react';
+import { Plus, Edit, Trash2, Clock, Download, Filter, Search, Calendar, CheckCircle, X, User, Building2, Wrench, AlertTriangle, FileText, Check, CalendarRange } from 'lucide-react';
 import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
 import { saisieHeureService } from '../../services/saisieHeureService';
 import { ouvrierService } from '../../services/ouvrierService';
@@ -41,6 +41,9 @@ export const SaisieHeures: React.FC = () => {
   const [chantierFilter, setChantierFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
   const [validationFilter, setValidationFilter] = useState('all');
+  const [dateRangeStart, setDateRangeStart] = useState('');
+  const [dateRangeEnd, setDateRangeEnd] = useState('');
+  const [isDateRangeFilterActive, setIsDateRangeFilterActive] = useState(false);
 
   const getOuvrier = (ouvrierId: string): Ouvrier | undefined => {
     if (!ouvriers) return undefined;
@@ -70,11 +73,20 @@ export const SaisieHeures: React.FC = () => {
     const matchesOuvrier = ouvrierFilter === 'all' || saisie.ouvrierId === ouvrierFilter;
     const matchesChantier = chantierFilter === 'all' || saisie.chantierId === chantierFilter;
     const matchesValidation = validationFilter === 'all' || 
-                             (validationFilter === 'valide' && saisie.valide) ||
-                             (validationFilter === 'non_valide' && !saisie.valide);
+                            (validationFilter === 'valide' && saisie.valide) ||
+                            (validationFilter === 'non_valide' && !saisie.valide);
     
     let matchesDate = true;
-    if (dateFilter !== 'all') {
+    if (isDateRangeFilterActive && dateRangeStart && dateRangeEnd) {
+      // Filtre par plage de dates personnalisée
+      const saisieDate = new Date(saisie.date);
+      const startDate = new Date(dateRangeStart);
+      const endDate = new Date(dateRangeEnd);
+      // Ajuster endDate pour inclure toute la journée
+      endDate.setHours(23, 59, 59, 999);
+      
+      matchesDate = saisieDate >= startDate && saisieDate <= endDate;
+    } else if (dateFilter !== 'all') {
       const today = new Date();
       const saisieDate = new Date(saisie.date);
       
@@ -252,6 +264,24 @@ export const SaisieHeures: React.FC = () => {
       }, 0);
   };
 
+  const toggleDateRangeFilter = () => {
+    setIsDateRangeFilterActive(!isDateRangeFilterActive);
+    if (!isDateRangeFilterActive) {
+      // Initialiser les dates si elles sont vides
+      if (!dateRangeStart) {
+        const today = new Date();
+        const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        setDateRangeStart(firstDayOfMonth.toISOString().split('T')[0]);
+      }
+      if (!dateRangeEnd) {
+        const today = new Date();
+        setDateRangeEnd(today.toISOString().split('T')[0]);
+      }
+      // Désactiver le filtre de date prédéfini
+      setDateFilter('all');
+    }
+  };
+
   const SaisieForm = () => (
     <form onSubmit={(e) => {
       e.preventDefault();
@@ -265,12 +295,19 @@ export const SaisieHeures: React.FC = () => {
               name="ouvrierId"
               required
               defaultValue={editingSaisie?.ouvrierId || undefined}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
             >
               <option value="">Sélectionner un ouvrier</option>
-              {ouvriers?.map(ouvrier => (
+              {ouvriers?.sort((a, b) => {
+                // Trier d'abord par statut (actif en premier)
+                if (a.statut === 'actif' && b.statut !== 'actif') return -1;
+                if (a.statut !== 'actif' && b.statut === 'actif') return 1;
+                // Puis par nom
+                return `${a.nom} ${a.prenom}`.localeCompare(`${b.nom} ${b.prenom}`);
+              }).map(ouvrier => (
                 <option key={ouvrier.id} value={ouvrier.id}>
-                  {ouvrier.prenom} {ouvrier.nom} - {ouvrier.qualification}
+                  {ouvrier.prenom} {ouvrier.nom} - {ouvrier.qualification} 
+                  {ouvrier.statut !== 'actif' ? ` (${ouvrier.statut})` : ''}
                 </option>
               ))}
             </select>
@@ -281,12 +318,18 @@ export const SaisieHeures: React.FC = () => {
               name="chantierId"
               required
               defaultValue={editingSaisie?.chantierId || undefined}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
             >
               <option value="">Sélectionner un chantier</option>
-              {chantiers?.map(chantier => (
+              {chantiers?.sort((a, b) => {
+                // Trier d'abord par statut (actif en premier)
+                if (a.statut === 'actif' && b.statut !== 'actif') return -1;
+                if (a.statut !== 'actif' && b.statut === 'actif') return 1;
+                // Puis par nom
+                return a.nom.localeCompare(b.nom);
+              }).map(chantier => (
                 <option key={chantier.id} value={chantier.id}>
-                  {chantier.nom}
+                  {chantier.nom} {chantier.statut !== 'actif' ? ` (${chantier.statut})` : ''}
                 </option>
               ))}
             </select>
@@ -298,12 +341,20 @@ export const SaisieHeures: React.FC = () => {
           <select
             name="materielId"
             defaultValue={editingSaisie?.materielId || undefined}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
           >
             <option value="">Aucun matériel</option>
-            {materiel?.map(materiel => (
+            {materiel?.sort((a, b) => {
+              // Trier d'abord par statut (disponible et en_service en premier)
+              const aStatus = a.statut === 'disponible' || a.statut === 'en_service' ? 0 : 1;
+              const bStatus = b.statut === 'disponible' || b.statut === 'en_service' ? 0 : 1;
+              if (aStatus !== bStatus) return aStatus - bStatus;
+              // Puis par nom
+              return a.nom.localeCompare(b.nom);
+            }).map(materiel => (
               <option key={materiel.id} value={materiel.id}>
-                {materiel.nom} - {materiel.marque} {materiel.modele}
+                {materiel.nom} - {materiel.marque} {materiel.modele} 
+                {materiel.statut !== 'disponible' && materiel.statut !== 'en_service' ? ` (${materiel.statut})` : ''}
               </option>
             ))}
           </select>
@@ -316,7 +367,7 @@ export const SaisieHeures: React.FC = () => {
               name="date"
               type="date"
               required
-              defaultValue={editingSaisie?.date || new Date().toISOString().split('T')[0]}
+              defaultValue={editingSaisie?.date || (dateRangeStart && isDateRangeFilterActive ? dateRangeStart : new Date().toISOString().split('T')[0])}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -359,7 +410,7 @@ export const SaisieHeures: React.FC = () => {
           <div className="flex items-center">
             <Clock className="w-5 h-5 text-blue-500 mr-2" />
             <p className="text-sm text-blue-600">
-              Les heures sont maintenant calculées en heures totales, sans distinction entre heures normales et supplémentaires.
+              Les heures sont calculées automatiquement en fonction des horaires saisis.
             </p>
           </div>
         </div>
@@ -520,14 +571,54 @@ export const SaisieHeures: React.FC = () => {
         <div className="p-4 border-b">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <input
-                type="text"
-                placeholder="Rechercher..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <input
+                    type="text"
+                    placeholder="Rechercher..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={toggleDateRangeFilter}
+                  className={`px-3 py-2 border rounded-md flex items-center ${
+                    isDateRangeFilterActive 
+                      ? 'bg-blue-100 border-blue-300 text-blue-700' 
+                      : 'bg-gray-100 border-gray-300 text-gray-700'
+                  }`}
+                  title="Filtrer par plage de dates"
+                >
+                  <CalendarRange className="w-4 h-4 mr-2" />
+                  <span className="hidden sm:inline">Plage de dates</span>
+                </button>
+              </div>
+              
+              {isDateRangeFilterActive && (
+                <div className="mt-2 flex gap-2 items-center">
+                  <div className="flex-1">
+                    <label className="block text-xs text-gray-600 mb-1">Date début</label>
+                    <input
+                      type="date"
+                      value={dateRangeStart}
+                      onChange={(e) => setDateRangeStart(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-xs text-gray-600 mb-1">Date fin</label>
+                    <input
+                      type="date"
+                      value={dateRangeEnd}
+                      onChange={(e) => setDateRangeEnd(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
             <div className="flex items-center space-x-2">
               <Filter className="w-4 h-4 text-gray-500" />
@@ -537,7 +628,7 @@ export const SaisieHeures: React.FC = () => {
                 className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[180px]"
               >
                 <option value="all">Tous les ouvriers</option>
-                {ouvriers?.map(ouvrier => (
+                {ouvriers?.sort((a, b) => a.nom.localeCompare(b.nom)).map(ouvrier => (
                   <option key={ouvrier.id} value={ouvrier.id}>
                     {ouvrier.prenom} {ouvrier.nom}
                   </option>
@@ -549,7 +640,7 @@ export const SaisieHeures: React.FC = () => {
                 className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[180px]"
               >
                 <option value="all">Tous les chantiers</option>
-                {chantiers?.map(chantier => (
+                {chantiers?.sort((a, b) => a.nom.localeCompare(b.nom)).map(chantier => (
                   <option key={chantier.id} value={chantier.id}>
                     {chantier.nom}
                   </option>
@@ -559,6 +650,7 @@ export const SaisieHeures: React.FC = () => {
                 value={dateFilter}
                 onChange={(e) => setDateFilter(e.target.value)}
                 className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
+                disabled={isDateRangeFilterActive}
               >
                 <option value="all">Toutes les dates</option>
                 <option value="today">Aujourd'hui</option>
