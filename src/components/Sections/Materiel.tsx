@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, Edit, Trash2, Wrench, Calendar, Download, Euro, Clock, TrendingUp, Calculator } from 'lucide-react';
-import { useSupabase } from '../../hooks/useSupabase';
+import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
 import { materielService } from '../../services/materielService';
 import { Materiel } from '../../types';
 import { Modal } from '../Common/Modal';
@@ -8,20 +8,19 @@ import { Button } from '../Common/Button';
 import { StatusBadge } from '../Common/StatusBadge';
 
 export const MaterielSection: React.FC = () => {
-  const { data: materiel, loading, error, refresh } = useSupabase<Materiel>({
+  const { data: materiel, loading, error, refresh } = useRealtimeSupabase<Materiel>({
     table: 'materiel',
-    orderBy: { column: 'nom' }
+    fetchFunction: materielService.getAll
   });
   
-  const { data: chantiers } = useSupabase({
+  const { data: chantiers } = useRealtimeSupabase({
     table: 'chantiers',
-    columns: 'id, nom, client_id',
-    orderBy: { column: 'nom' }
+    fetchFunction: chantierService.getAll
   });
   
-  const { data: saisiesHeures } = useSupabase({
+  const { data: saisiesHeures } = useRealtimeSupabase({
     table: 'saisies_heures',
-    columns: 'id, materiel_id, heures_total, ouvrier_id',
+    fetchFunction: saisieHeureService.getAll
   });
   
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -90,11 +89,13 @@ export const MaterielSection: React.FC = () => {
 
     try {
       if (editingMateriel) {
-        await materielService.update(editingMateriel.id, materielData);
+        const updatedMateriel = await materielService.update(editingMateriel.id, materielData);
+        console.log('Matériel mis à jour:', updatedMateriel);
       } else {
-        await materielService.create(materielData);
+        const newMateriel = await materielService.create(materielData);
+        console.log('Nouveau matériel créé:', newMateriel);
       }
-      refresh();
+      // Le refresh est automatique grâce à l'abonnement en temps réel
       setIsModalOpen(false);
       setEditingMateriel(null);
     } catch (error) {
@@ -534,7 +535,7 @@ export const MaterielSection: React.FC = () => {
                 {filteredMateriel.length === 0 && (
                   <tfoot>
                     <tr>
-                      <td colSpan={7} className="px-6 py-10 text-center text-gray-500">
+                      <td colSpan={7} className="px-6 py-10 text-center text-gray-500 bg-gray-50">
                         Aucun matériel trouvé
                       </td>
                     </tr>

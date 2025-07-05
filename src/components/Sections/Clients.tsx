@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, Edit, Trash2, User, Building, Phone, Mail, FileText, MessageSquare, Calendar, Download, Filter, Search, Eye, Send } from 'lucide-react';
-import { useSupabase } from '../../hooks/useSupabase';
+import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
 import { clientService } from '../../services/clientService';
 import { chantierService } from '../../services/chantierService';
 import { factureService } from '../../services/factureService';
@@ -10,21 +10,19 @@ import { Button } from '../Common/Button';
 import { StatusBadge } from '../Common/StatusBadge';
 
 export const Clients: React.FC = () => {
-  const { data: clients, loading, error, refresh } = useSupabase<Client>({
+  const { data: clients, loading, error, refresh } = useRealtimeSupabase<Client>({
     table: 'clients',
-    orderBy: { column: 'nom' }
+    fetchFunction: clientService.getAll
   });
   
-  const { data: chantiers } = useSupabase<Chantier>({
+  const { data: chantiers } = useRealtimeSupabase<Chantier>({
     table: 'chantiers',
-    columns: '*',
-    orderBy: { column: 'nom' }
+    fetchFunction: chantierService.getAll
   });
   
-  const { data: factures } = useSupabase<Facture>({
+  const { data: factures } = useRealtimeSupabase<Facture>({
     table: 'factures',
-    columns: '*',
-    orderBy: { column: 'date_emission', ascending: false }
+    fetchFunction: factureService.getAll
   });
   
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -107,11 +105,13 @@ export const Clients: React.FC = () => {
 
     try {
       if (editingClient) {
-        await clientService.update(editingClient.id, clientData);
+        const updatedClient = await clientService.update(editingClient.id, clientData);
+        console.log('Client mis à jour:', updatedClient);
       } else {
-        await clientService.create(clientData);
+        const newClient = await clientService.create(clientData);
+        console.log('Nouveau client créé:', newClient);
       }
-      refresh();
+      // Le refresh est automatique grâce à l'abonnement en temps réel
       setIsModalOpen(false);
       setEditingClient(null);
     } catch (error) {
@@ -625,7 +625,7 @@ export const Clients: React.FC = () => {
                 {filteredClients.length === 0 && (
                   <tfoot>
                     <tr>
-                      <td colSpan={5} className="px-6 py-10 text-center text-gray-500">
+                      <td colSpan={5} className="px-6 py-10 text-center text-gray-500 bg-gray-50">
                         Aucun client trouvé
                       </td>
                     </tr>

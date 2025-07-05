@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, Edit, Trash2, User, Phone, Mail, Download } from 'lucide-react';
-import { useSupabase } from '../../hooks/useSupabase';
+import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
 import { ouvrierService } from '../../services/ouvrierService';
 import { Ouvrier } from '../../types';
 import { Modal } from '../Common/Modal';
@@ -8,10 +8,9 @@ import { Button } from '../Common/Button';
 import { StatusBadge } from '../Common/StatusBadge';
 
 export const Ouvriers: React.FC = () => {
-  const { data: ouvriers, loading, error, refresh } = useSupabase<Ouvrier>({
+  const { data: ouvriers, loading, error, refresh } = useRealtimeSupabase<Ouvrier>({
     table: 'ouvriers',
-    columns: '*',
-    orderBy: { column: 'nom' }
+    fetchFunction: ouvrierService.getAll
   });
   
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -57,11 +56,13 @@ export const Ouvriers: React.FC = () => {
 
     try {
       if (editingOuvrier) {
-        await ouvrierService.update(editingOuvrier.id, ouvrierData);
+        const updatedOuvrier = await ouvrierService.update(editingOuvrier.id, ouvrierData);
+        console.log('Ouvrier mis à jour:', updatedOuvrier);
       } else {
-        await ouvrierService.create(ouvrierData);
+        const newOuvrier = await ouvrierService.create(ouvrierData);
+        console.log('Nouvel ouvrier créé:', newOuvrier);
       }
-      refresh();
+      // Le refresh est automatique grâce à l'abonnement en temps réel
       setIsModalOpen(false);
       setEditingOuvrier(null);
     } catch (error) {
@@ -330,7 +331,7 @@ export const Ouvriers: React.FC = () => {
                 {filteredOuvriers.length === 0 && (
                   <tfoot>
                     <tr>
-                      <td colSpan={6} className="px-6 py-10 text-center text-gray-500">
+                      <td colSpan={6} className="px-6 py-10 text-center text-gray-500 bg-gray-50">
                         Aucun ouvrier trouvé
                       </td>
                     </tr>
