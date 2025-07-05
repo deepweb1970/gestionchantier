@@ -10,8 +10,10 @@ import { Modal } from '../Common/Modal';
 import { Button } from '../Common/Button';
 import { ExportModal } from '../Common/ExportModal';
 import { PointageDigital } from './PointageDigital';
+import { useState as usePointageState } from 'react';
 
 export const SaisieHeures: React.FC = () => {
+  const [showPointageDigital, setShowPointageDigital] = usePointageState(false);
   const { data: saisies, loading: saisiesLoading, error: saisiesError, refresh: refreshSaisies } = useRealtimeSupabase<SaisieHeure>({
     table: 'saisies_heures',
     fetchFunction: saisieHeureService.getAll
@@ -503,6 +505,13 @@ export const SaisieHeures: React.FC = () => {
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-800">Saisie des Heures</h1>
         <div className="flex space-x-3">
+          <Button 
+            onClick={() => setShowPointageDigital(!showPointageDigital)} 
+            variant={showPointageDigital ? "success" : "secondary"}
+          >
+            <Clock className="w-4 h-4 mr-2" />
+            Pointage Digital
+          </Button>
           <Button onClick={() => setIsModalOpen(true)} disabled={ouvriersLoading || chantiersLoading || materielLoading}>
             <Plus className="w-4 h-4 mr-2" />
             Nouvelle Saisie
@@ -519,7 +528,7 @@ export const SaisieHeures: React.FC = () => {
       </div>
 
       {/* Statistiques */}
-      <PointageDigital />
+      {showPointageDigital && <PointageDigital />}
       
       {saisiesLoading ? (
         <div className="text-center py-8">
