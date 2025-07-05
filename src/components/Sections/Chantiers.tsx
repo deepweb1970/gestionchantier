@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Camera, MapPin, Filter, Download, Clock, Users, Upload, X, Eye, Calendar, Tag } from 'lucide-react';
 import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
 import { chantierService } from '../../services/chantierService';
