@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from './components/Auth/AuthProvider';
+import { AuthLayout } from './components/Auth/AuthLayout';
 import { Sidebar } from './components/Layout/Sidebar';
 import { Header } from './components/Layout/Header';
 import { Dashboard } from './components/Sections/Dashboard';
@@ -14,6 +16,7 @@ import { Planning } from './components/Sections/Planning';
 import { ParametresHeuresSup } from './components/Sections/ParametresHeuresSup';
 
 function App() {
+  const { user, loading } = useAuth();
   const [activeSection, setActiveSection] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -117,6 +120,23 @@ function App() {
         return <Dashboard />;
     }
   };
+
+  // Si l'authentification est en cours de chargement, afficher un indicateur de chargement
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Chargement...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Si l'utilisateur n'est pas connecté, afficher le formulaire de connexion
+  if (!user) {
+    return <AuthLayout />;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
