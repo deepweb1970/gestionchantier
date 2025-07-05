@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Plus, Edit, Trash2, Wrench, Calendar, Download, Euro, Clock, TrendingUp, Calculator } from 'lucide-react';
 import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
 import { materielService } from '../../services/materielService';
+import { chantierService } from '../../services/chantierService';
+import { saisieHeureService } from '../../services/saisieHeureService';
 import { Materiel } from '../../types';
 import { Modal } from '../Common/Modal';
 import { Button } from '../Common/Button';
