@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Edit, Trash2, Clock, Download, Filter, Search, Calendar, CheckCircle, X, User, Building2, Wrench, AlertTriangle, FileText, Check, CalendarRange } from 'lucide-react';
+import { Plus, Edit, Trash2, Clock, Download, Filter, Search, Calendar, CheckCircle, X, User, Building2, Wrench, AlertTriangle, FileText, Check, CalendarRange, DollarSign } from 'lucide-react';
 import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
 import { saisieHeureService } from '../../services/saisieHeureService';
 import { ouvrierService } from '../../services/ouvrierService';
@@ -258,6 +258,16 @@ export const SaisieHeures: React.FC = () => {
     }, 0);
   };
 
+  const getTotalCost = () => {
+    return (filteredSaisies || []).reduce((total, saisie) => {
+      const ouvrier = getOuvrier(saisie.ouvrierId);
+      if (!ouvrier) return total;
+      
+      const totalHeures = saisie.heuresNormales + saisie.heuresSupplementaires + (saisie.heuresExceptionnelles || 0);
+      return total + (totalHeures * ouvrier.tauxHoraire);
+    }, 0);
+  };
+
   const getValidatedHours = () => {
     return (filteredSaisies || [])
       .filter(saisie => saisie.valide)
@@ -474,10 +484,13 @@ export const SaisieHeures: React.FC = () => {
                         {ouvrier?.prenom} {ouvrier?.nom}
                       </div>
                       <div className="text-sm text-gray-600">
+                        {ouvrier?.qualification}
+                      </div>
+                      <div className="text-sm text-gray-600">
                         {chantier?.nom} - {new Date(saisie.date).toLocaleDateString()}
                       </div>
                       <div className="text-sm text-gray-500">
-                        {saisie.heuresNormales + saisie.heuresSupplementaires + (saisie.heuresExceptionnelles || 0)} heures
+                        {ouvrier?.tauxHoraire}€/h
                       </div>
                     </div>
                     <button
@@ -511,6 +524,15 @@ export const SaisieHeures: React.FC = () => {
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-800">Saisie des Heures</h1>
         <div className="flex space-x-3">
+          <Button 
+            variant="secondary"
+            onClick={() => {
+              alert(`Coût total: ${getTotalCost().toLocaleString()}€`);
+            }}
+          >
+            <DollarSign className="w-4 h-4 mr-2" />
+            Coût Total
+          </Button>
           <Button 
             onClick={() => setShowPointageDigital(!showPointageDigital)} 
             variant={showPointageDigital ? "success" : "secondary"}
@@ -550,7 +572,7 @@ export const SaisieHeures: React.FC = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white rounded-lg shadow-sm border p-6">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-2">
             <div>
               <p className="text-sm font-medium text-gray-600">Total Heures</p>
               <p className="text-2xl font-bold text-gray-900">{getTotalHours().toFixed(1)}h</p>
@@ -558,6 +580,9 @@ export const SaisieHeures: React.FC = () => {
             <div className="p-3 rounded-full bg-blue-500">
               <Clock className="w-6 h-6 text-white" />
             </div>
+          </div>
+          <div className="text-sm text-gray-500">
+            Coût: {getTotalCost().toLocaleString()}€
           </div>
         </div>
 
@@ -798,8 +823,17 @@ export const SaisieHeures: React.FC = () => {
                         <Calendar className="w-4 h-4 text-gray-400 mr-2" />
                         <span className="text-sm text-gray-900">{new Date(saisie.date).toLocaleDateString()}</span>
                       </div>
-                      <div className="text-xs text-gray-500 mt-1">
+                      <div className="text-xs text-gray-500">
                         {saisie.heureDebut} - {saisie.heureFin}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        {(() => {
+                          const ouvrier = getOuvrier(saisie.ouvrierId);
+                          if (!ouvrier) return '';
+                          const totalHeures = saisie.heuresNormales + saisie.heuresSupplementaires + (saisie.heuresExceptionnelles || 0);
+                          const cout = totalHeures * ouvrier.tauxHoraire;
+                          return `${cout.toLocaleString()}€ (${ouvrier.tauxHoraire}€/h)`;
+                        })()}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
