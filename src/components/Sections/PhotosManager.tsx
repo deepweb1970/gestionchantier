@@ -3,7 +3,7 @@ import {
   Image, Plus, Edit, Trash2, Download, Filter, Search, Calendar, 
   CheckCircle, X, Building2, Tag, Info, Upload, Eye, EyeOff, 
   ArrowLeft, ArrowRight, Maximize, Minimize, Copy, Link, Share2,
-  AlertTriangle
+  AlertTriangle, LinkOff
 } from 'lucide-react';
 import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
 import { chantierService } from '../../services/chantierService';
@@ -31,6 +31,7 @@ export const PhotosManager: React.FC = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [isLinkChantierModalOpen, setIsLinkChantierModalOpen] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
   const [isGalleryView, setIsGalleryView] = useState(true);
   
@@ -45,6 +46,7 @@ export const PhotosManager: React.FC = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [selectedChantier, setSelectedChantier] = useState('');
   
   // Gallery view states
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
@@ -246,6 +248,37 @@ export const PhotosManager: React.FC = () => {
     }
   };
 
+  const handleLinkToChantier = (photo: Photo) => {
+    setSelectedPhoto(photo);
+    setSelectedChantier(photo.chantierId || '');
+    setIsLinkChantierModalOpen(true);
+  };
+
+  const handleSaveLinkToChantier = async () => {
+    if (!selectedPhoto) return;
+    
+    try {
+      const { error } = await supabase
+        .from('photos')
+        .update({
+          chantier_id: selectedChantier || null
+        })
+        .eq('id', selectedPhoto.id);
+      
+      if (error) throw error;
+      
+      setIsLinkChantierModalOpen(false);
+      setSelectedPhoto(null);
+      setSelectedChantier('');
+      
+      // Show success message
+      alert('Photo liée au chantier avec succès');
+    } catch (error) {
+      console.error('Error linking photo to chantier:', error);
+      alert('Erreur lors de la liaison de la photo au chantier');
+    }
+  };
+
   // File upload handling
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -442,6 +475,19 @@ export const PhotosManager: React.FC = () => {
               <Calendar className="w-3 h-3 mr-1" />
               {new Date(photo.date).toLocaleDateString()}
             </p>
+            <div className="text-sm text-gray-500 flex items-center mt-1">
+              {photo.chantierId ? (
+                <>
+                  <Building2 className="w-3 h-3 mr-1 text-blue-500" />
+                  <span className="text-blue-600">{photo.chantierNom || getChantierName(photo.chantierId)}</span>
+                </>
+              ) : (
+                <>
+                  <LinkOff className="w-3 h-3 mr-1 text-gray-400" />
+                  <span className="text-gray-400">Non associée</span>
+                </>
+              )}
+            </div>
           </div>
         </div>
       ))}
@@ -501,6 +547,22 @@ export const PhotosManager: React.FC = () => {
                 {photo.filename && (
                   <div className="text-xs text-gray-500 mt-1">{photo.filename}</div>
                 )}
+                <div className="text-sm text-gray-500">
+                  {new Date(photo.date).toLocaleDateString()}
+                </div>
+                <div className="text-sm text-gray-500 flex items-center mt-1">
+                  {photo.chantierId ? (
+                    <>
+                      <Building2 className="w-3 h-3 mr-1 text-blue-500" />
+                      <span className="text-blue-600">{photo.chantierNom || getChantierName(photo.chantierId)}</span>
+                    </>
+                  ) : (
+                    <>
+                      <LinkOff className="w-3 h-3 mr-1 text-gray-400" />
+                      <span className="text-gray-400">Non associée</span>
+                    </>
+                  )}
+                </div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
                 <div className="flex items-center">
@@ -541,9 +603,14 @@ export const PhotosManager: React.FC = () => {
                       setIsEditModalOpen(true);
                     }}
                     className="text-blue-600 hover:text-blue-900"
-                    title="Modifier"
-                  >
+                    title="Modifier">
                     <Edit className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleLinkToChantier(photo)}
+                    className="text-purple-600 hover:text-purple-900"
+                    title="Lier à un chantier">
+                    <Link className="w-4 h-4" />
                   </button>
                   <button
                     onClick={(e) => {
@@ -648,6 +715,7 @@ export const PhotosManager: React.FC = () => {
               className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">Tous les chantiers</option>
+              <option value="">Non associées</option>
               {chantiers?.map(chantier => (
                 <option key={chantier.id} value={chantier.id}>{chantier.nom}</option>
               ))}
@@ -1047,30 +1115,16 @@ export const PhotosManager: React.FC = () => {
               />
             </div>
             
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-              <textarea
-                value={selectedPhoto.description}
-                disabled={isUploading}
-                onChange={(e) => setSelectedPhoto({...selectedPhoto, description: e.target.value})}
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
-              />
-            </div>
-            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Chantier</label>
-                <select
-                  value={selectedPhoto.chantierId || ''}
-                  onChange={(e) => setSelectedPhoto({...selectedPhoto, chantierId: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Sélectionner un chantier</option>
-                  {chantiers?.map(chantier => (
-                    <option key={chantier.id} value={chantier.id}>{chantier.nom}</option>
-                  ))}
-                </select>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <textarea
+                  rows={3}
+                  value={selectedPhoto.description}
+                  disabled={isUploading}
+                  onChange={(e) => setSelectedPhoto({...selectedPhoto, description: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
+                />
               </div>
               
               <div>
@@ -1087,6 +1141,19 @@ export const PhotosManager: React.FC = () => {
                   <option value="finition">Finition</option>
                   <option value="avant">Avant</option>
                   <option value="apres">Après</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Chantier associé</label>
+                <select
+                  value={selectedPhoto.chantierId || ''}
+                  onChange={(e) => setSelectedPhoto({...selectedPhoto, chantierId: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Aucun chantier</option>
+                  {chantiers?.map(chantier => (
+                    <option key={chantier.id} value={chantier.id}>{chantier.nom}</option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -1150,6 +1217,77 @@ export const PhotosManager: React.FC = () => {
             <CheckCircle className="w-4 h-4 mr-2" />
             Enregistrer
           </Button>
+        </div>
+      </Modal>
+
+      {/* Modal pour lier une photo à un chantier */}
+      <Modal
+        isOpen={isLinkChantierModalOpen}
+        onClose={() => {
+          setIsLinkChantierModalOpen(false);
+          setSelectedPhoto(null);
+          setSelectedChantier('');
+        }}
+        title="Lier la photo à un chantier"
+        size="md"
+      >
+        <div className="space-y-6">
+          {selectedPhoto && (
+            <div className="flex items-center space-x-4">
+              <div className="w-20 h-20 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden">
+                <img 
+                  src={selectedPhoto.url} 
+                  alt={selectedPhoto.description} 
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <div>
+                <p className="font-medium text-gray-900">{selectedPhoto.description}</p>
+                <p className="text-sm text-gray-500">{new Date(selectedPhoto.date).toLocaleDateString()}</p>
+                <p className="text-sm text-gray-500">{getCategoryLabel(selectedPhoto.category)}</p>
+              </div>
+            </div>
+          )}
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Chantier</label>
+            <select
+              value={selectedChantier}
+              onChange={(e) => setSelectedChantier(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Aucun chantier (dissocier)</option>
+              {chantiers?.map(chantier => (
+                <option key={chantier.id} value={chantier.id}>{chantier.nom}</option>
+              ))}
+            </select>
+          </div>
+          
+          <div className="flex justify-end space-x-3">
+            <Button 
+              variant="secondary" 
+              onClick={() => {
+                setIsLinkChantierModalOpen(false);
+                setSelectedPhoto(null);
+                setSelectedChantier('');
+              }}
+            >
+              Annuler
+            </Button>
+            <Button onClick={handleSaveLinkToChantier}>
+              {selectedChantier ? (
+                <>
+                  <Link className="w-4 h-4 mr-2" />
+                  Lier au chantier
+                </>
+              ) : (
+                <>
+                  <LinkOff className="w-4 h-4 mr-2" />
+                  Dissocier
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </Modal>
 
