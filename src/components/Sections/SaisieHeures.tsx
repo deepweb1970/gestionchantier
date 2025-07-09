@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Edit, Trash2, Clock, Download, Filter, Search, Calendar, CheckCircle, X, User, Building2, Wrench, AlertTriangle, FileText, Check, CalendarRange, DollarSign, PieChart, TrendingUp } from 'lucide-react';
+import { Plus, Edit, Trash2, Clock, Download, Filter, Search, Calendar, CheckCircle, X, User, Building2, Wrench, AlertTriangle, FileText, Check, CalendarRange, DollarSign } from 'lucide-react';
 import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
 import { saisieHeureService } from '../../services/saisieHeureService';
 import { ouvrierService } from '../../services/ouvrierService';
@@ -259,31 +259,36 @@ export const SaisieHeures: React.FC = () => {
   };
 
   const getTotalCost = () => {
-    return (filteredSaisies || []).reduce((total, saisie) => {
+    const totalCost = (filteredSaisies || []).reduce((total, saisie) => {
       const ouvrier = getOuvrier(saisie.ouvrierId);
       if (!ouvrier) return total;
+      
       const totalHeures = saisie.heuresNormales + saisie.heuresSupplementaires + (saisie.heuresExceptionnelles || 0);
       return total + (totalHeures * ouvrier.tauxHoraire);
     }, 0);
+    
+    return totalCost;
   };
-
+  
   const getValidatedCost = () => {
     return (filteredSaisies || [])
       .filter(saisie => saisie.valide)
       .reduce((total, saisie) => {
         const ouvrier = getOuvrier(saisie.ouvrierId);
         if (!ouvrier) return total;
+        
         const totalHeures = saisie.heuresNormales + saisie.heuresSupplementaires + (saisie.heuresExceptionnelles || 0);
         return total + (totalHeures * ouvrier.tauxHoraire);
       }, 0);
   };
-
+  
   const getPendingCost = () => {
     return (filteredSaisies || [])
       .filter(saisie => !saisie.valide)
       .reduce((total, saisie) => {
         const ouvrier = getOuvrier(saisie.ouvrierId);
         if (!ouvrier) return total;
+        
         const totalHeures = saisie.heuresNormales + saisie.heuresSupplementaires + (saisie.heuresExceptionnelles || 0);
         return total + (totalHeures * ouvrier.tauxHoraire);
       }, 0);
@@ -472,6 +477,12 @@ export const SaisieHeures: React.FC = () => {
     const selectedSaisiesData = (saisies || []).filter(s => selectedSaisies.includes(s.id));
     const totalHeures = selectedSaisiesData.reduce((total, s) => 
       total + s.heuresNormales + s.heuresSupplementaires + (s.heuresExceptionnelles || 0), 0);
+    const totalCout = selectedSaisiesData.reduce((total, s) => {
+      const ouvrier = getOuvrier(s.ouvrierId);
+      if (!ouvrier) return total;
+      const heures = s.heuresNormales + s.heuresSupplementaires + (s.heuresExceptionnelles || 0);
+      return total + (heures * ouvrier.tauxHoraire);
+    }, 0);
     
     return (
       <div className="space-y-6">
@@ -489,7 +500,13 @@ export const SaisieHeures: React.FC = () => {
           
           <div className="bg-white border rounded-lg p-4">
             <div className="flex justify-between items-center mb-4">
-              <span className="font-medium text-gray-900">Total : {totalHeures.toFixed(1)} heures</span>
+              <div>
+                <div className="font-medium text-gray-900">Total : {totalHeures.toFixed(1)} heures</div>
+                <div className="text-sm text-gray-600 flex items-center mt-1">
+                  <DollarSign className="w-4 h-4 mr-1 text-green-600" />
+                  <span>Coût : {totalCout.toLocaleString()}€</span>
+                </div>
+              </div>
               <span className="text-sm text-gray-500">{selectedSaisies.length} saisie(s)</span>
             </div>
             
@@ -507,11 +524,18 @@ export const SaisieHeures: React.FC = () => {
                       <div className="text-sm text-gray-600">
                         {ouvrier?.qualification}
                       </div>
-                      <div className="text-sm text-gray-500">
+                      <div className="text-sm text-gray-600">
                         {chantier?.nom} - {new Date(saisie.date).toLocaleDateString()}
                       </div>
-                      <div className="text-sm font-medium text-blue-600">
-                        {ouvrier?.tauxHoraire} €/h
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">
+                          {(saisie.heuresNormales + saisie.heuresSupplementaires + (saisie.heuresExceptionnelles || 0)).toFixed(1)}h
+                        </span>
+                        {ouvrier && (
+                          <span className="text-green-600 font-medium">
+                            {((saisie.heuresNormales + saisie.heuresSupplementaires + (saisie.heuresExceptionnelles || 0)) * ouvrier.tauxHoraire).toLocaleString()}€
+                          </span>
+                        )}
                       </div>
                     </div>
                     <button
@@ -547,15 +571,10 @@ export const SaisieHeures: React.FC = () => {
         <div className="flex space-x-3">
           <Button 
             variant="secondary"
-            onClick={() => alert(`
-Résumé des coûts:
-- Total: ${getTotalCost().toLocaleString()}€
-- Validé: ${getValidatedCost().toLocaleString()}€
-- En attente: ${getPendingCost().toLocaleString()}€
-            `)}
+            onClick={() => setIsExportModalOpen(true)}
           >
-            <DollarSign className="w-4 h-4 mr-2" />
-            Résumé Coûts
+            <Download className="w-4 h-4 mr-2" />
+            Exporter
           </Button>
           <Button 
             onClick={() => setShowPointageDigital(!showPointageDigital)} 
@@ -568,13 +587,22 @@ Résumé des coûts:
             <Plus className="w-4 h-4 mr-2" />
             Nouvelle Saisie
           </Button>
+          <Button 
+            onClick={() => {
+              const totalCost = getTotalCost();
+              const validatedCost = getValidatedCost();
+              const pendingCost = getPendingCost();
+              
+              alert(`Résumé des coûts:\n\nCoût total: ${totalCost.toLocaleString()}€\nCoût validé: ${validatedCost.toLocaleString()}€\nCoût en attente: ${pendingCost.toLocaleString()}€`);
+            }}
+            variant="secondary"
+          >
+            <DollarSign className="w-4 h-4 mr-2" />
+            Résumé Coûts
+          </Button>
           <Button onClick={handleValidation} disabled={selectedSaisies.length === 0} variant="success">
             <CheckCircle className="w-4 h-4 mr-2" />
             Valider Sélection
-          </Button>
-          <Button variant="secondary" onClick={() => setIsExportModalOpen(true)}>
-            <Download className="w-4 h-4 mr-2" />
-            Exporter
           </Button>
         </div>
       </div>
@@ -599,14 +627,17 @@ Résumé des coûts:
           <div className="flex items-center justify-between mb-2">
             <div>
               <p className="text-sm font-medium text-gray-600">Total Heures</p>
-              <p className="text-2xl font-bold text-gray-900">{getTotalHours().toFixed(1)}h</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {getTotalHours().toFixed(1)}h
+              </p>
             </div>
             <div className="p-3 rounded-full bg-blue-500">
-              <TrendingUp className="w-6 h-6 text-white" />
+              <Clock className="w-6 h-6 text-white" />
             </div>
           </div>
-          <div className="text-sm font-medium text-blue-600">
-            Coût: {getTotalCost().toLocaleString()} €
+          <div className="text-sm text-gray-600 flex items-center">
+            <DollarSign className="w-4 h-4 mr-1 text-blue-500" />
+            <span>Coût: <span className="font-medium">{getTotalCost().toLocaleString()}€</span></span>
           </div>
         </div>
 
@@ -614,14 +645,17 @@ Résumé des coûts:
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Heures Validées</p>
-              <p className="text-2xl font-bold text-green-600">{getValidatedHours().toFixed(1)}h</p>
+              <p className="text-2xl font-bold text-green-600">
+                {getValidatedHours().toFixed(1)}h
+              </p>
             </div>
             <div className="p-3 rounded-full bg-green-500">
-              <DollarSign className="w-6 h-6 text-white" />
+              <CheckCircle className="w-6 h-6 text-white" />
             </div>
           </div>
-          <div className="text-sm font-medium text-green-600">
-            Coût: {getValidatedCost().toLocaleString()} €
+          <div className="text-sm text-gray-600 flex items-center">
+            <DollarSign className="w-4 h-4 mr-1 text-green-500" />
+            <span>Coût: <span className="font-medium">{getValidatedCost().toLocaleString()}€</span></span>
           </div>
         </div>
 
@@ -629,14 +663,17 @@ Résumé des coûts:
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Heures En Attente</p>
-              <p className="text-2xl font-bold text-orange-600">{getPendingHours().toFixed(1)}h</p>
+              <p className="text-2xl font-bold text-orange-600">
+                {getPendingHours().toFixed(1)}h
+              </p>
             </div>
             <div className="p-3 rounded-full bg-orange-500">
-              <PieChart className="w-6 h-6 text-white" />
+              <AlertTriangle className="w-6 h-6 text-white" />
             </div>
           </div>
-          <div className="text-sm font-medium text-orange-600">
-            Coût: {getPendingCost().toLocaleString()} €
+          <div className="text-sm text-gray-600 flex items-center">
+            <DollarSign className="w-4 h-4 mr-1 text-orange-500" />
+            <span>Coût: <span className="font-medium">{getPendingCost().toLocaleString()}€</span></span>
           </div>
         </div>
       </div>)}
@@ -764,21 +801,11 @@ Résumé des coûts:
                     value={validationFilter}
                     onChange={(e) => setValidationFilter(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                <div className="text-sm text-gray-500">
+                  >
                     <option value="all">Tous les statuts</option>
                     <option value="valide">Validées</option>
-                <div className="flex justify-between mt-1">
-                  <span className="text-sm font-medium text-blue-600">
-                    {saisie.heuresNormales + saisie.heuresSupplementaires + (saisie.heuresExceptionnelles || 0)} heures
-                  </span>
-                  <span className="text-sm font-medium text-green-600">
-                    {(() => {
-                      const ouvrier = getOuvrier(saisie.ouvrierId);
-                      if (!ouvrier) return '';
-                      const totalHeures = saisie.heuresNormales + saisie.heuresSupplementaires + (saisie.heuresExceptionnelles || 0);
-                      return `${(totalHeures * ouvrier.tauxHoraire).toLocaleString()} €`;
-                    })()}
-                  </span>
+                    <option value="non_valide">Non validées</option>
+                  </select>
                 </div>
               </div>
             )}
@@ -840,7 +867,7 @@ Résumé des coûts:
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="flex-shrink-0 h-10 w-10">
-                          <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center">
+                          <div className={`h-10 w-10 rounded-full ${ouvrier?.statut === 'actif' ? 'bg-blue-500' : 'bg-gray-400'} flex items-center justify-center`}>
                             <User className="h-5 w-5 text-white" />
                           </div>
                         </div>
@@ -849,6 +876,9 @@ Résumé des coûts:
                             {ouvrier?.prenom} {ouvrier?.nom}
                           </div>
                           <div className="text-sm text-gray-500">{ouvrier?.qualification}</div>
+                          <div className="text-xs text-blue-600 font-medium mt-1">
+                            {ouvrier?.tauxHoraire}€/h
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -866,21 +896,28 @@ Résumé des coûts:
                       <div className="text-xs text-gray-500">
                         {saisie.heureDebut} - {saisie.heureFin}
                       </div>
-                      <div className="text-xs font-medium text-green-600 mt-1 flex items-center">
-                        <DollarSign className="w-3 h-3 mr-1" />
+                      <div className="text-xs text-gray-500 mt-1">
                         {(() => {
                           const ouvrier = getOuvrier(saisie.ouvrierId);
                           if (!ouvrier) return '';
                           const totalHeures = saisie.heuresNormales + saisie.heuresSupplementaires + (saisie.heuresExceptionnelles || 0);
-                          const cout = totalHeures * ouvrier.tauxHoraire;
-                          return `${cout.toLocaleString()} € (${totalHeures.toFixed(1)}h)`;
+                          const cout = Math.round(totalHeures * ouvrier.tauxHoraire * 100) / 100;
+                          return (
+                            <span className="flex items-center">
+                              <DollarSign className="w-3 h-3 mr-1 text-green-600" />
+                              <span className="font-medium">{cout.toLocaleString()}€</span>
+                            </span>
+                          );
                         })()}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="space-y-1">
                         <div className="text-sm font-medium">
-                          {(saisie.heuresNormales + saisie.heuresSupplementaires + (saisie.heuresExceptionnelles || 0)).toFixed(1)}h total
+                          {(() => {
+                            const totalHeures = saisie.heuresNormales + saisie.heuresSupplementaires + (saisie.heuresExceptionnelles || 0);
+                            return `${totalHeures.toFixed(1)}h total`;
+                          })()}
                         </div>
                         <div className="text-xs text-gray-500">
                           {saisie.heureDebut} - {saisie.heureFin}
@@ -974,7 +1011,7 @@ Résumé des coûts:
       <Modal
         isOpen={isValidationModalOpen}
         onClose={() => setIsValidationModalOpen(false)}
-        title="Validation des saisies d'heures"
+        title="Validation des saisies d'heures et coûts"
         size="md"
       >
         <ValidationModal />
