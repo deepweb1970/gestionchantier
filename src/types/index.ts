@@ -101,10 +101,10 @@ export interface SaisieHeure {
   date: string;
   heureDebut: string;
   heureFin: string;
-  heureTable?: string;
   heuresNormales: number;
   heuresSupplementaires: number;
   heuresExceptionnelles?: number;
+  heureTable?: string;
   description: string;
   valide: boolean;
   parametresId?: string;
