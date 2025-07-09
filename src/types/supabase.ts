@@ -314,6 +314,7 @@ export interface Database {
           date: string
           heure_debut: string
           heure_fin: string
+          heure_table: string | null
           heures_normales: number
           heures_supplementaires: number
           description: string
@@ -332,6 +333,7 @@ export interface Database {
           date: string
           heure_debut: string
           heure_fin: string
+          heure_table?: string | null
           heures_normales?: number
           heures_supplementaires?: number
           description: string
@@ -350,6 +352,7 @@ export interface Database {
           date?: string
           heure_debut?: string
           heure_fin?: string
+          heure_table?: string | null
           heures_normales?: number
           heures_supplementaires?: number
           description?: string

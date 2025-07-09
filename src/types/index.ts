@@ -101,6 +101,7 @@ export interface SaisieHeure {
   date: string;
   heureDebut: string;
   heureFin: string;
+  heureTable?: string;
   heuresNormales: number;
   heuresSupplementaires: number;
   heuresExceptionnelles?: number;
@@ -118,6 +119,7 @@ export interface SimpleSaisieHeure {
   date: string;
   heureDebut: string;
   heureFin: string;
+  heureTable?: string;
   heuresTotal: number;
   description: string;
   valide: boolean;
