@@ -1,60 +1,91 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Image, Download, Filter, Search, Calendar, CheckCircle, X, Building2, Camera, ArrowLeft, ArrowRight, Upload, Eye, Info, Tag, Clock } from 'lucide-react';
+import { 
+  Image, Plus, Edit, Trash2, Download, Filter, Search, Calendar, 
+  CheckCircle, X, Building2, Tag, Info, Upload, Eye, EyeOff, 
+  ArrowLeft, ArrowRight, Maximize, Minimize, Copy, Link, Share2,
+  AlertTriangle, Unlink
+} from 'lucide-react';
 import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
-import { PhotoService } from '../../services/photoService';
 import { chantierService } from '../../services/chantierService';
 import { Photo, Chantier } from '../../types';
 import { Modal } from '../Common/Modal';
 import { Button } from '../Common/Button';
-import { ExportModal } from '../Common/ExportModal';
 import { supabase } from '../../lib/supabase';
 
 export const PhotosManager: React.FC = () => {
-  // State
+  // State for photos and chantiers
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-  const [editingPhoto, setEditingPhoto] = useState<Photo | null>(null);
-  const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
+  
+  // Filters and search
   const [searchTerm, setSearchTerm] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('all');
   const [chantierFilter, setChantierFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(12);
-  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
+  const [dateRangeStart, setDateRangeStart] = useState('');
+  const [dateRangeEnd, setDateRangeEnd] = useState('');
+  const [isDateRangeFilterActive, setIsDateRangeFilterActive] = useState(false);
+  
+  // Modal states
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [isLinkChantierModalOpen, setIsLinkChantierModalOpen] = useState(false);
+  const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
+  const [isGalleryView, setIsGalleryView] = useState(true);
+  
+  // Form states
   const [newPhotoUrl, setNewPhotoUrl] = useState('');
-  const [newPhotoFile, setNewPhotoFile] = useState<File | null>(null);
-
-  // Data fetching with realtime updates
-  const { data: chantiers, loading: chantiersLoading } = useRealtimeSupabase<Chantier>({
+  const [newPhotoDescription, setNewPhotoDescription] = useState('');
+  const [newPhotoCategory, setNewPhotoCategory] = useState<Photo['category']>('avancement');
+  const [newPhotoDate, setNewPhotoDate] = useState(new Date().toISOString().split('T')[0]);
+  const [newPhotoChantier, setNewPhotoChantier] = useState('');
+  const [newPhotoFilename, setNewPhotoFilename] = useState('');
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [selectedChantier, setSelectedChantier] = useState('');
+  
+  // Gallery view states
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  
+  // Get chantiers data
+  const { data: chantiers } = useRealtimeSupabase<Chantier>({
     table: 'chantiers',
     fetchFunction: chantierService.getAll
   });
 
-  // Load photos
+  // Fetch photos
   useEffect(() => {
-    const loadPhotos = async () => {
+    const fetchPhotos = async () => {
       try {
         setLoading(true);
-        const allPhotos = await PhotoService.getAll();
+        const { data, error } = await supabase
+          .from('photos')
+          .select(`
+            *,
+            chantiers(nom)
+          `)
+          .order('date', { ascending: false });
         
-        // Enhance photos with chantier information
-        const enhancedPhotos = allPhotos.map(photo => {
-          const chantier = chantiers?.find(c => c.id === photo.chantier_id);
-          return {
-            ...photo,
-            chantierId: photo.chantier_id || undefined,
-            chantierNom: chantier?.nom || 'Sans chantier'
-          };
-        });
+        if (error) throw error;
         
-        setPhotos(enhancedPhotos);
+        const formattedPhotos: Photo[] = (data || []).map(item => ({
+          id: item.id,
+          url: item.url,
+          description: item.description,
+          date: item.date,
+          category: item.category || undefined,
+          filename: item.filename || undefined,
+          size: item.size_bytes || undefined,
+          chantierId: item.chantier_id,
+          chantierNom: item.chantiers ? (item.chantiers as any).nom : undefined
+        }));
+        
+        setPhotos(formattedPhotos);
         setError(null);
       } catch (err) {
         console.error('Erreur lors du chargement des photos:', err);
@@ -64,13 +95,9 @@ export const PhotosManager: React.FC = () => {
       }
     };
 
-    if (!chantiersLoading) {
-      loadPhotos();
-    }
-  }, [chantiersLoading, chantiers]);
-
-  // Setup realtime subscription
-  useEffect(() => {
+    fetchPhotos();
+    
+    // Set up realtime subscription
     const channel = supabase
       .channel('photos-changes')
       .on('postgres_changes', { 
@@ -78,450 +105,596 @@ export const PhotosManager: React.FC = () => {
         schema: 'public', 
         table: 'photos' 
       }, () => {
-        // Refresh photos when changes occur
-        refreshPhotos();
+        fetchPhotos();
       })
       .subscribe();
-
+    
     return () => {
-      channel.unsubscribe();
+      supabase.removeChannel(channel);
     };
   }, []);
 
-  // Refresh photos
-  const refreshPhotos = async () => {
-    try {
-      const allPhotos = await PhotoService.getAll();
-      
-      // Enhance photos with chantier information
-      const enhancedPhotos = allPhotos.map(photo => {
-        const chantier = chantiers?.find(c => c.id === photo.chantier_id);
-        return {
-          ...photo,
-          chantierId: photo.chantier_id || undefined,
-          chantierNom: chantier?.nom || 'Sans chantier'
-        };
-      });
-      
-      setPhotos(enhancedPhotos);
-    } catch (err) {
-      console.error('Erreur lors du rafraîchissement des photos:', err);
-    }
-  };
-
   // Filter photos
   const filteredPhotos = photos.filter(photo => {
-    const matchesSearch = photo.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         photo.chantierNom.toLowerCase().includes(searchTerm.toLowerCase());
+    // Search term filter
+    const matchesSearch = 
+      photo.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (photo.chantierNom && photo.chantierNom.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (photo.filename && photo.filename.toLowerCase().includes(searchTerm.toLowerCase()));
     
-    const matchesCategory = categoryFilter === 'all' || photo.category === categoryFilter;
+    // Chantier filter
     const matchesChantier = chantierFilter === 'all' || photo.chantierId === chantierFilter;
     
+    // Category filter
+    const matchesCategory = categoryFilter === 'all' || photo.category === categoryFilter;
+    
+    // Date filter
     let matchesDate = true;
-    if (dateFilter !== 'all') {
+    if (isDateRangeFilterActive && dateRangeStart && dateRangeEnd) {
+      // Custom date range filter
       const photoDate = new Date(photo.date);
+      const startDate = new Date(dateRangeStart);
+      const endDate = new Date(dateRangeEnd);
+      endDate.setHours(23, 59, 59, 999);
+      
+      matchesDate = photoDate >= startDate && photoDate <= endDate;
+    } else if (dateFilter !== 'all') {
       const today = new Date();
-      const lastWeek = new Date();
-      lastWeek.setDate(today.getDate() - 7);
-      const lastMonth = new Date();
-      lastMonth.setMonth(today.getMonth() - 1);
+      const photoDate = new Date(photo.date);
       
       switch (dateFilter) {
         case 'today':
           matchesDate = photoDate.toDateString() === today.toDateString();
           break;
-        case 'week':
-          matchesDate = photoDate >= lastWeek;
+        case 'this_week':
+          const startOfWeek = new Date(today);
+          startOfWeek.setDate(today.getDate() - today.getDay());
+          matchesDate = photoDate >= startOfWeek;
           break;
-        case 'month':
-          matchesDate = photoDate >= lastMonth;
+        case 'this_month':
+          matchesDate = photoDate.getMonth() === today.getMonth() && 
+                       photoDate.getFullYear() === today.getFullYear();
+          break;
+        case 'this_year':
+          matchesDate = photoDate.getFullYear() === today.getFullYear();
           break;
       }
     }
     
-    return matchesSearch && matchesCategory && matchesChantier && matchesDate;
+    return matchesSearch && matchesChantier && matchesCategory && matchesDate;
   });
 
-  // Pagination
-  const totalPages = Math.ceil(filteredPhotos.length / itemsPerPage);
-  const paginatedPhotos = filteredPhotos.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
-
   // CRUD operations
-  const handleCreate = () => {
-    setEditingPhoto(null);
-    setIsModalOpen(true);
-  };
-
-  const handleEdit = (photo: Photo) => {
-    setEditingPhoto(photo);
-    setIsModalOpen(true);
-  };
-
-  const handleViewDetails = (photo: Photo) => {
-    setSelectedPhoto(photo);
-    setIsDetailModalOpen(true);
-  };
-
-  const handleDelete = async (id: string) => {
-    if (confirm('Êtes-vous sûr de vouloir supprimer cette photo ? Cette action est irréversible.')) {
-      try {
-        await PhotoService.delete(id);
-        refreshPhotos();
-      } catch (error) {
-        console.error('Erreur lors de la suppression:', error);
-        alert('Erreur lors de la suppression de la photo');
-      }
+  const handleAddPhoto = async () => {
+    if (!newPhotoUrl || !newPhotoDescription || !newPhotoDate || !newPhotoChantier) {
+      alert('Veuillez remplir tous les champs obligatoires');
+      return;
     }
-  };
-
-  const handleSave = async (formData: FormData) => {
+    
     try {
-      const photoData = {
-        chantier_id: formData.get('chantierId') as string || null,
-        url: formData.get('url') as string,
-        description: formData.get('description') as string,
-        date: formData.get('date') as string,
-        category: formData.get('category') as Photo['category'] || 'avancement',
-        filename: formData.get('filename') as string || null,
-        size_bytes: newPhotoFile ? newPhotoFile.size : null
-      };
-
-      if (editingPhoto) {
-        await PhotoService.update(editingPhoto.id, photoData);
-      } else {
-        await PhotoService.create(photoData);
-      }
+      const { data, error } = await supabase
+        .from('photos')
+        .insert({
+          url: newPhotoUrl,
+          description: newPhotoDescription,
+          date: newPhotoDate,
+          category: newPhotoCategory,
+          chantier_id: newPhotoChantier,
+          filename: newPhotoFilename || null,
+          size_bytes: null
+        })
+        .select()
+        .single();
       
-      refreshPhotos();
-      setIsModalOpen(false);
-      setEditingPhoto(null);
+      if (error) throw error;
+      
+      // Reset form
       setNewPhotoUrl('');
-      setNewPhotoFile(null);
-    } catch (error) {
-      console.error('Erreur lors de l\'enregistrement:', error);
-      alert('Erreur lors de l\'enregistrement de la photo');
-    }
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setNewPhotoFile(file);
+      setNewPhotoDescription('');
+      setNewPhotoCategory('avancement');
+      setNewPhotoDate(new Date().toISOString().split('T')[0]);
+      setNewPhotoChantier('');
+      setNewPhotoFilename('');
       
-      // Create a preview URL
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          setNewPhotoUrl(event.target.result as string);
-        }
-      };
-      reader.readAsDataURL(file);
+      setIsAddModalOpen(false);
+    } catch (err) {
+      console.error('Erreur lors de l\'ajout de la photo:', err);
+      alert('Erreur lors de l\'ajout de la photo');
     }
   };
 
-  const handleExternalUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setNewPhotoUrl(e.target.value);
-    setNewPhotoFile(null);
+  const handleUpdatePhoto = async () => {
+    if (!selectedPhoto) return;
+    
+    try {
+      const { error } = await supabase
+        .from('photos')
+        .update({
+          description: selectedPhoto.description,
+          category: selectedPhoto.category,
+          date: selectedPhoto.date,
+          chantier_id: selectedPhoto.chantierId
+        })
+        .eq('id', selectedPhoto.id);
+      
+      if (error) throw error;
+      
+      setIsEditModalOpen(false);
+    } catch (err) {
+      console.error('Erreur lors de la mise à jour de la photo:', err);
+      alert('Erreur lors de la mise à jour de la photo');
+    }
   };
 
-  // Form component
-  const PhotoForm = () => (
-    <form onSubmit={(e) => {
-      e.preventDefault();
-      handleSave(new FormData(e.currentTarget));
-    }}>
-      <div className="space-y-6">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Chantier</label>
-          <select
-            name="chantierId"
-            defaultValue={editingPhoto?.chantierId || ''}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Aucun chantier</option>
-            {chantiers?.map(chantier => (
-              <option key={chantier.id} value={chantier.id}>
-                {chantier.nom} ({chantier.statut})
-              </option>
-            ))}
-          </select>
-        </div>
-        
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-          <input
-            name="description"
-            type="text"
-            required
-            defaultValue={editingPhoto?.description || ''}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-            <input
-              name="date"
-              type="date"
-              required
-              defaultValue={editingPhoto?.date || new Date().toISOString().split('T')[0]}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+  const handleDeletePhoto = async (id: string) => {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer cette photo ?')) return;
+    
+    try {
+      const { error } = await supabase
+        .from('photos')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+      
+      // Close modal if the deleted photo is the selected one
+      if (selectedPhoto && selectedPhoto.id === id) {
+        setIsViewModalOpen(false);
+        setIsEditModalOpen(false);
+      }
+    } catch (err) {
+      console.error('Erreur lors de la suppression de la photo:', err);
+      alert('Erreur lors de la suppression de la photo');
+    }
+  };
+
+  const handleLinkToChantier = (photo: Photo) => {
+    setSelectedPhoto(photo);
+    setSelectedChantier(photo.chantierId || '');
+    setIsLinkChantierModalOpen(true);
+  };
+
+  const handleSaveLinkToChantier = async () => {
+    if (!selectedPhoto) return;
+    
+    try {
+      const { error } = await supabase
+        .from('photos')
+        .update({
+          chantier_id: selectedChantier || null
+        })
+        .eq('id', selectedPhoto.id);
+      
+      if (error) throw error;
+      
+      setIsLinkChantierModalOpen(false);
+      setSelectedPhoto(null);
+      setSelectedChantier('');
+      
+      // Show success message
+      alert('Photo liée au chantier avec succès');
+    } catch (error) {
+      console.error('Error linking photo to chantier:', error);
+      alert('Erreur lors de la liaison de la photo au chantier');
+    }
+  };
+
+  // File upload handling
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    
+    const file = files[0];
+    
+    // Check file type
+    if (!file.type.startsWith('image/')) {
+      setUploadError('Le fichier doit être une image (jpg, png, etc.)');
+      return;
+    }
+    
+    // Check file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadError('La taille du fichier ne doit pas dépasser 5MB');
+      return;
+    }
+    
+    setUploadedFile(file);
+    setNewPhotoFilename(file.name);
+    setUploadError(null);
+    
+    // Create a preview URL
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      if (e.target?.result) {
+        setNewPhotoUrl(e.target.result as string);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+  
+  const uploadFile = async () => {
+    if (!uploadedFile || !newPhotoChantier) {
+      setUploadError('Veuillez sélectionner un fichier et un chantier');
+      return;
+    }
+    
+    setIsUploading(true);
+    setUploadProgress(0);
+    setUploadError(null);
+    
+    try {
+      // Create a unique file path
+      const timestamp = Date.now();
+      const fileExt = uploadedFile.name.split('.').pop();
+      const filePath = `photos/${newPhotoChantier}/${timestamp}.${fileExt}`;
+      
+      // Upload to Supabase Storage
+      const { data, error } = await supabase.storage
+        .from('photos')
+        .upload(filePath, uploadedFile, {
+          cacheControl: '3600',
+          upsert: false,
+          onUploadProgress: (progress) => {
+            const percent = Math.round((progress.loaded / progress.total) * 100);
+            setUploadProgress(percent);
+          }
+        });
+      
+      if (error) throw error;
+      
+      // Get the public URL
+      const { data: publicURLData } = supabase.storage
+        .from('photos')
+        .getPublicUrl(filePath);
+      
+      // Update the form with the new URL
+      setNewPhotoUrl(publicURLData.publicUrl);
+      
+      // Add success message
+      alert('Fichier téléversé avec succès!');
+    } catch (err) {
+      console.error('Erreur lors du téléversement:', err);
+      setUploadError(err instanceof Error ? err.message : 'Erreur lors du téléversement');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // Helper functions
+  const getCategoryLabel = (category?: string) => {
+    switch (category) {
+      case 'avancement': return 'Avancement';
+      case 'probleme': return 'Problème';
+      case 'materiel': return 'Matériel';
+      case 'securite': return 'Sécurité';
+      case 'finition': return 'Finition';
+      case 'avant': return 'Avant';
+      case 'apres': return 'Après';
+      default: return 'Autre';
+    }
+  };
+
+  const getCategoryColor = (category?: string) => {
+    switch (category) {
+      case 'avancement': return 'bg-blue-100 text-blue-800';
+      case 'probleme': return 'bg-red-100 text-red-800';
+      case 'materiel': return 'bg-orange-100 text-orange-800';
+      case 'securite': return 'bg-yellow-100 text-yellow-800';
+      case 'finition': return 'bg-green-100 text-green-800';
+      case 'avant': return 'bg-purple-100 text-purple-800';
+      case 'apres': return 'bg-indigo-100 text-indigo-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getChantierName = (chantierId?: string) => {
+    if (!chantierId || !chantiers) return 'Non assigné';
+    const chantier = chantiers.find(c => c.id === chantierId);
+    return chantier ? chantier.nom : 'Non assigné';
+  };
+
+  const formatFileSize = (bytes?: number) => {
+    if (!bytes) return 'N/A';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    alert('URL copiée dans le presse-papiers');
+  };
+
+  // Navigation in gallery view
+  const navigateGallery = (direction: 'prev' | 'next') => {
+    if (filteredPhotos.length === 0) return;
+    
+    if (direction === 'prev') {
+      setCurrentPhotoIndex(prev => (prev > 0 ? prev - 1 : filteredPhotos.length - 1));
+    } else {
+      setCurrentPhotoIndex(prev => (prev < filteredPhotos.length - 1 ? prev + 1 : 0));
+    }
+    
+    setSelectedPhoto(filteredPhotos[currentPhotoIndex]);
+  };
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      const galleryElement = document.getElementById('photo-gallery-fullscreen');
+      if (galleryElement) {
+        galleryElement.requestFullscreen().catch(err => {
+          console.error(`Erreur lors du passage en plein écran: ${err.message}`);
+        });
+      }
+      setIsFullscreen(true);
+    } else {
+      document.exitFullscreen();
+      setIsFullscreen(false);
+    }
+  };
+
+  // Component for the photo gallery
+  const PhotoGallery = () => (
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      {filteredPhotos.map((photo, index) => (
+        <div 
+          key={photo.id} 
+          className="relative group overflow-hidden rounded-lg shadow-sm border hover:shadow-md transition-shadow cursor-pointer"
+          onClick={() => {
+            setSelectedPhoto(photo);
+            setCurrentPhotoIndex(index);
+            setIsViewModalOpen(true);
+          }}
+        >
+          <div className="aspect-w-16 aspect-h-9 bg-gray-100">
+            <img 
+              src={photo.url} 
+              alt={photo.description} 
+              className="object-cover w-full h-full"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300x200?text=Image+non+disponible';
+              }}
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Catégorie</label>
-            <select
-              name="category"
-              defaultValue={editingPhoto?.category || 'avancement'}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="avancement">Avancement</option>
-              <option value="probleme">Problème</option>
-              <option value="materiel">Matériel</option>
-              <option value="securite">Sécurité</option>
-              <option value="finition">Finition</option>
-              <option value="avant">Avant</option>
-              <option value="apres">Après</option>
-            </select>
+          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-opacity flex items-center justify-center">
+            <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+              <Eye className="w-8 h-8 text-white" />
+            </div>
           </div>
-        </div>
-        
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">URL de la photo</label>
-          <input
-            name="url"
-            type="url"
-            required
-            value={newPhotoUrl || editingPhoto?.url || ''}
-            onChange={handleExternalUrlChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="https://example.com/image.jpg"
-          />
-        </div>
-        
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Ou télécharger une image</label>
-          <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
-            <div className="space-y-1 text-center">
-              <Camera className="mx-auto h-12 w-12 text-gray-400" />
-              <div className="flex text-sm text-gray-600">
-                <label htmlFor="file-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500">
-                  <span>Télécharger un fichier</span>
-                  <input 
-                    id="file-upload" 
-                    name="file-upload" 
-                    type="file" 
-                    className="sr-only"
-                    accept="image/*"
-                    onChange={handleFileChange}
-                  />
-                </label>
-                <p className="pl-1">ou glisser-déposer</p>
+          <div className="p-3">
+            <div className="flex justify-between items-start">
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-medium text-gray-900 truncate">{photo.description}</h3>
+                <p className="text-xs text-gray-500 mt-1 truncate">{getChantierName(photo.chantierId)}</p>
               </div>
-              <p className="text-xs text-gray-500">
-                PNG, JPG, GIF jusqu'à 10MB
-              </p>
+              <span className={`ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getCategoryColor(photo.category)}`}>
+                {getCategoryLabel(photo.category)}
+              </span>
+            </div>
+            <p className="text-xs text-gray-500 mt-2 flex items-center">
+              <Calendar className="w-3 h-3 mr-1" />
+              {new Date(photo.date).toLocaleDateString()}
+            </p>
+            <div className="text-sm text-gray-500 flex items-center mt-1">
+              {photo.chantierId ? (
+                <>
+                  <Building2 className="w-3 h-3 mr-1 text-blue-500" />
+                  <span className="text-blue-600">{photo.chantierNom || getChantierName(photo.chantierId)}</span>
+                </>
+              ) : (
+                <>
+                  <Unlink className="w-3 h-3 mr-1 text-gray-400" />
+                  <span className="text-gray-400">Non associée</span>
+                </>
+              )}
             </div>
           </div>
         </div>
-        
-        <input
-          type="hidden"
-          name="filename"
-          value={newPhotoFile?.name || editingPhoto?.filename || ''}
-        />
-        
-        {/* Preview */}
-        {(newPhotoUrl || editingPhoto?.url) && (
-          <div className="mt-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Aperçu</label>
-            <div className="border rounded-lg overflow-hidden">
-              <img 
-                src={newPhotoUrl || editingPhoto?.url} 
-                alt="Aperçu" 
-                className="w-full h-64 object-contain bg-gray-100"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400x300?text=Image+non+disponible';
-                }}
-              />
-            </div>
-          </div>
-        )}
-      </div>
-      
-      <div className="flex justify-end space-x-3 mt-6">
-        <Button variant="secondary" onClick={() => {
-          setIsModalOpen(false);
-          setEditingPhoto(null);
-          setNewPhotoUrl('');
-          setNewPhotoFile(null);
-        }}>
-          Annuler
-        </Button>
-        <Button type="submit" disabled={isUploading}>
-          {editingPhoto ? 'Mettre à jour' : 'Créer'}
-        </Button>
-      </div>
-    </form>
+      ))}
+      {filteredPhotos.length === 0 && !loading && (
+        <div className="col-span-full flex flex-col items-center justify-center py-12 text-gray-500">
+          <Image className="w-16 h-16 text-gray-300 mb-4" />
+          <p>Aucune photo trouvée</p>
+          <p className="text-sm mt-2">Ajustez les filtres ou ajoutez de nouvelles photos</p>
+        </div>
+      )}
+    </div>
   );
 
-  // Detail modal component
-  const PhotoDetailModal = () => {
-    if (!selectedPhoto) return null;
-
-    const chantier = chantiers?.find(c => c.id === selectedPhoto.chantierId);
-
-    return (
-      <div className="space-y-6">
-        <div className="bg-white border rounded-lg overflow-hidden">
-          <img 
-            src={selectedPhoto.url} 
-            alt={selectedPhoto.description} 
-            className="w-full h-96 object-contain bg-gray-100"
-            onError={(e) => {
-              (e.target as HTMLImageElement).src = 'https://via.placeholder.com/800x600?text=Image+non+disponible';
-            }}
-          />
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-4">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-800 mb-2">Informations</h3>
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-600">Date</p>
-                    <p className="font-medium">{new Date(selectedPhoto.date).toLocaleDateString()}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Catégorie</p>
-                    <p className="font-medium capitalize">{selectedPhoto.category}</p>
-                  </div>
-                  {selectedPhoto.filename && (
-                    <div>
-                      <p className="text-sm text-gray-600">Nom du fichier</p>
-                      <p className="font-medium">{selectedPhoto.filename}</p>
-                    </div>
-                  )}
-                  {selectedPhoto.size_bytes && (
-                    <div>
-                      <p className="text-sm text-gray-600">Taille</p>
-                      <p className="font-medium">{(selectedPhoto.size_bytes / 1024).toFixed(1)} KB</p>
-                    </div>
+  // Component for the photo list view
+  const PhotoList = () => (
+    <div className="overflow-x-auto">
+      <table className="w-full">
+        <thead className="bg-gray-50">
+          <tr>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Photo
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Description
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Chantier
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Catégorie
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Date
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Actions
+            </th>
+          </tr>
+        </thead>
+        <tbody className="bg-white divide-y divide-gray-200">
+          {filteredPhotos.map((photo, index) => (
+            <tr key={photo.id} className="hover:bg-gray-50">
+              <td className="px-6 py-4 whitespace-nowrap">
+                <div className="flex-shrink-0 h-16 w-16 rounded overflow-hidden">
+                  <img 
+                    src={photo.url} 
+                    alt={photo.description} 
+                    className="h-16 w-16 object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://via.placeholder.com/64?text=Error';
+                    }}
+                  />
+                </div>
+              </td>
+              <td className="px-6 py-4">
+                <div className="text-sm text-gray-900">{photo.description}</div>
+                {photo.filename && (
+                  <div className="text-xs text-gray-500 mt-1">{photo.filename}</div>
+                )}
+                <div className="text-sm text-gray-500">
+                  {new Date(photo.date).toLocaleDateString()}
+                </div>
+                <div className="text-sm text-gray-500 flex items-center mt-1">
+                  {photo.chantierId ? (
+                    <>
+                      <Building2 className="w-3 h-3 mr-1 text-blue-500" />
+                      <span className="text-blue-600">{photo.chantierNom || getChantierName(photo.chantierId)}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Unlink className="w-3 h-3 mr-1 text-gray-400" />
+                      <span className="text-gray-400">Non associée</span>
+                    </>
                   )}
                 </div>
-              </div>
-            </div>
-
-            <div>
-              <h3 className="text-lg font-semibold text-gray-800 mb-2">Description</h3>
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <p className="text-gray-900">{selectedPhoto.description}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            {chantier && (
-              <div>
-                <h3 className="text-lg font-semibold text-gray-800 mb-2">Chantier</h3>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <div className="flex items-center mb-2">
-                    <Building2 className="w-5 h-5 text-blue-600 mr-2" />
-                    <p className="font-medium text-gray-900">{chantier.nom}</p>
-                  </div>
-                  <p className="text-sm text-gray-600">{chantier.adresse}</p>
-                  <div className="mt-2">
-                    <StatusBadge status={chantier.statut} type="chantier" />
-                  </div>
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap">
+                <div className="flex items-center">
+                  <Building2 className="w-4 h-4 text-gray-400 mr-2" />
+                  <span className="text-sm text-gray-900">{getChantierName(photo.chantierId)}</span>
                 </div>
-              </div>
-            )}
-
-            <div>
-              <h3 className="text-lg font-semibold text-gray-800 mb-2">Actions</h3>
-              <div className="space-y-2">
-                <Button 
-                  variant="secondary" 
-                  className="w-full"
-                  onClick={() => {
-                    const a = document.createElement('a');
-                    a.href = selectedPhoto.url;
-                    a.download = selectedPhoto.filename || 'photo.jpg';
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                  }}
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  Télécharger l'image
-                </Button>
-                
-                <Button 
-                  variant="secondary" 
-                  className="w-full"
-                  onClick={() => {
-                    window.open(selectedPhoto.url, '_blank');
-                  }}
-                >
-                  <Eye className="w-4 h-4 mr-2" />
-                  Voir en plein écran
-                </Button>
-                
-                <Button 
-                  className="w-full"
-                  onClick={() => {
-                    setIsDetailModalOpen(false);
-                    setEditingPhoto(selectedPhoto);
-                    setIsModalOpen(true);
-                  }}
-                >
-                  <Edit className="w-4 h-4 mr-2" />
-                  Modifier
-                </Button>
-                
-                <Button 
-                  variant="danger" 
-                  className="w-full"
-                  onClick={() => {
-                    handleDelete(selectedPhoto.id);
-                    setIsDetailModalOpen(false);
-                  }}
-                >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Supprimer
-                </Button>
-              </div>
-            </div>
-          </div>
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap">
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getCategoryColor(photo.category)}`}>
+                  <Tag className="w-3 h-3 mr-1" />
+                  {getCategoryLabel(photo.category)}
+                </span>
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                <div className="flex items-center">
+                  <Calendar className="w-4 h-4 mr-1 text-gray-400" />
+                  {new Date(photo.date).toLocaleDateString()}
+                </div>
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                <div className="flex space-x-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedPhoto(photo);
+                      setCurrentPhotoIndex(index);
+                      setIsViewModalOpen(true);
+                    }}
+                    className="text-green-600 hover:text-green-900"
+                    title="Voir"
+                  >
+                    <Eye className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedPhoto(photo);
+                      setIsEditModalOpen(true);
+                    }}
+                    className="text-blue-600 hover:text-blue-900"
+                    title="Modifier">
+                    <Edit className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleLinkToChantier(photo)}
+                    className="text-purple-600 hover:text-purple-900"
+                    title="Lier à un chantier">
+                    <Link className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeletePhoto(photo.id);
+                    }}
+                    className="text-red-600 hover:text-red-900"
+                    title="Supprimer"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {filteredPhotos.length === 0 && !loading && (
+        <div className="text-center py-12 text-gray-500">
+          <Image className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+          <p>Aucune photo trouvée</p>
+          <p className="text-sm mt-2">Ajustez les filtres ou ajoutez de nouvelles photos</p>
         </div>
-      </div>
-    );
-  };
+      )}
+    </div>
+  );
 
-  // Main component render
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-800">Gestion des Photos</h1>
         <div className="flex space-x-3">
-          <Button onClick={handleCreate}>
+          <Button onClick={() => setIsAddModalOpen(true)}>
             <Plus className="w-4 h-4 mr-2" />
-            Nouvelle Photo
+            Ajouter une Photo
           </Button>
-          <Button variant="secondary" onClick={() => setIsExportModalOpen(true)}>
+          <Button 
+            variant="secondary" 
+            onClick={() => setIsGalleryView(!isGalleryView)}
+          >
+            {isGalleryView ? (
+              <>
+                <List className="w-4 h-4 mr-2" />
+                Vue Liste
+              </>
+            ) : (
+              <>
+                <Grid className="w-4 h-4 mr-2" />
+                Vue Galerie
+              </>
+            )}
+          </Button>
+          <Button variant="secondary">
             <Download className="w-4 h-4 mr-2" />
             Exporter
+          </Button>
+          <Button variant="secondary" onClick={() => {
+            if (filteredPhotos.length === 0) {
+              alert('Aucune photo à télécharger');
+              return;
+            }
+            
+            // Create a text file with all photo URLs
+            const photoList = filteredPhotos.map(photo => 
+              `${photo.description} (${getChantierName(photo.chantierId)}): ${photo.url}`
+            ).join('\n\n');
+            
+            const blob = new Blob([photoList], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `photos-export-${new Date().toISOString().split('T')[0]}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          }}>
+            <Share2 className="w-4 h-4 mr-2" />
+            Télécharger URLs
           </Button>
         </div>
       </div>
 
-      {/* Filters and search */}
+      {/* Filters */}
       <div className="bg-white rounded-lg shadow-sm border p-4">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
@@ -536,6 +709,18 @@ export const PhotosManager: React.FC = () => {
           </div>
           
           <div className="flex flex-wrap gap-2">
+            <select
+              value={chantierFilter}
+              onChange={(e) => setChantierFilter(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">Tous les chantiers</option>
+              <option value="">Non associées</option>
+              {chantiers?.map(chantier => (
+                <option key={chantier.id} value={chantier.id}>{chantier.nom}</option>
+              ))}
+            </select>
+            
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
@@ -552,370 +737,798 @@ export const PhotosManager: React.FC = () => {
             </select>
             
             <select
-              value={chantierFilter}
-              onChange={(e) => setChantierFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">Tous les chantiers</option>
-              {chantiers?.map(chantier => (
-                <option key={chantier.id} value={chantier.id}>{chantier.nom}</option>
-              ))}
-            </select>
-            
-            <select
               value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
+              onChange={(e) => {
+                setDateFilter(e.target.value);
+                if (e.target.value !== 'custom') {
+                  setIsDateRangeFilterActive(false);
+                } else {
+                  setIsDateRangeFilterActive(true);
+                  // Initialize date range if empty
+                  if (!dateRangeStart) {
+                    const today = new Date();
+                    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+                    setDateRangeStart(firstDayOfMonth.toISOString().split('T')[0]);
+                    setDateRangeEnd(today.toISOString().split('T')[0]);
+                  }
+                }
+              }}
               className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">Toutes les dates</option>
               <option value="today">Aujourd'hui</option>
-              <option value="week">Cette semaine</option>
-              <option value="month">Ce mois</option>
+              <option value="this_week">Cette semaine</option>
+              <option value="this_month">Ce mois</option>
+              <option value="this_year">Cette année</option>
+              <option value="custom">Plage personnalisée</option>
             </select>
-            
-            <div className="flex border rounded-md overflow-hidden">
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`px-3 py-2 ${viewMode === 'grid' ? 'bg-blue-500 text-white' : 'bg-gray-100'}`}
-                title="Vue grille"
-              >
-                <div className="grid grid-cols-2 gap-1">
-                  <div className="w-3 h-3 bg-current rounded-sm"></div>
-                  <div className="w-3 h-3 bg-current rounded-sm"></div>
-                  <div className="w-3 h-3 bg-current rounded-sm"></div>
-                  <div className="w-3 h-3 bg-current rounded-sm"></div>
-                </div>
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={`px-3 py-2 ${viewMode === 'list' ? 'bg-blue-500 text-white' : 'bg-gray-100'}`}
-                title="Vue liste"
-              >
-                <div className="flex flex-col space-y-1">
-                  <div className="w-6 h-2 bg-current rounded-sm"></div>
-                  <div className="w-6 h-2 bg-current rounded-sm"></div>
-                  <div className="w-6 h-2 bg-current rounded-sm"></div>
-                </div>
-              </button>
+          </div>
+        </div>
+        
+        {/* Custom date range */}
+        {isDateRangeFilterActive && (
+          <div className="mt-4 flex flex-wrap gap-4">
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">Date début</label>
+              <input
+                type="date"
+                value={dateRangeStart}
+                onChange={(e) => setDateRangeStart(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">Date fin</label>
+              <input
+                type="date"
+                value={dateRangeEnd}
+                onChange={(e) => setDateRangeEnd(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="bg-white rounded-lg shadow-sm border p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Total Photos</p>
+              <p className="text-2xl font-bold text-gray-900">{photos.length}</p>
+            </div>
+            <div className="p-3 rounded-full bg-blue-500">
+              <Image className="w-6 h-6 text-white" />
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-lg shadow-sm border p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Chantiers avec Photos</p>
+              <p className="text-2xl font-bold text-green-600">
+                {new Set(photos.map(p => p.chantierId).filter(Boolean)).size}
+              </p>
+            </div>
+            <div className="p-3 rounded-full bg-green-500">
+              <Building2 className="w-6 h-6 text-white" />
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-lg shadow-sm border p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Photos ce mois</p>
+              <p className="text-2xl font-bold text-purple-600">
+                {photos.filter(p => {
+                  const photoDate = new Date(p.date);
+                  const today = new Date();
+                  return photoDate.getMonth() === today.getMonth() && 
+                         photoDate.getFullYear() === today.getFullYear();
+                }).length}
+              </p>
+            </div>
+            <div className="p-3 rounded-full bg-purple-500">
+              <Calendar className="w-6 h-6 text-white" />
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-lg shadow-sm border p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Catégories</p>
+              <p className="text-2xl font-bold text-orange-600">
+                {new Set(photos.map(p => p.category).filter(Boolean)).size}
+              </p>
+            </div>
+            <div className="p-3 rounded-full bg-orange-500">
+              <Tag className="w-6 h-6 text-white" />
             </div>
           </div>
         </div>
       </div>
 
-      {/* Loading state */}
-      {loading ? (
-        <div className="text-center py-8">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Chargement des photos...</p>
+      {/* Photos content */}
+      <div className="bg-white rounded-lg shadow-sm border">
+        <div className="p-4 border-b">
+          <div className="flex justify-between items-center">
+            <h2 className="text-lg font-semibold text-gray-800">
+              {filteredPhotos.length} photo{filteredPhotos.length !== 1 ? 's' : ''} trouvée{filteredPhotos.length !== 1 ? 's' : ''}
+            </h2>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setIsGalleryView(true)}
+                className={`p-2 rounded ${isGalleryView ? 'bg-blue-100 text-blue-700' : 'text-gray-500 hover:bg-gray-100'}`}
+                title="Vue galerie"
+              >
+                <Grid className="w-5 h-5" />
+              </button>
+              <button
+                onClick={() => setIsGalleryView(false)}
+                className={`p-2 rounded ${!isGalleryView ? 'bg-blue-100 text-blue-700' : 'text-gray-500 hover:bg-gray-100'}`}
+                title="Vue liste"
+              >
+                <List className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
         </div>
-      ) : error ? (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
-          <p className="text-red-700">Erreur lors du chargement des photos</p>
-          <p className="text-sm text-red-600 mt-1">{error.message}</p>
+        
+        <div className="p-4">
+          {loading ? (
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+              <p className="mt-4 text-gray-600">Chargement des photos...</p>
+            </div>
+          ) : error ? (
+            <div className="text-center py-12 text-red-500">
+              <p>Erreur lors du chargement des photos</p>
+              <p className="text-sm">{error.message}</p>
+            </div>
+          ) : (
+            isGalleryView ? <PhotoGallery /> : <PhotoList />
+          )}
         </div>
-      ) : (
-        <>
-          {/* Grid view */}
-          {viewMode === 'grid' && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {paginatedPhotos.length > 0 ? (
-                paginatedPhotos.map(photo => (
-                  <div key={photo.id} className="bg-white border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-                    <div 
-                      className="h-48 bg-gray-100 relative cursor-pointer"
-                      onClick={() => handleViewDetails(photo)}
-                    >
-                      <img 
-                        src={photo.url} 
-                        alt={photo.description} 
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400x300?text=Image+non+disponible';
-                        }}
-                      />
-                      <div className="absolute top-2 right-2">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                          photo.category === 'avancement' ? 'bg-blue-100 text-blue-800' :
-                          photo.category === 'probleme' ? 'bg-red-100 text-red-800' :
-                          photo.category === 'materiel' ? 'bg-orange-100 text-orange-800' :
-                          photo.category === 'securite' ? 'bg-yellow-100 text-yellow-800' :
-                          photo.category === 'finition' ? 'bg-green-100 text-green-800' :
-                          photo.category === 'avant' ? 'bg-purple-100 text-purple-800' :
-                          photo.category === 'apres' ? 'bg-indigo-100 text-indigo-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {photo.category}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="p-4">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h3 className="text-sm font-medium text-gray-900 line-clamp-1">{photo.description}</h3>
-                          <p className="text-xs text-gray-500 mt-1">{new Date(photo.date).toLocaleDateString()}</p>
-                        </div>
-                        <div className="flex space-x-1">
-                          <button
-                            onClick={() => handleEdit(photo)}
-                            className="p-1 text-blue-600 hover:text-blue-900 rounded-full hover:bg-blue-50"
-                            title="Modifier"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(photo.id)}
-                            className="p-1 text-red-600 hover:text-red-900 rounded-full hover:bg-red-50"
-                            title="Supprimer"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                      <div className="mt-2 text-xs text-gray-600 flex items-center">
-                        <Building2 className="w-3 h-3 mr-1 text-gray-400" />
-                        <span className="truncate">{photo.chantierNom}</span>
-                      </div>
-                    </div>
+      </div>
+
+      {/* Add Photo Modal */}
+      <Modal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        title="Ajouter une nouvelle photo"
+        size="lg"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">URL de l'image</label>
+            <div className="flex">
+              <input
+                type="text"
+                disabled={isUploading}
+                value={newPhotoUrl}
+                onChange={(e) => setNewPhotoUrl(e.target.value)}
+                placeholder="https://example.com/image.jpg"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
+              />
+              <label className="px-3 py-2 bg-gray-100 border border-l-0 border-gray-300 rounded-r-md hover:bg-gray-200 cursor-pointer">
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleFileChange}
+                  disabled={isUploading}
+                />
+                <Upload className="w-5 h-5 text-gray-500" />
+              </label>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Entrez l'URL d'une image existante ou téléversez une nouvelle image
+            </p>
+          </div>
+          
+          {uploadedFile && (
+            <div className="border rounded-md p-4 bg-blue-50">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-sm font-medium text-blue-700 flex items-center">
+                  <Upload className="w-4 h-4 mr-2" />
+                  Fichier sélectionné
+                </h4>
+                <button
+                  onClick={() => {
+                    setUploadedFile(null);
+                    setNewPhotoFilename('');
+                    if (newPhotoUrl.startsWith('data:')) {
+                      setNewPhotoUrl('');
+                    }
+                  }}
+                  className="text-blue-700 hover:text-blue-900"
+                  disabled={isUploading}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="text-sm text-blue-700">
+                <p><span className="font-medium">Nom:</span> {uploadedFile.name}</p>
+                <p><span className="font-medium">Type:</span> {uploadedFile.type}</p>
+                <p><span className="font-medium">Taille:</span> {formatFileSize(uploadedFile.size)}</p>
+              </div>
+              
+              {isUploading ? (
+                <div className="mt-3">
+                  <div className="flex justify-between text-xs text-blue-700 mb-1">
+                    <span>Téléversement en cours...</span>
+                    <span>{uploadProgress}%</span>
                   </div>
-                ))
-              ) : (
-                <div className="col-span-full text-center py-12 bg-gray-50 rounded-lg">
-                  <Image className="w-12 h-12 mx-auto text-gray-400 mb-4" />
-                  <p className="text-gray-500">Aucune photo trouvée</p>
+                  <div className="w-full bg-blue-200 rounded-full h-2">
+                    <div 
+                      className="bg-blue-600 h-2 rounded-full" 
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
                 </div>
+              ) : (
+                <button
+                  onClick={uploadFile}
+                  className="mt-3 w-full px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center justify-center"
+                  disabled={!newPhotoChantier}
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Téléverser maintenant
+                </button>
+              )}
+              
+              {!newPhotoChantier && (
+                <p className="text-xs text-blue-700 mt-2">
+                  Veuillez sélectionner un chantier avant de téléverser
+                </p>
               )}
             </div>
           )}
-
-          {/* List view */}
-          {viewMode === 'list' && (
-            <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Photo
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Description
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Chantier
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Catégorie
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Date
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {paginatedPhotos.length > 0 ? (
-                    paginatedPhotos.map(photo => (
-                      <tr key={photo.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div 
-                            className="h-16 w-16 bg-gray-100 rounded overflow-hidden cursor-pointer"
-                            onClick={() => handleViewDetails(photo)}
-                          >
-                            <img 
-                              src={photo.url} 
-                              alt={photo.description} 
-                              className="h-full w-full object-cover"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).src = 'https://via.placeholder.com/64?text=Error';
-                              }}
-                            />
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-sm text-gray-900">{photo.description}</div>
-                          {photo.filename && (
-                            <div className="text-xs text-gray-500 mt-1">{photo.filename}</div>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <Building2 className="w-4 h-4 text-gray-400 mr-2" />
-                            <span className="text-sm text-gray-900">{photo.chantierNom}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            photo.category === 'avancement' ? 'bg-blue-100 text-blue-800' :
-                            photo.category === 'probleme' ? 'bg-red-100 text-red-800' :
-                            photo.category === 'materiel' ? 'bg-orange-100 text-orange-800' :
-                            photo.category === 'securite' ? 'bg-yellow-100 text-yellow-800' :
-                            photo.category === 'finition' ? 'bg-green-100 text-green-800' :
-                            photo.category === 'avant' ? 'bg-purple-100 text-purple-800' :
-                            photo.category === 'apres' ? 'bg-indigo-100 text-indigo-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {photo.category}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <Calendar className="w-4 h-4 text-gray-400 mr-2" />
-                            <span className="text-sm text-gray-900">{new Date(photo.date).toLocaleDateString()}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          <div className="flex space-x-2">
-                            <button
-                              onClick={() => handleViewDetails(photo)}
-                              className="text-green-600 hover:text-green-900"
-                              title="Voir détails"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleEdit(photo)}
-                              className="text-blue-600 hover:text-blue-900"
-                              title="Modifier"
-                            >
-                              <Edit className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleDelete(photo.id)}
-                              className="text-red-600 hover:text-red-900"
-                              title="Supprimer"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={6} className="px-6 py-10 text-center text-gray-500 bg-gray-50">
-                        Aucune photo trouvée
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+          
+          {uploadError && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-md flex items-start">
+              <AlertTriangle className="w-5 h-5 text-red-500 mr-2 mt-0.5" />
+              <p className="text-sm text-red-600">{uploadError}</p>
             </div>
           )}
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex justify-between items-center mt-6">
-              <div className="flex items-center space-x-2">
-                <span className="text-sm text-gray-700">
-                  Affichage de {(currentPage - 1) * itemsPerPage + 1} à {Math.min(currentPage * itemsPerPage, filteredPhotos.length)} sur {filteredPhotos.length} photos
-                </span>
-                <select
-                  value={itemsPerPage}
-                  onChange={(e) => {
-                    setItemsPerPage(Number(e.target.value));
-                    setCurrentPage(1);
+          
+          {newPhotoUrl && (
+            <div className="border rounded-md p-2 bg-gray-50">
+              <p className="text-sm font-medium text-gray-700 mb-2">Aperçu :</p>
+              <div className="aspect-w-16 aspect-h-9 bg-gray-200 rounded overflow-hidden">
+                <img 
+                  src={newPhotoUrl} 
+                  alt="Aperçu" 
+                  className="object-contain w-full h-full"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300x200?text=URL+invalide';
                   }}
-                  className="px-2 py-1 border border-gray-300 rounded-md text-sm"
-                >
-                  <option value="12">12</option>
-                  <option value="24">24</option>
-                  <option value="48">48</option>
-                  <option value="96">96</option>
-                </select>
-              </div>
-              
-              <div className="flex space-x-2">
-                <button
-                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                  disabled={currentPage === 1}
-                  className="px-3 py-1 border border-gray-300 rounded-md disabled:opacity-50"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                </button>
-                
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  let pageNum;
-                  if (totalPages <= 5) {
-                    pageNum = i + 1;
-                  } else if (currentPage <= 3) {
-                    pageNum = i + 1;
-                  } else if (currentPage >= totalPages - 2) {
-                    pageNum = totalPages - 4 + i;
-                  } else {
-                    pageNum = currentPage - 2 + i;
-                  }
-                  
-                  return (
-                    <button
-                      key={i}
-                      onClick={() => setCurrentPage(pageNum)}
-                      className={`px-3 py-1 border rounded-md ${
-                        currentPage === pageNum 
-                          ? 'bg-blue-600 text-white border-blue-600' 
-                          : 'border-gray-300 hover:bg-gray-50'
-                      }`}
-                    >
-                      {pageNum}
-                    </button>
-                  );
-                })}
-                
-                <button
-                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                  disabled={currentPage === totalPages}
-                  className="px-3 py-1 border border-gray-300 rounded-md disabled:opacity-50"
-                >
-                  <ArrowRight className="w-4 h-4" />
-                </button>
+                />
               </div>
             </div>
           )}
-        </>
-      )}
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <textarea
+              value={newPhotoDescription}
+              onChange={(e) => setNewPhotoDescription(e.target.value)}
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Description de la photo..."
+            />
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Chantier</label>
+              <select
+                value={newPhotoChantier}
+                onChange={(e) => setNewPhotoChantier(e.target.value)}
+                disabled={isUploading}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
+              >
+                <option value="">Sélectionner un chantier</option>
+                {chantiers?.map(chantier => (
+                  <option key={chantier.id} value={chantier.id}>{chantier.nom}</option>
+                ))}
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Catégorie</label>
+              <select
+                value={newPhotoCategory || 'avancement'}
+                onChange={(e) => setNewPhotoCategory(e.target.value as Photo['category'])}
+                disabled={isUploading}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
+              >
+                <option value="avancement">Avancement</option>
+                <option value="probleme">Problème</option>
+                <option value="materiel">Matériel</option>
+                <option value="securite">Sécurité</option>
+                <option value="finition">Finition</option>
+                <option value="avant">Avant</option>
+                <option value="apres">Après</option>
+              </select>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+              <input
+                type="date"
+                value={newPhotoDate}
+                disabled={isUploading}
+                onChange={(e) => setNewPhotoDate(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nom du fichier (optionnel)</label>
+              <input
+                type="text"
+                value={newPhotoFilename}
+                disabled={isUploading || !!uploadedFile}
+                onChange={(e) => setNewPhotoFilename(e.target.value)}
+                placeholder="nom-du-fichier.jpg"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
+              />
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex justify-end space-x-3 mt-6">
+          <Button variant="secondary" onClick={() => setIsAddModalOpen(false)}>
+            {isUploading ? 'Fermer' : 'Annuler'}
+          </Button>
+          <Button 
+            onClick={handleAddPhoto} 
+            disabled={isUploading || !newPhotoUrl || !newPhotoDescription || !newPhotoDate || !newPhotoChantier}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Ajouter
+          </Button>
+        </div>
+      </Modal>
 
-      {/* Modals */}
+      {/* Edit Photo Modal */}
       <Modal
-        isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          setEditingPhoto(null);
-          setNewPhotoUrl('');
-          setNewPhotoFile(null);
-        }}
-        title={editingPhoto ? 'Modifier la photo' : 'Nouvelle photo'}
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        title="Modifier la photo"
         size="lg"
       >
-        <PhotoForm />
+        {selectedPhoto && (
+          <div className="space-y-4">
+            <div className="aspect-w-16 aspect-h-9 bg-gray-100 rounded-lg overflow-hidden">
+              <img 
+                src={selectedPhoto.url} 
+                alt={selectedPhoto.description} 
+                className="object-contain w-full h-full"
+              />
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <textarea
+                  rows={3}
+                  value={selectedPhoto.description}
+                  disabled={isUploading}
+                  onChange={(e) => setSelectedPhoto({...selectedPhoto, description: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Catégorie</label>
+                <select
+                  value={selectedPhoto.category || 'avancement'}
+                  onChange={(e) => setSelectedPhoto({...selectedPhoto, category: e.target.value as Photo['category']})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="avancement">Avancement</option>
+                  <option value="probleme">Problème</option>
+                  <option value="materiel">Matériel</option>
+                  <option value="securite">Sécurité</option>
+                  <option value="finition">Finition</option>
+                  <option value="avant">Avant</option>
+                  <option value="apres">Après</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Chantier associé</label>
+                <select
+                  value={selectedPhoto.chantierId || ''}
+                  onChange={(e) => setSelectedPhoto({...selectedPhoto, chantierId: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Aucun chantier</option>
+                  {chantiers?.map(chantier => (
+                    <option key={chantier.id} value={chantier.id}>{chantier.nom}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+              <input
+                type="date"
+                value={selectedPhoto.date}
+                onChange={(e) => setSelectedPhoto({...selectedPhoto, date: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h3 className="text-sm font-medium text-gray-700 mb-2">Informations du fichier</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                <div>
+                  <span className="text-gray-500">URL:</span>
+                  <div className="flex items-center mt-1">
+                    <input
+                      type="text"
+                      value={selectedPhoto.url}
+                      readOnly
+                      className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded-l-md bg-gray-50"
+                    />
+                    <button
+                      onClick={() => copyToClipboard(selectedPhoto.url)}
+                      className="px-2 py-1 bg-gray-100 border border-l-0 border-gray-300 rounded-r-md hover:bg-gray-200"
+                    >
+                      <Copy className="w-4 h-4 text-gray-500" />
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <span className="text-gray-500">Nom du fichier:</span>
+                  <p className="font-medium">{selectedPhoto.filename || 'Non spécifié'}</p>
+                </div>
+                <div>
+                  <span className="text-gray-500">Taille:</span>
+                  <p className="font-medium">{formatFileSize(selectedPhoto.size)}</p>
+                </div>
+                <div>
+                  <span className="text-gray-500">ID:</span>
+                  <p className="font-medium text-xs">{selectedPhoto.id}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        <div className="flex justify-end space-x-3 mt-6">
+          <Button variant="secondary" onClick={() => setIsEditModalOpen(false)}>
+            Annuler
+          </Button>
+          <Button variant="danger" onClick={() => selectedPhoto && handleDeletePhoto(selectedPhoto.id)}>
+            <Trash2 className="w-4 h-4 mr-2" />
+            Supprimer
+          </Button>
+          <Button onClick={handleUpdatePhoto}>
+            <CheckCircle className="w-4 h-4 mr-2" />
+            Enregistrer
+          </Button>
+        </div>
       </Modal>
 
+      {/* Modal pour lier une photo à un chantier */}
       <Modal
-        isOpen={isDetailModalOpen}
+        isOpen={isLinkChantierModalOpen}
         onClose={() => {
-          setIsDetailModalOpen(false);
+          setIsLinkChantierModalOpen(false);
           setSelectedPhoto(null);
+          setSelectedChantier('');
         }}
-        title="Détails de la photo"
+        title="Lier la photo à un chantier"
+        size="md"
+      >
+        <div className="space-y-6">
+          {selectedPhoto && (
+            <div className="flex items-center space-x-4">
+              <div className="w-20 h-20 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden">
+                <img 
+                  src={selectedPhoto.url} 
+                  alt={selectedPhoto.description} 
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <div>
+                <p className="font-medium text-gray-900">{selectedPhoto.description}</p>
+                <p className="text-sm text-gray-500">{new Date(selectedPhoto.date).toLocaleDateString()}</p>
+                <p className="text-sm text-gray-500">{getCategoryLabel(selectedPhoto.category)}</p>
+              </div>
+            </div>
+          )}
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Chantier</label>
+            <select
+              value={selectedChantier}
+              onChange={(e) => setSelectedChantier(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Aucun chantier (dissocier)</option>
+              {chantiers?.map(chantier => (
+                <option key={chantier.id} value={chantier.id}>{chantier.nom}</option>
+              ))}
+            </select>
+          </div>
+          
+          <div className="flex justify-end space-x-3">
+            <Button 
+              variant="secondary" 
+              onClick={() => {
+                setIsLinkChantierModalOpen(false);
+                setSelectedPhoto(null);
+                setSelectedChantier('');
+              }}
+            >
+              Annuler
+            </Button>
+            <Button onClick={handleSaveLinkToChantier}>
+              {selectedChantier ? (
+                <>
+                  <Link className="w-4 h-4 mr-2" />
+                  Lier au chantier
+                </>
+              ) : (
+                <>
+                  <Unlink className="w-4 h-4 mr-2" />
+                  Dissocier
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* View Photo Modal */}
+      <Modal
+        isOpen={isViewModalOpen}
+        onClose={() => setIsViewModalOpen(false)}
+        title={selectedPhoto?.description || 'Visualisation de la photo'}
         size="xl"
       >
-        <PhotoDetailModal />
+        {selectedPhoto && (
+          <div id="photo-gallery-fullscreen" className="space-y-4">
+            <div className="relative bg-black rounded-lg overflow-hidden">
+              <img 
+                src={selectedPhoto.url} 
+                alt={selectedPhoto.description} 
+                className="mx-auto max-h-[70vh] object-contain"
+              />
+              
+              {/* Navigation controls */}
+              <div className="absolute inset-x-0 top-1/2 transform -translate-y-1/2 flex justify-between px-4">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigateGallery('prev');
+                  }}
+                  className="p-2 rounded-full bg-black bg-opacity-50 text-white hover:bg-opacity-70"
+                >
+                  <ArrowLeft className="w-6 h-6" />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigateGallery('next');
+                  }}
+                  className="p-2 rounded-full bg-black bg-opacity-50 text-white hover:bg-opacity-70"
+                >
+                  <ArrowRight className="w-6 h-6" />
+                </button>
+              </div>
+              
+              {/* Fullscreen toggle */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleFullscreen();
+                }}
+                className="absolute top-4 right-4 p-2 rounded-full bg-black bg-opacity-50 text-white hover:bg-opacity-70"
+              >
+                {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">{selectedPhoto.description}</h3>
+                <div className="space-y-2">
+                  <div className="flex items-center">
+                    <Building2 className="w-5 h-5 text-gray-400 mr-2" />
+                    <span className="text-gray-700">{getChantierName(selectedPhoto.chantierId)}</span>
+                  </div>
+                  <div className="flex items-center">
+                    <Calendar className="w-5 h-5 text-gray-400 mr-2" />
+                    <span className="text-gray-700">{new Date(selectedPhoto.date).toLocaleDateString()}</span>
+                  </div>
+                  <div className="flex items-center">
+                    <Tag className="w-5 h-5 text-gray-400 mr-2" />
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getCategoryColor(selectedPhoto.category)}`}>
+                      {getCategoryLabel(selectedPhoto.category)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h3 className="text-sm font-medium text-gray-700 mb-3 flex items-center">
+                  <Info className="w-4 h-4 mr-2 text-gray-500" />
+                  Informations techniques
+                </h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Nom du fichier:</span>
+                    <span className="text-gray-900 font-medium">{selectedPhoto.filename || 'Non spécifié'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Taille:</span>
+                    <span className="text-gray-900 font-medium">{formatFileSize(selectedPhoto.size)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">ID:</span>
+                    <span className="text-gray-900 font-medium text-xs">{selectedPhoto.id}</span>
+                  </div>
+                  <div className="pt-2">
+                    <span className="text-gray-600 block mb-1">URL:</span>
+                    <div className="flex">
+                      <input
+                        type="text"
+                        value={selectedPhoto.url}
+                        readOnly
+                        className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded-l-md bg-gray-50"
+                      />
+                      <button
+                        onClick={() => copyToClipboard(selectedPhoto.url)}
+                        className="px-2 py-1 bg-gray-100 border border-l-0 border-gray-300 rounded-r-md hover:bg-gray-200"
+                        title="Copier l'URL"
+                      >
+                        <Copy className="w-4 h-4 text-gray-500" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Thumbnails navigation */}
+            <div className="pt-4 border-t">
+              <h3 className="text-sm font-medium text-gray-700 mb-3">Autres photos ({filteredPhotos.length})</h3>
+              <div className="flex space-x-2 overflow-x-auto pb-2">
+                {filteredPhotos.map((photo, index) => (
+                  <div 
+                    key={photo.id}
+                    className={`flex-shrink-0 w-16 h-16 rounded overflow-hidden border-2 cursor-pointer ${
+                      currentPhotoIndex === index ? 'border-blue-500' : 'border-transparent'
+                    }`}
+                    onClick={() => {
+                      setSelectedPhoto(photo);
+                      setCurrentPhotoIndex(index);
+                    }}
+                  >
+                    <img 
+                      src={photo.url} 
+                      alt={photo.description} 
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            <div className="flex justify-between pt-4 border-t">
+              <div className="flex space-x-2">
+                <Button 
+                  variant="secondary" 
+                  size="sm"
+                  onClick={() => {
+                    window.open(selectedPhoto.url, '_blank');
+                  }}
+                >
+                  <Link className="w-4 h-4 mr-2" />
+                  Ouvrir
+                </Button>
+                <Button 
+                  variant="secondary" 
+                  size="sm"
+                  onClick={() => downloadPhoto(selectedPhoto)}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Télécharger
+                </Button>
+                <Button 
+                  variant="secondary" 
+                  size="sm"
+                  onClick={() => {
+                    setIsViewModalOpen(false);
+                    setIsEditModalOpen(true);
+                  }}
+                >
+                  <Edit className="w-4 h-4 mr-2" />
+                  Modifier
+                </Button>
+                <Button 
+                  variant="danger" 
+                  size="sm"
+                  onClick={() => {
+                    handleDeletePhoto(selectedPhoto.id);
+                    setIsViewModalOpen(false);
+                  }}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Supprimer
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </Modal>
-
-      <ExportModal
-        isOpen={isExportModalOpen}
-        onClose={() => setIsExportModalOpen(false)}
-        title="Exporter les photos"
-        data={filteredPhotos.map(photo => ({
-          Description: photo.description,
-          URL: photo.url,
-          Chantier: photo.chantierNom,
-          Catégorie: photo.category,
-          Date: new Date(photo.date).toLocaleDateString(),
-          'Nom du fichier': photo.filename || '',
-          'Taille (KB)': photo.size_bytes ? (photo.size_bytes / 1024).toFixed(1) : ''
-        }))}
-        filename="photos"
-      />
     </div>
   );
 };
+
+// Function to download a photo
+const downloadPhoto = (photo: Photo) => {
+  // Create a download link
+  const a = document.createElement('a');
+  a.href = photo.url;
+  a.download = photo.filename || `photo-${photo.id}.jpg`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+};
+
+// These components are defined here to avoid importing from lucide-react
+// since they're not exported in the import statement at the top
+const Grid: React.FC<{ className?: string }> = ({ className }) => (
+  <svg 
+    xmlns="http://www.w3.org/2000/svg" 
+    width="24" 
+    height="24" 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor" 
+    strokeWidth="2" 
+    strokeLinecap="round" 
+    strokeLinejoin="round" 
+    className={className}
+  >
+    <rect x="3" y="3" width="7" height="7" />
+    <rect x="14" y="3" width="7" height="7" />
+    <rect x="14" y="14" width="7" height="7" />
+    <rect x="3" y="14" width="7" height="7" />
+  </svg>
+);
+
+const List: React.FC<{ className?: string }> = ({ className }) => (
+  <svg 
+    xmlns="http://www.w3.org/2000/svg" 
+    width="24" 
+    height="24" 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor" 
+    strokeWidth="2" 
+    strokeLinecap="round" 
+    strokeLinejoin="round" 
+    className={className}
+  >
+    <line x1="8" y1="6" x2="21" y2="6" />
+    <line x1="8" y1="12" x2="21" y2="12" />
+    <line x1="8" y1="18" x2="21" y2="18" />
+    <line x1="3" y1="6" x2="3.01" y2="6" />
+    <line x1="3" y1="12" x2="3.01" y2="12" />
+    <line x1="3" y1="18" x2="3.01" y2="18" />
+  </svg>
+);
