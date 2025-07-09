@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Image, Plus, Edit, Trash2, Download, Filter, Search, Calendar, 
   CheckCircle, X, Building2, Tag, Info, Upload, Eye, EyeOff, 
-  ArrowLeft, ArrowRight, Maximize, Minimize, Copy, Link
+  ArrowLeft, ArrowRight, Maximize, Minimize, Copy, Link, Share2
 } from 'lucide-react';
 import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
 import { chantierService } from '../../services/chantierService';
@@ -513,6 +513,30 @@ export const PhotosManager: React.FC = () => {
           <Button variant="secondary">
             <Download className="w-4 h-4 mr-2" />
             Exporter
+          </Button>
+          <Button variant="secondary" onClick={() => {
+            if (filteredPhotos.length === 0) {
+              alert('Aucune photo à télécharger');
+              return;
+            }
+            
+            // Create a text file with all photo URLs
+            const photoList = filteredPhotos.map(photo => 
+              `${photo.description} (${getChantierName(photo.chantierId)}): ${photo.url}`
+            ).join('\n\n');
+            
+            const blob = new Blob([photoList], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `photos-export-${new Date().toISOString().split('T')[0]}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          }}>
+            <Share2 className="w-4 h-4 mr-2" />
+            Télécharger URLs
           </Button>
         </div>
       </div>
@@ -1113,23 +1137,24 @@ export const PhotosManager: React.FC = () => {
                 <Button 
                   variant="secondary" 
                   size="sm"
+                  onClick={() => window.open(selectedPhoto.url, '_blank')}
+                >
+                  <Link className="w-4 h-4 mr-2" />
+                  Ouvrir
+                </Button>
+                <Button 
+                  variant="secondary" 
+                  size="sm"
                   onClick={() => {
+                    // Create a download link
                     const a = document.createElement('a');
                     a.href = selectedPhoto.url;
-                    a.download = selectedPhoto.filename || 'photo.jpg';
+                    a.download = selectedPhoto.filename || `photo-${selectedPhoto.id}.jpg`;
                     document.body.appendChild(a);
                     a.click();
                     document.body.removeChild(a);
                   }}
                 >
-                  <Download className="w-4 h-4 mr-2" />
-                  Télécharger
-                </Button>
-              </div>
-              <div className="flex space-x-2">
-                <Button 
-                  variant="secondary" 
-                  size="sm"
                   onClick={() => {
                     setIsViewModalOpen(false);
                     setIsEditModalOpen(true);
