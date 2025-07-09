@@ -24,6 +24,8 @@ export interface Photo {
   category?: 'avancement' | 'probleme' | 'materiel' | 'securite' | 'finition' | 'avant' | 'apres';
   filename?: string;
   size?: number;
+  chantierId?: string;
+  chantierNom?: string;
 }
 
 export interface Ouvrier {

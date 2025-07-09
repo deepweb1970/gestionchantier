@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { 
   Building2, 
+  Image,
   Users, 
   Wrench,
   UserCheck,
@@ -28,6 +29,7 @@ interface SidebarProps {
 
 const menuItems = [
   { id: 'chantiers', label: 'Chantiers', icon: Building2 },
+  { id: 'photos', label: 'Photos', icon: Image },
   { id: 'ouvriers', label: 'Ouvriers', icon: Users },
   { id: 'materiel', label: 'Matériel', icon: Wrench },
   { id: 'clients', label: 'Clients', icon: UserCheck },

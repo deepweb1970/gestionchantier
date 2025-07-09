@@ -7,6 +7,7 @@ import { Dashboard } from './components/Sections/Dashboard';
 import { Chantiers } from './components/Sections/Chantiers';
 import { Ouvriers } from './components/Sections/Ouvriers';
 import { MaterielSection } from './components/Sections/Materiel';
+import { PhotosManager } from './components/Sections/PhotosManager';
 import { Clients } from './components/Sections/Clients';
 import { Facturation } from './components/Sections/Facturation';
 import { SaisieHeures } from './components/Sections/SaisieHeures';
@@ -99,6 +100,8 @@ function App() {
         return <Dashboard />;
       case 'chantiers':
         return <Chantiers />;
+      case 'photos':
+        return <PhotosManager />;
       case 'ouvriers':
         return <Ouvriers />;
       case 'materiel':
