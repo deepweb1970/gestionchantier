@@ -17,7 +17,6 @@ const toChantier = (row: ChantierRow, photos: Photo[] = []): Chantier => ({
   adresse: row.adresse,
   dateDebut: row.date_debut,
   dateFin: row.date_fin || undefined,
-  workedHours: row.worked_hours || 0,
   statut: row.statut,
   avancement: row.avancement || 0,
   budget: row.budget || 0,
@@ -36,7 +35,6 @@ const toChantierInsert = (chantier: Omit<Chantier, 'id' | 'client' | 'photos'>, 
   date_debut: chantier.dateDebut,
   date_fin: chantier.dateFin || null,
   statut: chantier.statut,
-  worked_hours: chantier.workedHours || 0,
   avancement: chantier.avancement,
   budget: chantier.budget,
   latitude: chantier.coordinates?.lat || null,
@@ -53,7 +51,6 @@ const toChantierUpdate = (chantier: Partial<Omit<Chantier, 'id' | 'client' | 'ph
   if (chantier.dateDebut !== undefined) update.date_debut = chantier.dateDebut;
   if (chantier.dateFin !== undefined) update.date_fin = chantier.dateFin || null;
   if (chantier.statut !== undefined) update.statut = chantier.statut;
-  if (chantier.workedHours !== undefined) update.worked_hours = chantier.workedHours;
   if (chantier.avancement !== undefined) update.avancement = chantier.avancement;
   if (chantier.budget !== undefined) update.budget = chantier.budget;
   if (chantier.coordinates !== undefined) {

@@ -8,7 +8,6 @@ export interface Chantier {
   dateFin?: string;
   statut: 'actif' | 'termine' | 'pause' | 'planifie';
   avancement: number;
-  workedHours?: number;
   budget: number;
   photos: Photo[];
   coordinates?: {
