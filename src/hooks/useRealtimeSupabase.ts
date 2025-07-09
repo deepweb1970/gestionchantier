@@ -8,6 +8,8 @@ type UseRealtimeSupabaseOptions<T> = {
   initialData?: T[];
 };
 
+import { supabase } from '../lib/supabase';
+
 export function useRealtimeSupabase<T>({ 
   table, 
   fetchFunction,
@@ -24,7 +26,9 @@ export function useRealtimeSupabase<T>({
       setLoading(true);
       const result = await fetchFunction();
       setData(result);
-      setError(null);
+      let query = supabase
+        .from(table)
+        .select(selectQuery);
     } catch (err) {
       console.error(`Erreur lors du chargement des données de ${table}:`, err);
       setError(err instanceof Error ? err : new Error(String(err)));
@@ -76,11 +80,15 @@ export function useRealtimeSupabase<T>({
     // Nettoyage lors du démontage du composant
     return () => {
       if (realtimeChannel) {
-        supabase.removeChannel(realtimeChannel);
+        console.error(`Erreur lors du chargement des données de ${table}:`, fetchError);
+        setError(`Erreur lors du chargement des données: ${fetchError.message}`);
+        return;
       }
     };
   }, [table]);
-
+      const errorMessage = err instanceof Error ? err.message : 'Une erreur est survenue';
+      console.error(`Erreur lors du chargement des données de ${table}:`, err);
+      setError(errorMessage);
   // Fonction pour forcer un rechargement des données
   const refresh = () => {
     fetchData();

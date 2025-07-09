@@ -49,7 +49,6 @@ export interface Database {
           created_at?: string | null
           updated_at?: string | null
         }
-        Relationships: []
       }
       chantiers: {
         Row: {
@@ -100,189 +99,53 @@ export interface Database {
           created_at?: string | null
           updated_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "chantiers_client_id_fkey"
-            columns: ["client_id"]
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          }
-        ]
       }
-      documents: {
+      ouvriers: {
         Row: {
           id: string
           nom: string
-          type: string
-          url: string
-          ouvrier_id: string | null
-          chantier_id: string | null
-          created_at: string | null
-        }
-        Insert: {
-          id?: string
-          nom: string
-          type: string
-          url: string
-          ouvrier_id?: string | null
-          chantier_id?: string | null
-          created_at?: string | null
-        }
-        Update: {
-          id?: string
-          nom?: string
-          type?: string
-          url?: string
-          ouvrier_id?: string | null
-          chantier_id?: string | null
-          created_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "documents_chantier_id_fkey"
-            columns: ["chantier_id"]
-            referencedRelation: "chantiers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "documents_ouvrier_id_fkey"
-            columns: ["ouvrier_id"]
-            referencedRelation: "ouvriers"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      facture_items: {
-        Row: {
-          id: string
-          facture_id: string | null
-          description: string
-          quantite: number
-          prix_unitaire: number
-          total: number
-          created_at: string | null
-        }
-        Insert: {
-          id?: string
-          facture_id?: string | null
-          description: string
-          quantite?: number
-          prix_unitaire: number
-          total: number
-          created_at?: string | null
-        }
-        Update: {
-          id?: string
-          facture_id?: string | null
-          description?: string
-          quantite?: number
-          prix_unitaire?: number
-          total?: number
-          created_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "facture_items_facture_id_fkey"
-            columns: ["facture_id"]
-            referencedRelation: "factures"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      factures: {
-        Row: {
-          id: string
-          numero: string
-          client_id: string | null
-          chantier_id: string | null
-          date_emission: string
-          date_echeance: string
-          montant_ht: number
-          tva: number
-          montant_ttc: number
-          statut: 'brouillon' | 'envoyee' | 'payee' | 'retard' | 'annulee'
+          prenom: string
+          email: string
+          telephone: string
+          qualification: string
+          certifications: string[] | null
+          date_embauche: string
+          statut: 'actif' | 'conge' | 'arret' | 'indisponible'
+          taux_horaire: number
+          adresse: string
           created_at: string | null
           updated_at: string | null
         }
         Insert: {
           id?: string
-          numero: string
-          client_id?: string | null
-          chantier_id?: string | null
-          date_emission: string
-          date_echeance: string
-          montant_ht?: number
-          tva?: number
-          montant_ttc?: number
-          statut?: 'brouillon' | 'envoyee' | 'payee' | 'retard' | 'annulee'
+          nom: string
+          prenom: string
+          email: string
+          telephone: string
+          qualification: string
+          certifications?: string[] | null
+          date_embauche: string
+          statut?: 'actif' | 'conge' | 'arret' | 'indisponible'
+          taux_horaire: number
+          adresse: string
           created_at?: string | null
           updated_at?: string | null
         }
         Update: {
           id?: string
-          numero?: string
-          client_id?: string | null
-          chantier_id?: string | null
-          date_emission?: string
-          date_echeance?: string
-          montant_ht?: number
-          tva?: number
-          montant_ttc?: number
-          statut?: 'brouillon' | 'envoyee' | 'payee' | 'retard' | 'annulee'
+          nom?: string
+          prenom?: string
+          email?: string
+          telephone?: string
+          qualification?: string
+          certifications?: string[] | null
+          date_embauche?: string
+          statut?: 'actif' | 'conge' | 'arret' | 'indisponible'
+          taux_horaire?: number
+          adresse?: string
           created_at?: string | null
           updated_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "factures_chantier_id_fkey"
-            columns: ["chantier_id"]
-            referencedRelation: "chantiers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "factures_client_id_fkey"
-            columns: ["client_id"]
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      historique_connexions: {
-        Row: {
-          id: string
-          utilisateur_id: string | null
-          date_connexion: string | null
-          adresse_ip: unknown | null
-          navigateur: string | null
-          appareil: string | null
-          succes: boolean | null
-        }
-        Insert: {
-          id?: string
-          utilisateur_id?: string | null
-          date_connexion?: string | null
-          adresse_ip?: unknown | null
-          navigateur?: string | null
-          appareil?: string | null
-          succes?: boolean | null
-        }
-        Update: {
-          id?: string
-          utilisateur_id?: string | null
-          date_connexion?: string | null
-          adresse_ip?: unknown | null
-          navigateur?: string | null
-          appareil?: string | null
-          succes?: boolean | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "historique_connexions_utilisateur_id_fkey"
-            columns: ["utilisateur_id"]
-            referencedRelation: "utilisateurs"
-            referencedColumns: ["id"]
-          }
-        ]
       }
       materiel: {
         Row: {
@@ -333,21 +196,222 @@ export interface Database {
           created_at?: string | null
           updated_at?: string | null
         }
-        Relationships: []
       }
-      ouvriers: {
+      photos: {
+        Row: {
+          id: string
+          chantier_id: string | null
+          url: string
+          description: string
+          date: string
+          category: 'avancement' | 'probleme' | 'materiel' | 'securite' | 'finition' | 'avant' | 'apres' | null
+          filename: string | null
+          size_bytes: number | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          chantier_id?: string | null
+          url: string
+          description: string
+          date: string
+          category?: 'avancement' | 'probleme' | 'materiel' | 'securite' | 'finition' | 'avant' | 'apres' | null
+          filename?: string | null
+          size_bytes?: number | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          chantier_id?: string | null
+          url?: string
+          description?: string
+          date?: string
+          category?: 'avancement' | 'probleme' | 'materiel' | 'securite' | 'finition' | 'avant' | 'apres' | null
+          filename?: string | null
+          size_bytes?: number | null
+          created_at?: string | null
+        }
+      }
+      factures: {
+        Row: {
+          id: string
+          numero: string
+          client_id: string | null
+          chantier_id: string | null
+          date_emission: string
+          date_echeance: string
+          montant_ht: number
+          tva: number
+          montant_ttc: number
+          statut: 'brouillon' | 'envoyee' | 'payee' | 'retard' | 'annulee'
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          numero: string
+          client_id?: string | null
+          chantier_id?: string | null
+          date_emission: string
+          date_echeance: string
+          montant_ht?: number
+          tva?: number
+          montant_ttc?: number
+          statut?: 'brouillon' | 'envoyee' | 'payee' | 'retard' | 'annulee'
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          numero?: string
+          client_id?: string | null
+          chantier_id?: string | null
+          date_emission?: string
+          date_echeance?: string
+          montant_ht?: number
+          tva?: number
+          montant_ttc?: number
+          statut?: 'brouillon' | 'envoyee' | 'payee' | 'retard' | 'annulee'
+          created_at?: string | null
+          updated_at?: string | null
+        }
+      }
+      facture_items: {
+        Row: {
+          id: string
+          facture_id: string | null
+          description: string
+          quantite: number
+          prix_unitaire: number
+          total: number
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          facture_id?: string | null
+          description: string
+          quantite?: number
+          prix_unitaire: number
+          total: number
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          facture_id?: string | null
+          description?: string
+          quantite?: number
+          prix_unitaire?: number
+          total?: number
+          created_at?: string | null
+        }
+      }
+      saisies_heures: {
+        Row: {
+          id: string
+          ouvrier_id: string | null
+          chantier_id: string | null
+          materiel_id: string | null
+          date: string
+          heure_debut: string
+          heure_fin: string
+          heures_normales: number
+          heures_supplementaires: number
+          description: string
+          valide: boolean | null
+          created_at: string | null
+          updated_at: string | null
+          parametres_id: string | null
+          heures_exceptionnelles: number | null
+          heures_total: number | null
+        }
+        Insert: {
+          id?: string
+          ouvrier_id?: string | null
+          chantier_id?: string | null
+          materiel_id?: string | null
+          date: string
+          heure_debut: string
+          heure_fin: string
+          heures_normales?: number
+          heures_supplementaires?: number
+          description: string
+          valide?: boolean | null
+          created_at?: string | null
+          updated_at?: string | null
+          parametres_id?: string | null
+          heures_exceptionnelles?: number | null
+          heures_total?: number | null
+        }
+        Update: {
+          id?: string
+          ouvrier_id?: string | null
+          chantier_id?: string | null
+          materiel_id?: string | null
+          date?: string
+          heure_debut?: string
+          heure_fin?: string
+          heures_normales?: number
+          heures_supplementaires?: number
+          description?: string
+          valide?: boolean | null
+          created_at?: string | null
+          updated_at?: string | null
+          parametres_id?: string | null
+          heures_exceptionnelles?: number | null
+          heures_total?: number | null
+        }
+      }
+      planning_events: {
+        Row: {
+          id: string
+          titre: string
+          description: string | null
+          date_debut: string
+          date_fin: string
+          chantier_id: string | null
+          ouvrier_id: string | null
+          materiel_id: string | null
+          type: 'chantier' | 'maintenance' | 'conge' | 'formation'
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          titre: string
+          description?: string | null
+          date_debut: string
+          date_fin: string
+          chantier_id?: string | null
+          ouvrier_id?: string | null
+          materiel_id?: string | null
+          type: 'chantier' | 'maintenance' | 'conge' | 'formation'
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          titre?: string
+          description?: string | null
+          date_debut?: string
+          date_fin?: string
+          chantier_id?: string | null
+          ouvrier_id?: string | null
+          materiel_id?: string | null
+          type?: 'chantier' | 'maintenance' | 'conge' | 'formation'
+          created_at?: string | null
+          updated_at?: string | null
+        }
+      }
+      utilisateurs: {
         Row: {
           id: string
           nom: string
           prenom: string
           email: string
-          telephone: string
-          qualification: string
-          certifications: string[] | null
-          date_embauche: string
-          statut: 'actif' | 'conge' | 'arret' | 'indisponible'
-          taux_horaire: number
-          adresse: string
+          role: 'admin' | 'manager' | 'employe'
+          derniere_connexion: string | null
+          actif: boolean | null
+          permissions: string[] | null
           created_at: string | null
           updated_at: string | null
         }
@@ -356,13 +420,10 @@ export interface Database {
           nom: string
           prenom: string
           email: string
-          telephone: string
-          qualification: string
-          certifications?: string[] | null
-          date_embauche: string
-          statut?: 'actif' | 'conge' | 'arret' | 'indisponible'
-          taux_horaire: number
-          adresse: string
+          role?: 'admin' | 'manager' | 'employe'
+          derniere_connexion?: string | null
+          actif?: boolean | null
+          permissions?: string[] | null
           created_at?: string | null
           updated_at?: string | null
         }
@@ -371,17 +432,103 @@ export interface Database {
           nom?: string
           prenom?: string
           email?: string
-          telephone?: string
-          qualification?: string
-          certifications?: string[] | null
-          date_embauche?: string
-          statut?: 'actif' | 'conge' | 'arret' | 'indisponible'
-          taux_horaire?: number
-          adresse?: string
+          role?: 'admin' | 'manager' | 'employe'
+          derniere_connexion?: string | null
+          actif?: boolean | null
+          permissions?: string[] | null
           created_at?: string | null
           updated_at?: string | null
         }
-        Relationships: []
+      }
+      documents: {
+        Row: {
+          id: string
+          nom: string
+          type: string
+          url: string
+          ouvrier_id: string | null
+          chantier_id: string | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          nom: string
+          type: string
+          url: string
+          ouvrier_id?: string | null
+          chantier_id?: string | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          nom?: string
+          type?: string
+          url?: string
+          ouvrier_id?: string | null
+          chantier_id?: string | null
+          created_at?: string | null
+        }
+      }
+      rapports: {
+        Row: {
+          id: string
+          nom: string
+          type: 'performance' | 'couts' | 'activite' | 'financier' | 'ressources'
+          date_debut: string
+          date_fin: string
+          parametres: Json | null
+          cree_par: string | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          nom: string
+          type: 'performance' | 'couts' | 'activite' | 'financier' | 'ressources'
+          date_debut: string
+          date_fin: string
+          parametres?: Json | null
+          cree_par?: string | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          nom?: string
+          type?: 'performance' | 'couts' | 'activite' | 'financier' | 'ressources'
+          date_debut?: string
+          date_fin?: string
+          parametres?: Json | null
+          cree_par?: string | null
+          created_at?: string | null
+        }
+      }
+      historique_connexions: {
+        Row: {
+          id: string
+          utilisateur_id: string | null
+          date_connexion: string | null
+          adresse_ip: string | null
+          navigateur: string | null
+          appareil: string | null
+          succes: boolean | null
+        }
+        Insert: {
+          id?: string
+          utilisateur_id?: string | null
+          date_connexion?: string | null
+          adresse_ip?: string | null
+          navigateur?: string | null
+          appareil?: string | null
+          succes?: boolean | null
+        }
+        Update: {
+          id?: string
+          utilisateur_id?: string | null
+          date_connexion?: string | null
+          adresse_ip?: string | null
+          navigateur?: string | null
+          appareil?: string | null
+          succes?: boolean | null
+        }
       }
       parametres_heures_sup: {
         Row: {
@@ -429,272 +576,6 @@ export interface Database {
           created_at?: string | null
           updated_at?: string | null
         }
-        Relationships: []
-      }
-      photos: {
-        Row: {
-          id: string
-          chantier_id: string | null
-          url: string
-          description: string
-          date: string
-          category: 'avancement' | 'probleme' | 'materiel' | 'securite' | 'finition' | 'avant' | 'apres' | null
-          filename: string | null
-          size_bytes: number | null
-          created_at: string | null
-        }
-        Insert: {
-          id?: string
-          chantier_id?: string | null
-          url: string
-          description: string
-          date: string
-          category?: 'avancement' | 'probleme' | 'materiel' | 'securite' | 'finition' | 'avant' | 'apres' | null
-          filename?: string | null
-          size_bytes?: number | null
-          created_at?: string | null
-        }
-        Update: {
-          id?: string
-          chantier_id?: string | null
-          url?: string
-          description?: string
-          date?: string
-          category?: 'avancement' | 'probleme' | 'materiel' | 'securite' | 'finition' | 'avant' | 'apres' | null
-          filename?: string | null
-          size_bytes?: number | null
-          created_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "photos_chantier_id_fkey"
-            columns: ["chantier_id"]
-            referencedRelation: "chantiers"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      planning_events: {
-        Row: {
-          id: string
-          titre: string
-          description: string | null
-          date_debut: string
-          date_fin: string
-          chantier_id: string | null
-          ouvrier_id: string | null
-          materiel_id: string | null
-          type: 'chantier' | 'maintenance' | 'conge' | 'formation'
-          created_at: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          id?: string
-          titre: string
-          description?: string | null
-          date_debut: string
-          date_fin: string
-          chantier_id?: string | null
-          ouvrier_id?: string | null
-          materiel_id?: string | null
-          type: 'chantier' | 'maintenance' | 'conge' | 'formation'
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          id?: string
-          titre?: string
-          description?: string | null
-          date_debut?: string
-          date_fin?: string
-          chantier_id?: string | null
-          ouvrier_id?: string | null
-          materiel_id?: string | null
-          type?: 'chantier' | 'maintenance' | 'conge' | 'formation'
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "planning_events_chantier_id_fkey"
-            columns: ["chantier_id"]
-            referencedRelation: "chantiers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "planning_events_materiel_id_fkey"
-            columns: ["materiel_id"]
-            referencedRelation: "materiel"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "planning_events_ouvrier_id_fkey"
-            columns: ["ouvrier_id"]
-            referencedRelation: "ouvriers"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      rapports: {
-        Row: {
-          id: string
-          nom: string
-          type: 'performance' | 'couts' | 'activite' | 'financier' | 'ressources'
-          date_debut: string
-          date_fin: string
-          parametres: Json | null
-          cree_par: string | null
-          created_at: string | null
-        }
-        Insert: {
-          id?: string
-          nom: string
-          type: 'performance' | 'couts' | 'activite' | 'financier' | 'ressources'
-          date_debut: string
-          date_fin: string
-          parametres?: Json | null
-          cree_par?: string | null
-          created_at?: string | null
-        }
-        Update: {
-          id?: string
-          nom?: string
-          type?: 'performance' | 'couts' | 'activite' | 'financier' | 'ressources'
-          date_debut?: string
-          date_fin?: string
-          parametres?: Json | null
-          cree_par?: string | null
-          created_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "rapports_cree_par_fkey"
-            columns: ["cree_par"]
-            referencedRelation: "utilisateurs"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      saisies_heures: {
-        Row: {
-          id: string
-          ouvrier_id: string | null
-          chantier_id: string | null
-          materiel_id: string | null
-          date: string
-          heure_debut: string
-          heure_fin: string
-          heures_normales: number
-          heures_supplementaires: number
-          description: string
-          valide: boolean | null
-          created_at: string | null
-          updated_at: string | null
-          parametres_id: string | null
-          heures_exceptionnelles: number | null
-          heures_total: number | null
-        }
-        Insert: {
-          id?: string
-          ouvrier_id?: string | null
-          chantier_id?: string | null
-          materiel_id?: string | null
-          date: string
-          heure_debut: string
-          heure_fin: string
-          heures_normales: number
-          heures_supplementaires: number
-          description: string
-          valide?: boolean | null
-          created_at?: string | null
-          updated_at?: string | null
-          parametres_id?: string | null
-          heures_exceptionnelles?: number | null
-          heures_total?: number | null
-        }
-        Update: {
-          id?: string
-          ouvrier_id?: string | null
-          chantier_id?: string | null
-          materiel_id?: string | null
-          date?: string
-          heure_debut?: string
-          heure_fin?: string
-          heures_normales?: number
-          heures_supplementaires?: number
-          description?: string
-          valide?: boolean | null
-          created_at?: string | null
-          updated_at?: string | null
-          parametres_id?: string | null
-          heures_exceptionnelles?: number | null
-          heures_total?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "saisies_heures_chantier_id_fkey"
-            columns: ["chantier_id"]
-            referencedRelation: "chantiers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "saisies_heures_materiel_id_fkey"
-            columns: ["materiel_id"]
-            referencedRelation: "materiel"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "saisies_heures_ouvrier_id_fkey"
-            columns: ["ouvrier_id"]
-            referencedRelation: "ouvriers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "saisies_heures_parametres_id_fkey"
-            columns: ["parametres_id"]
-            referencedRelation: "parametres_heures_sup"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      utilisateurs: {
-        Row: {
-          id: string
-          nom: string
-          prenom: string
-          email: string
-          role: 'admin' | 'manager' | 'employe'
-          derniere_connexion: string | null
-          actif: boolean | null
-          permissions: string[] | null
-          created_at: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          id?: string
-          nom: string
-          prenom: string
-          email: string
-          role?: 'admin' | 'manager' | 'employe'
-          derniere_connexion?: string | null
-          actif?: boolean | null
-          permissions?: string[] | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          id?: string
-          nom?: string
-          prenom?: string
-          email?: string
-          role?: 'admin' | 'manager' | 'employe'
-          derniere_connexion?: string | null
-          actif?: boolean | null
-          permissions?: string[] | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
       }
     }
     Views: {
