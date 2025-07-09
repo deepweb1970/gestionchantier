@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Edit, Trash2, Clock, Download, Filter, Search, Calendar, CheckCircle, X, User, Building2, Wrench, AlertTriangle, FileText, Check, CalendarRange, Euro } from 'lucide-react';
+import { Plus, Edit, Trash2, Clock, Download, Filter, Search, Calendar, CheckCircle, X, User, Building2, Wrench, AlertTriangle, FileText, Check, CalendarRange, Euro, Coffee } from 'lucide-react';
 import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
 import { saisieHeureService } from '../../services/saisieHeureService';
 import { ouvrierService } from '../../services/ouvrierService';
@@ -39,6 +39,7 @@ export const SaisieHeures: React.FC = () => {
   const [editingSaisie, setEditingSaisie] = useState<SaisieHeure | null>(null);
   const [selectedSaisies, setSelectedSaisies] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [lunchBreak, setLunchBreak] = useState('00:30');
   const [ouvrierFilter, setOuvrierFilter] = useState('all');
   const [chantierFilter, setChantierFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
@@ -111,15 +112,19 @@ export const SaisieHeures: React.FC = () => {
     return matchesSearch && matchesOuvrier && matchesChantier && matchesDate && matchesValidation;
   });
 
-  const calculateHours = (heureDebut: string, heureFin: string): number => {
+  const calculateHours = (heureDebut: string, heureFin: string, pauseDejeuner: string = '00:00'): number => {
     const [debutHours, debutMinutes] = heureDebut.split(':').map(Number);
     const [finHours, finMinutes] = heureFin.split(':').map(Number);
+    const [pauseHours, pauseMinutes] = pauseDejeuner.split(':').map(Number);
     
     const debutMinutesTotal = debutHours * 60 + debutMinutes;
     const finMinutesTotal = finHours * 60 + finMinutes;
+    const pauseMinutesTotal = pauseHours * 60 + pauseMinutes;
     
     const totalMinutes = finMinutesTotal - debutMinutesTotal;
-    return totalMinutes / 60;
+    // Subtract lunch break
+    const netMinutes = totalMinutes - pauseMinutesTotal;
+    return netMinutes / 60;
   };
 
   // Conversion d'une saisie existante vers le format simplifié
@@ -178,7 +183,8 @@ export const SaisieHeures: React.FC = () => {
   const handleSave = async (formData: FormData) => {
     const heureDebut = formData.get('heureDebut') as string;
     const heureFin = formData.get('heureFin') as string;
-    const heuresTotal = calculateHours(heureDebut, heureFin);
+    const pauseDejeuner = formData.get('pauseDejeuner') as string;
+    const heuresTotal = calculateHours(heureDebut, heureFin, pauseDejeuner);
     
     const saisieData: SimpleSaisieHeure = {
       id: editingSaisie?.id || Date.now().toString(),
@@ -437,6 +443,20 @@ export const SaisieHeures: React.FC = () => {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+              <Coffee className="w-4 h-4 mr-1 text-orange-500" />
+              Pause déjeuner
+            </label>
+            <input
+              name="pauseDejeuner"
+              type="time"
+              required
+              defaultValue={lunchBreak}
+              onChange={(e) => setLunchBreak(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
         </div>
         
         <div>
@@ -454,10 +474,43 @@ export const SaisieHeures: React.FC = () => {
         <div className="bg-blue-50 p-4 rounded-lg">
           <h4 className="text-sm font-medium text-blue-700 mb-2">Calcul des heures</h4>
           <div className="flex items-center">
-            <Clock className="w-5 h-5 text-blue-500 mr-2" />
-            <p className="text-sm text-blue-600">
-              Les heures sont calculées automatiquement en fonction des horaires saisis.
-            </p>
+            <div className="flex-1">
+              <Clock className="w-5 h-5 text-blue-500 mb-2" />
+              <p className="text-sm text-blue-600">
+                Les heures sont calculées automatiquement en fonction des horaires saisis.
+              </p>
+              <p className="text-sm text-blue-600 mt-2">
+                <span className="font-medium">Exemple:</span> 8h00 - 17h00 avec pause de 30min = 8.5h travaillées
+              </p>
+            </div>
+            <div className="flex-1 bg-white p-3 rounded-lg">
+              <p className="text-sm font-medium text-gray-700 mb-1">Aperçu du calcul:</p>
+              {(() => {
+                const debut = editingSaisie?.heureDebut || '08:00';
+                const fin = editingSaisie?.heureFin || '17:00';
+                const pause = lunchBreak;
+                const totalBrut = calculateHours(debut, fin, '00:00');
+                const totalNet = calculateHours(debut, fin, pause);
+                const pauseHours = totalBrut - totalNet;
+                
+                return (
+                  <div className="text-sm">
+                    <div className="flex justify-between">
+                      <span>Durée totale:</span>
+                      <span className="font-medium">{totalBrut.toFixed(2)}h</span>
+                    </div>
+                    <div className="flex justify-between text-orange-600">
+                      <span>Pause déjeuner:</span>
+                      <span className="font-medium">-{pauseHours.toFixed(2)}h</span>
+                    </div>
+                    <div className="flex justify-between text-blue-600 font-medium border-t pt-1 mt-1">
+                      <span>Heures travaillées:</span>
+                      <span>{totalNet.toFixed(2)}h</span>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
           </div>
         </div>
       </div>
@@ -914,10 +967,15 @@ export const SaisieHeures: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="space-y-1">
                         <div className="text-sm font-medium">
-                          {(() => {
-                            const totalHeures = saisie.heuresNormales + saisie.heuresSupplementaires + (saisie.heuresExceptionnelles || 0);
-                            return `${totalHeures.toFixed(1)}h total`;
-                          })()}
+                          <div className="flex items-center">
+                            <span>
+                              {(() => {
+                                const totalHeures = saisie.heuresNormales + saisie.heuresSupplementaires + (saisie.heuresExceptionnelles || 0);
+                                return `${totalHeures.toFixed(1)}h total`;
+                              })()}
+                            </span>
+                            <Coffee className="w-3 h-3 ml-1 text-orange-500" title="Pause déjeuner déduite" />
+                          </div>
                         </div>
                         <div className="text-xs text-gray-500">
                           {saisie.heureDebut} - {saisie.heureFin}
