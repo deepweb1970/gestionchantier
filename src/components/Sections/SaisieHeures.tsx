@@ -117,9 +117,22 @@ export const SaisieHeures: React.FC = () => {
 
     const debutMinutesTotal = debutHours * 60 + debutMinutes;
     const finMinutesTotal = finHours * 60 + finMinutes;
-    
+
     const totalMinutes = finMinutesTotal - debutMinutesTotal;
     return totalMinutes / 60;
+  };
+
+  // Calcule les heures nettes en soustrayant l'heure de table
+  const calculateNetHours = (heureDebut: string, heureFin: string, heureTable?: string): number => {
+    const totalHours = calculateHours(heureDebut, heureFin);
+    
+    if (!heureTable) return totalHours;
+    
+    // Convertir l'heure de table en heures décimales
+    const [tableHours, tableMinutes] = heureTable.split(':').map(Number);
+    const tableDecimal = tableHours + (tableMinutes / 60);
+    
+    return Math.max(0, totalHours - tableDecimal);
   };
 
   const calculateNetHours = (heureDebut: string, heureFin: string, heureTable?: string): number => {
@@ -144,7 +157,7 @@ export const SaisieHeures: React.FC = () => {
   // Conversion d'une saisie existante vers le format simplifié
   const convertToSimpleSaisie = (saisie: SaisieHeure): SimpleSaisieHeure => {
     const heuresTotal = saisie.heuresNormales + saisie.heuresSupplementaires + (saisie.heuresExceptionnelles || 0);
-    
+
     return {
       id: saisie.id,
       ouvrierId: saisie.ouvrierId,
@@ -154,6 +167,7 @@ export const SaisieHeures: React.FC = () => {
       date: saisie.date,
       heureDebut: saisie.heureDebut,
       heureFin: saisie.heureFin,
+      heureTable: saisie.heureTable,
       heuresTotal: heuresTotal,
       description: saisie.description,
       valide: saisie.valide
@@ -170,6 +184,7 @@ export const SaisieHeures: React.FC = () => {
       date: saisie.date,
       heureDebut: saisie.heureDebut,
       heureFin: saisie.heureFin,
+      heureTable: saisie.heureTable,
       heuresNormales: saisie.heuresNormales,
       heuresSupplementaires: saisie.heuresSupplementaires,
       heuresExceptionnelles: saisie.heuresExceptionnelles,
@@ -198,18 +213,19 @@ export const SaisieHeures: React.FC = () => {
   const handleSave = async (formData: FormData) => {
     const heureDebut = formData.get('heureDebut') as string;
     const heureFin = formData.get('heureFin') as string;
-    const heureTable = formData.get('heureTable') as string || undefined;
-    const heuresTotal = calculateNetHours(heureDebut, heureFin, heureTable);
+    const heureTable = formData.get('heureTable') as string;
+    const heuresTotal = calculateNetHours(heureDebut, heureFin, heureTable || undefined);
     
     const saisieData: SimpleSaisieHeure = {
       id: editingSaisie?.id || Date.now().toString(),
       ouvrierId: formData.get('ouvrierId') as string,
       chantierId: formData.get('chantierId') as string,
       materielId: formData.get('materielId') as string || undefined,
-      heureTable: heureTable,
+      heureTable: heureTable || undefined,
       date: formData.get('date') as string,
       heureDebut,
       heureFin,
+      heureTable: heureTable || undefined,
       heuresTotal,
       description: formData.get('description') as string,
       valide: editingSaisie?.valide || false
@@ -461,13 +477,13 @@ export const SaisieHeures: React.FC = () => {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Pause déjeuner
-              <span className="text-xs text-gray-500 ml-1">(optionnel)</span>
+              Heure de table
+              <span className="text-xs text-gray-500 ml-1">(pause déjeuner)</span>
             </label>
             <input
               name="heureTable"
               type="time"
-              defaultValue={editingSaisie?.heureTable || '01:00'}
+              defaultValue={editingSaisie?.heureTable || "01:00"}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <p className="text-xs text-gray-500 mt-1">
@@ -977,6 +993,9 @@ export const SaisieHeures: React.FC = () => {
                         </div>
                         <div className="text-xs text-gray-500">
                           {saisie.heureDebut} - {saisie.heureFin}
+                          {saisie.heureTable && (
+                            <span className="ml-1">(-{saisie.heureTable} pause)</span>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -1090,6 +1109,7 @@ export const SaisieHeures: React.FC = () => {
             Ouvrier: `${ouvrier?.prenom} ${ouvrier?.nom}`,
             Chantier: chantier?.nom || '-',
             'Horaires': `${saisie.heureDebut} - ${saisie.heureFin}${saisie.heureTable ? ` (Pause: ${saisie.heureTable})` : ''}`,
+            'Pause déjeuner': saisie.heureTable || 'Aucune',
             'Total heures': totalHeures.toFixed(1),
             'Coût': `${cout.toFixed(2)} €`,
             'Matériel': materiel?.nom || '-',
