@@ -135,23 +135,18 @@ export const SaisieHeures: React.FC = () => {
     return Math.max(0, totalHours - tableDecimal);
   };
 
-  const calculateNetHours = (heureDebut: string, heureFin: string, heureTable?: string): number => {
-    const [debutHours, debutMinutes] = heureDebut.split(':').map(Number);
-    const [finHours, finMinutes] = heureFin.split(':').map(Number);
+  // Calcul des heures avec pause déjeuner
+  const calculateHoursWithLunch = (heureDebut: string, heureFin: string, heureTable?: string): number => {
+    let totalHours = calculateHours(heureDebut, heureFin);
     
-    const debutMinutesTotal = debutHours * 60 + debutMinutes;
-    const finMinutesTotal = finHours * 60 + finMinutes;
-    
-    let totalMinutes = finMinutesTotal - debutMinutesTotal;
-    
-    // Subtract lunch break time if provided
+    // Si une pause déjeuner est spécifiée, la soustraire
     if (heureTable) {
       const [tableHours, tableMinutes] = heureTable.split(':').map(Number);
-      const tableMinutesTotal = tableHours * 60 + tableMinutes;
-      totalMinutes -= tableMinutesTotal;
+      const tableHoursDecimal = tableHours + (tableMinutes / 60);
+      totalHours -= tableHoursDecimal;
     }
     
-    return totalMinutes / 60;
+    return Math.max(0, totalHours); // Éviter les valeurs négatives
   };
 
   // Conversion d'une saisie existante vers le format simplifié
@@ -214,7 +209,7 @@ export const SaisieHeures: React.FC = () => {
     const heureDebut = formData.get('heureDebut') as string;
     const heureFin = formData.get('heureFin') as string;
     const heureTable = formData.get('heureTable') as string;
-    const heuresTotal = calculateNetHours(heureDebut, heureFin, heureTable || undefined);
+    const heuresTotal = calculateHoursWithLunch(heureDebut, heureFin, heureTable);
     
     const saisieData: SimpleSaisieHeure = {
       id: editingSaisie?.id || Date.now().toString(),
@@ -476,19 +471,14 @@ export const SaisieHeures: React.FC = () => {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Heure de table
-              <span className="text-xs text-gray-500 ml-1">(pause déjeuner)</span>
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Pause déjeuner</label>
             <input
               name="heureTable"
               type="time"
-              defaultValue={editingSaisie?.heureTable || "01:00"}
+              defaultValue={editingSaisie?.heureTable || '01:00'}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <p className="text-xs text-gray-500 mt-1">
-              Durée de la pause déjeuner (sera déduite du total)
-            </p>
+            <p className="text-xs text-gray-500 mt-1">Durée de la pause (sera déduite du total)</p>
           </div>
         </div>
         
@@ -993,9 +983,7 @@ export const SaisieHeures: React.FC = () => {
                         </div>
                         <div className="text-xs text-gray-500">
                           {saisie.heureDebut} - {saisie.heureFin}
-                          {saisie.heureTable && (
-                            <span className="ml-1">(-{saisie.heureTable} pause)</span>
-                          )}
+                          {saisie.heureTable && <span> (pause: {saisie.heureTable})</span>}
                         </div>
                       </div>
                     </td>
@@ -1109,7 +1097,7 @@ export const SaisieHeures: React.FC = () => {
             Ouvrier: `${ouvrier?.prenom} ${ouvrier?.nom}`,
             Chantier: chantier?.nom || '-',
             'Horaires': `${saisie.heureDebut} - ${saisie.heureFin}${saisie.heureTable ? ` (Pause: ${saisie.heureTable})` : ''}`,
-            'Pause déjeuner': saisie.heureTable || 'Aucune',
+            'Pause déjeuner': saisie.heureTable || '-',
             'Total heures': totalHeures.toFixed(1),
             'Coût': `${cout.toFixed(2)} €`,
             'Matériel': materiel?.nom || '-',
