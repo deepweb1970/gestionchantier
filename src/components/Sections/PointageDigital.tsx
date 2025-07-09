@@ -116,6 +116,13 @@ export const PointageDigital: React.FC = () => {
     const formattedStartTime = `${startTime.getHours().toString().padStart(2, '0')}:${startTime.getMinutes().toString().padStart(2, '0')}`;
     const formattedEndTime = `${endTime.getHours().toString().padStart(2, '0')}:${endTime.getMinutes().toString().padStart(2, '0')}`;
     
+    // Calculate lunch break in hours
+    const [lunchHours, lunchMinutes] = pointage.heureTable.split(':').map(Number);
+    const lunchTimeInHours = lunchHours + (lunchMinutes / 60);
+    
+    // Subtract lunch break from total hours
+    const adjustedElapsedHours = Math.max(0, elapsedHours - lunchTimeInHours);
+    
     try {
       // Create saisie heure record
       const saisieData = {
@@ -126,14 +133,15 @@ export const PointageDigital: React.FC = () => {
         date: startTime.toISOString().split('T')[0], // YYYY-MM-DD
         heureDebut: formattedStartTime,
         heureFin: formattedEndTime,
-        heuresTotal: parseFloat(elapsedHours.toFixed(2)),
+        heureTable: pointage.heureTable,
+        heuresTotal: parseFloat(adjustedElapsedHours.toFixed(2)),
         description: pointage.description,
         valide: false
       };
       
       await saisieHeureService.create(saisieData);
       
-      setSuccess(`Pointage enregistré avec succès: ${elapsedHours.toFixed(2)} heures`);
+      setSuccess(`Pointage enregistré avec succès: ${adjustedElapsedHours.toFixed(2)} heures (${lunchTimeInHours}h de pause déduites)`);
       
       // Reset the form
       setPointage({
@@ -144,6 +152,7 @@ export const PointageDigital: React.FC = () => {
         chantierId: '',
         ouvrierId: '',
         materielId: '',
+        heureTable: '01:00',
         description: ''
       });
       
@@ -164,6 +173,7 @@ export const PointageDigital: React.FC = () => {
         chantierId: '',
         ouvrierId: '',
         materielId: '',
+        heureTable: '01:00',
         description: ''
       });
       
@@ -281,10 +291,9 @@ export const PointageDigital: React.FC = () => {
                 onChange={(e) => setPointage({ ...pointage, heureTable: e.target.value })}
                 disabled={pointage.isActive}
                 className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
-                placeholder="01:00"
               />
-              <p className="text-xs text-gray-500 mt-1">Format: HH:MM (ex: 01:00 pour 1 heure)</p>
             </div>
+            <p className="text-xs text-gray-500 mt-1">Temps de pause à déduire du total</p>
           </div>
           
           <div>
