@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { 
   Image, Plus, Edit, Trash2, Download, Filter, Search, Calendar, 
   CheckCircle, X, Building2, Tag, Info, Upload, Eye, EyeOff, 
-  ArrowLeft, ArrowRight, Maximize, Minimize, Copy, Link, Share2
+  ArrowLeft, ArrowRight, Maximize, Minimize, Copy, Link, Share2,
+  AlertTriangle
 } from 'lucide-react';
 import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
 import { chantierService } from '../../services/chantierService';
@@ -40,6 +41,10 @@ export const PhotosManager: React.FC = () => {
   const [newPhotoDate, setNewPhotoDate] = useState(new Date().toISOString().split('T')[0]);
   const [newPhotoChantier, setNewPhotoChantier] = useState('');
   const [newPhotoFilename, setNewPhotoFilename] = useState('');
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   
   // Gallery view states
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
@@ -238,6 +243,87 @@ export const PhotosManager: React.FC = () => {
     } catch (err) {
       console.error('Erreur lors de la suppression de la photo:', err);
       alert('Erreur lors de la suppression de la photo');
+    }
+  };
+
+  // File upload handling
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    
+    const file = files[0];
+    
+    // Check file type
+    if (!file.type.startsWith('image/')) {
+      setUploadError('Le fichier doit être une image (jpg, png, etc.)');
+      return;
+    }
+    
+    // Check file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadError('La taille du fichier ne doit pas dépasser 5MB');
+      return;
+    }
+    
+    setUploadedFile(file);
+    setNewPhotoFilename(file.name);
+    setUploadError(null);
+    
+    // Create a preview URL
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      if (e.target?.result) {
+        setNewPhotoUrl(e.target.result as string);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+  
+  const uploadFile = async () => {
+    if (!uploadedFile || !newPhotoChantier) {
+      setUploadError('Veuillez sélectionner un fichier et un chantier');
+      return;
+    }
+    
+    setIsUploading(true);
+    setUploadProgress(0);
+    setUploadError(null);
+    
+    try {
+      // Create a unique file path
+      const timestamp = Date.now();
+      const fileExt = uploadedFile.name.split('.').pop();
+      const filePath = `photos/${newPhotoChantier}/${timestamp}.${fileExt}`;
+      
+      // Upload to Supabase Storage
+      const { data, error } = await supabase.storage
+        .from('photos')
+        .upload(filePath, uploadedFile, {
+          cacheControl: '3600',
+          upsert: false,
+          onUploadProgress: (progress) => {
+            const percent = Math.round((progress.loaded / progress.total) * 100);
+            setUploadProgress(percent);
+          }
+        });
+      
+      if (error) throw error;
+      
+      // Get the public URL
+      const { data: publicURLData } = supabase.storage
+        .from('photos')
+        .getPublicUrl(filePath);
+      
+      // Update the form with the new URL
+      setNewPhotoUrl(publicURLData.publicUrl);
+      
+      // Add success message
+      alert('Fichier téléversé avec succès!');
+    } catch (err) {
+      console.error('Erreur lors du téléversement:', err);
+      setUploadError(err instanceof Error ? err.message : 'Erreur lors du téléversement');
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -754,22 +840,93 @@ export const PhotosManager: React.FC = () => {
             <div className="flex">
               <input
                 type="text"
+                disabled={isUploading}
                 value={newPhotoUrl}
                 onChange={(e) => setNewPhotoUrl(e.target.value)}
                 placeholder="https://example.com/image.jpg"
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
               />
-              <button
-                className="px-3 py-2 bg-gray-100 border border-l-0 border-gray-300 rounded-r-md hover:bg-gray-200"
-                title="Téléverser une image"
-              >
+              <label className="px-3 py-2 bg-gray-100 border border-l-0 border-gray-300 rounded-r-md hover:bg-gray-200 cursor-pointer">
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleFileChange}
+                  disabled={isUploading}
+                />
                 <Upload className="w-5 h-5 text-gray-500" />
-              </button>
+              </label>
             </div>
             <p className="text-xs text-gray-500 mt-1">
-              Entrez l'URL d'une image existante ou utilisez le bouton de téléversement
+              Entrez l'URL d'une image existante ou téléversez une nouvelle image
             </p>
           </div>
+          
+          {uploadedFile && (
+            <div className="border rounded-md p-4 bg-blue-50">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-sm font-medium text-blue-700 flex items-center">
+                  <Upload className="w-4 h-4 mr-2" />
+                  Fichier sélectionné
+                </h4>
+                <button
+                  onClick={() => {
+                    setUploadedFile(null);
+                    setNewPhotoFilename('');
+                    if (newPhotoUrl.startsWith('data:')) {
+                      setNewPhotoUrl('');
+                    }
+                  }}
+                  className="text-blue-700 hover:text-blue-900"
+                  disabled={isUploading}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="text-sm text-blue-700">
+                <p><span className="font-medium">Nom:</span> {uploadedFile.name}</p>
+                <p><span className="font-medium">Type:</span> {uploadedFile.type}</p>
+                <p><span className="font-medium">Taille:</span> {formatFileSize(uploadedFile.size)}</p>
+              </div>
+              
+              {isUploading ? (
+                <div className="mt-3">
+                  <div className="flex justify-between text-xs text-blue-700 mb-1">
+                    <span>Téléversement en cours...</span>
+                    <span>{uploadProgress}%</span>
+                  </div>
+                  <div className="w-full bg-blue-200 rounded-full h-2">
+                    <div 
+                      className="bg-blue-600 h-2 rounded-full" 
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={uploadFile}
+                  className="mt-3 w-full px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center justify-center"
+                  disabled={!newPhotoChantier}
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Téléverser maintenant
+                </button>
+              )}
+              
+              {!newPhotoChantier && (
+                <p className="text-xs text-blue-700 mt-2">
+                  Veuillez sélectionner un chantier avant de téléverser
+                </p>
+              )}
+            </div>
+          )}
+          
+          {uploadError && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-md flex items-start">
+              <AlertTriangle className="w-5 h-5 text-red-500 mr-2 mt-0.5" />
+              <p className="text-sm text-red-600">{uploadError}</p>
+            </div>
+          )}
           
           {newPhotoUrl && (
             <div className="border rounded-md p-2 bg-gray-50">
@@ -804,7 +961,8 @@ export const PhotosManager: React.FC = () => {
               <select
                 value={newPhotoChantier}
                 onChange={(e) => setNewPhotoChantier(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={isUploading}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
               >
                 <option value="">Sélectionner un chantier</option>
                 {chantiers?.map(chantier => (
@@ -818,7 +976,8 @@ export const PhotosManager: React.FC = () => {
               <select
                 value={newPhotoCategory || 'avancement'}
                 onChange={(e) => setNewPhotoCategory(e.target.value as Photo['category'])}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={isUploading}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
               >
                 <option value="avancement">Avancement</option>
                 <option value="probleme">Problème</option>
@@ -837,8 +996,9 @@ export const PhotosManager: React.FC = () => {
               <input
                 type="date"
                 value={newPhotoDate}
+                disabled={isUploading}
                 onChange={(e) => setNewPhotoDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
               />
             </div>
             
@@ -847,9 +1007,10 @@ export const PhotosManager: React.FC = () => {
               <input
                 type="text"
                 value={newPhotoFilename}
+                disabled={isUploading || !!uploadedFile}
                 onChange={(e) => setNewPhotoFilename(e.target.value)}
                 placeholder="nom-du-fichier.jpg"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
               />
             </div>
           </div>
@@ -857,9 +1018,12 @@ export const PhotosManager: React.FC = () => {
         
         <div className="flex justify-end space-x-3 mt-6">
           <Button variant="secondary" onClick={() => setIsAddModalOpen(false)}>
-            Annuler
+            {isUploading ? 'Fermer' : 'Annuler'}
           </Button>
-          <Button onClick={handleAddPhoto}>
+          <Button 
+            onClick={handleAddPhoto} 
+            disabled={isUploading || !newPhotoUrl || !newPhotoDescription || !newPhotoDate || !newPhotoChantier}
+          >
             <Plus className="w-4 h-4 mr-2" />
             Ajouter
           </Button>
@@ -887,9 +1051,10 @@ export const PhotosManager: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
               <textarea
                 value={selectedPhoto.description}
+                disabled={isUploading}
                 onChange={(e) => setSelectedPhoto({...selectedPhoto, description: e.target.value})}
                 rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
               />
             </div>
             
@@ -1129,7 +1294,9 @@ export const PhotosManager: React.FC = () => {
                 <Button 
                   variant="secondary" 
                   size="sm"
-                  onClick={() => window.open(selectedPhoto.url, '_blank')}
+                  onClick={() => {
+                    window.open(selectedPhoto.url, '_blank');
+                  }}
                 >
                   <Link className="w-4 h-4 mr-2" />
                   Ouvrir
@@ -1137,15 +1304,7 @@ export const PhotosManager: React.FC = () => {
                 <Button 
                   variant="secondary" 
                   size="sm"
-                  onClick={() => {
-                    // Create a download link
-                    const a = document.createElement('a');
-                    a.href = selectedPhoto.url;
-                    a.download = selectedPhoto.filename || `photo-${selectedPhoto.id}.jpg`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                  }}
+                  onClick={() => downloadPhoto(selectedPhoto)}
                 >
                   <Download className="w-4 h-4 mr-2" />
                   Télécharger
@@ -1179,6 +1338,17 @@ export const PhotosManager: React.FC = () => {
       </Modal>
     </div>
   );
+};
+
+// Function to download a photo
+const downloadPhoto = (photo: Photo) => {
+  // Create a download link
+  const a = document.createElement('a');
+  a.href = photo.url;
+  a.download = photo.filename || `photo-${photo.id}.jpg`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 };
 
 // These components are defined here to avoid importing from lucide-react
