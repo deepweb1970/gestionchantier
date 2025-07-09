@@ -3,6 +3,7 @@ import { Building2, Users, Wrench, FileText, TrendingUp, Clock, AlertTriangle, C
 import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
 import { clientService } from '../../services/clientService';
 import { chantierService } from '../../services/chantierService';
+import { saisieHeureService } from '../../services/saisieHeureService';
 import { ouvrierService } from '../../services/ouvrierService';
 import { materielService } from '../../services/materielService';
 import { factureService } from '../../services/factureService';
@@ -17,6 +18,11 @@ export const Dashboard: React.FC = () => {
   const { data: chantiers, loading: chantiersLoading } = useRealtimeSupabase({
     table: 'chantiers',
     fetchFunction: chantierService.getAll
+  });
+
+  const { data: saisiesHeures, loading: saisiesLoading } = useRealtimeSupabase({
+    table: 'saisies_heures',
+    fetchFunction: saisieHeureService.getAll
   });
   
   const { data: ouvriers, loading: ouvriersLoading } = useRealtimeSupabase({
@@ -38,6 +44,8 @@ export const Dashboard: React.FC = () => {
   const chantiersActifs = (chantiers || []).filter(c => c.statut === 'actif').length;
   const ouvriersDisponibles = (ouvriers || []).filter(o => o.statut === 'actif').length;
   const materielEnService = (materiel || []).filter(m => m.statut === 'en_service').length;
+  const totalHeuresTravaillees = (saisiesHeures || []).reduce((sum, s) => 
+    sum + s.heuresNormales + s.heuresSupplementaires + (s.heuresExceptionnelles || 0), 0);
   const facturesEnAttente = (factures || []).filter(f => f.statut === 'envoyee').length;
 
   const stats = [
@@ -69,13 +77,13 @@ export const Dashboard: React.FC = () => {
       loading: materielLoading
     },
     {
-      title: 'Factures en Attente',
-      value: facturesEnAttente.toString(),
-      change: '-2',
+      title: 'Heures Travaillées',
+      value: totalHeuresTravaillees.toFixed(1),
+      change: '+15',
       changeType: 'positive',
-      icon: FileText,
-      color: 'bg-purple-500',
-      loading: facturesLoading
+      icon: Clock,
+      color: 'bg-indigo-500',
+      loading: saisiesLoading
     }
   ];
 
@@ -228,7 +236,7 @@ export const Dashboard: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="text-center">
               <div className="text-2xl font-bold text-blue-600">75%</div>
-              <div className="text-sm text-gray-600">Taux d'occupation</div>
+              <div className="text-sm text-gray-600">Taux d'occupation ouvriers</div>
               <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
                 <div className="bg-blue-600 h-2 rounded-full" style={{ width: '75%' }}></div>
               </div>
@@ -243,9 +251,17 @@ export const Dashboard: React.FC = () => {
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-orange-600">94%</div>
-              <div className="text-sm text-gray-600">Matériel opérationnel</div>
+              <div className="text-sm text-gray-600">Matériel utilisé</div>
               <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
                 <div className="bg-orange-600 h-2 rounded-full" style={{ width: '94%' }}></div>
+              </div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-indigo-600">{totalHeuresTravaillees.toFixed(1)}h</div>
+              <div className="text-sm text-gray-600">Heures travaillées ce mois</div>
+              <div className="flex items-center justify-center mt-2">
+                <Clock className="w-4 h-4 text-indigo-600 mr-1" />
+                <span className="text-sm text-indigo-600">+15h</span>
               </div>
             </div>
           </div>
