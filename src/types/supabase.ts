@@ -61,6 +61,7 @@ export interface Database {
           date_fin: string | null
           statut: 'actif' | 'termine' | 'pause' | 'planifie'
           avancement: number | null
+          worked_hours: number | null
           budget: number | null
           latitude: number | null
           longitude: number | null
@@ -77,6 +78,7 @@ export interface Database {
           date_fin?: string | null
           statut?: 'actif' | 'termine' | 'pause' | 'planifie'
           avancement?: number | null
+          worked_hours?: number | null
           budget?: number | null
           latitude?: number | null
           longitude?: number | null
@@ -93,6 +95,7 @@ export interface Database {
           date_fin?: string | null
           statut?: 'actif' | 'termine' | 'pause' | 'planifie'
           avancement?: number | null
+          worked_hours?: number | null
           budget?: number | null
           latitude?: number | null
           longitude?: number | null
