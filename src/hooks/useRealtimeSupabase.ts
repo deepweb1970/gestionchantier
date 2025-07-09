@@ -75,10 +75,13 @@ export function useRealtimeSupabase<T>({
       // Listen for form refresh events
       .on('broadcast', { event: 'form_refresh' }, () => {
         console.log(`Événement de rafraîchissement reçu pour ${table}`);
+      }
+      )
     if (enableFormRefresh) {
       realtimeChannel.on('broadcast', { event: 'form_refresh' }, () => {
       })
       .subscribe();
+    }
 
     setChannel(realtimeChannel);
 
