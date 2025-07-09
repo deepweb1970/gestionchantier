@@ -1137,14 +1137,6 @@ export const PhotosManager: React.FC = () => {
                 <Button 
                   variant="secondary" 
                   size="sm"
-                  onClick={() => window.open(selectedPhoto.url, '_blank')}
-                >
-                  <Link className="w-4 h-4 mr-2" />
-                  Ouvrir
-                </Button>
-                <Button 
-                  variant="secondary" 
-                  size="sm"
                   onClick={() => {
                     // Create a download link
                     const a = document.createElement('a');
@@ -1155,6 +1147,12 @@ export const PhotosManager: React.FC = () => {
                     document.body.removeChild(a);
                   }}
                 >
+                  <Download className="w-4 h-4 mr-2" />
+                  Télécharger
+                </Button>
+                <Button 
+                  variant="secondary" 
+                  size="sm"
                   onClick={() => {
                     setIsViewModalOpen(false);
                     setIsEditModalOpen(true);
