@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Camera, MapPin, Filter, Download, Clock, Users, Upload, X, Eye, Calendar, Tag, Image, ImagePlus, Layers, Search, Share2, ArrowUpDown, SlidersHorizontal, Euro } from 'lucide-react';
+import { Plus, Edit, Trash2, Camera, MapPin, Filter, Download, Clock, Users, Upload, X, Eye, Calendar, Tag, Image, ImagePlus, Layers, Search, Share2, ArrowUpDown, SlidersHorizontal, Euro, HardHat } from 'lucide-react';
 import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
 import { chantierService } from '../../services/chantierService';
 import { clientService } from '../../services/clientService';
