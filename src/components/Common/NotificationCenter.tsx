@@ -1,9 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Bell, X, CheckCircle, AlertTriangle, Info, Clock, Trash2, BookMarked as MarkAsRead } from 'lucide-react';
 
-// Flag to completely disable automatic notifications
-const DISABLE_NOTIFICATIONS = true;
-
 interface Notification {
   id: string;
   type: 'success' | 'warning' | 'info' | 'error';
@@ -137,8 +134,6 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
 
   // Simulation de nouvelles notifications en temps réel
   useEffect(() => {
-    if (DISABLE_NOTIFICATIONS) return;
-    
     const interval = setInterval(() => {
       // Simuler une nouvelle notification de temps en temps
       if (Math.random() < 0.1) { // 10% de chance toutes les 30 secondes

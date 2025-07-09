@@ -2,9 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Wifi, WifiOff, Database, RefreshCw } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
-// Flag to completely disable realtime status checks
-const DISABLE_REALTIME_STATUS = true;
-
 interface RealtimeStatusProps {
   className?: string;
 }
@@ -32,12 +29,6 @@ export const RealtimeStatus: React.FC<RealtimeStatusProps> = ({ className = '' }
   // Vérification de la connexion à Supabase
   useEffect(() => {
     const checkConnection = async () => {
-      if (DISABLE_REALTIME_STATUS) {
-        setIsConnected(true);
-        setLastSynced(new Date());
-        return;
-      }
-      
       try {
         const { error } = await supabase.from('clients').select('id').limit(1);
         setIsConnected(!error);
@@ -49,14 +40,17 @@ export const RealtimeStatus: React.FC<RealtimeStatusProps> = ({ className = '' }
       }
     };
 
-    // Initial check only, no interval
-    if (!DISABLE_REALTIME_STATUS) {
+    // Vérifier la connexion toutes les 30 secondes
+    const interval = setInterval(() => {
       if (isOnline) {
         checkConnection();
       }
-    }
+    }, 30000);
 
-    return () => {};
+    // Vérifier immédiatement au chargement
+    checkConnection();
+
+    return () => clearInterval(interval);
   }, [isOnline]);
 
   const formatLastSynced = () => {

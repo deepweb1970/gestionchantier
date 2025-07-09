@@ -2,9 +2,6 @@ import { useState, useEffect } from 'react';
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 
-// Flag to completely disable form synchronization
-const DISABLE_FORM_SYNC = true;
-
 type UseRealtimeSupabaseOptions<T> = {
   table: string;
   fetchFunction: () => Promise<T[]>;
@@ -27,7 +24,6 @@ export function useRealtimeSupabase<T>({
       setLoading(true);
       const result = await fetchFunction();
       setData(result);
-      setError(null);
     } catch (err) {
       console.error(`Erreur lors du chargement des données de ${table}:`, err);
       setError(err instanceof Error ? err : new Error(String(err)));
@@ -39,11 +35,6 @@ export function useRealtimeSupabase<T>({
   // Effet pour charger les données initiales et configurer les abonnements en temps réel
   useEffect(() => {
     fetchData();
-
-    // If form sync is disabled, don't set up any realtime subscriptions
-    if (DISABLE_FORM_SYNC) {
-      return;
-    }
 
     // Configurer l'abonnement en temps réel
     const realtimeChannel = supabase
@@ -75,20 +66,16 @@ export function useRealtimeSupabase<T>({
       // Listen for form refresh events
       .on('broadcast', { event: 'form_refresh' }, () => {
         console.log(`Événement de rafraîchissement reçu pour ${table}`);
-      }
-      )
-    if (enableFormRefresh) {
-      realtimeChannel.on('broadcast', { event: 'form_refresh' }, () => {
+        fetchData();
       })
       .subscribe();
-    }
 
     setChannel(realtimeChannel);
 
     // Nettoyage lors du démontage du composant
     return () => {
       if (realtimeChannel) {
-        supabase.removeChannel(realtimeChannel);
+        realtimeChannel.unsubscribe();
       }
     };
   }, [table]);
