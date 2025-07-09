@@ -19,6 +19,7 @@ const toSaisieHeure = (row: SaisieHeureRow): SaisieHeure => ({
   heureTable: row.heure_table || undefined,
   heureTable: row.heure_table || undefined,
   heureTable: row.heure_table || undefined,
+  heureTable: row.heure_table || undefined,
   heuresNormales: row.heures_normales,
   heuresSupplementaires: row.heures_supplementaires,
   heuresExceptionnelles: row.heures_exceptionnelles || 0,
@@ -35,6 +36,7 @@ const toSaisieHeureInsert = (saisie: SimpleSaisieHeure): SaisieHeureInsert => ({
   date: saisie.date,
   heure_debut: saisie.heureDebut,
   heure_fin: saisie.heureFin,
+  heure_table: saisie.heureTable || null,
   heure_table: saisie.heureTable || null,
   heure_table: saisie.heureTable || null,
   heure_table: saisie.heureTable || null,
@@ -56,6 +58,7 @@ const toSaisieHeureUpdate = (saisie: Partial<SimpleSaisieHeure>): SaisieHeureUpd
   if (saisie.date !== undefined) update.date = saisie.date;
   if (saisie.heureDebut !== undefined) update.heure_debut = saisie.heureDebut;
   if (saisie.heureFin !== undefined) update.heure_fin = saisie.heureFin;
+  if (saisie.heureTable !== undefined) update.heure_table = saisie.heureTable || null;
   if (saisie.heureTable !== undefined) update.heure_table = saisie.heureTable || null;
   if (saisie.heureTable !== undefined) update.heure_table = saisie.heureTable || null;
   if (saisie.heureTable !== undefined) update.heure_table = saisie.heureTable || null;
