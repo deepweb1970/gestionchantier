@@ -171,17 +171,6 @@ export const Chantiers: React.FC = () => {
     setIsPhotoViewerOpen(true);
   };
 
-  const handleNavigateToPhotos = (chantierId: string, chantierNom: string) => {
-    // Store the chantier ID and name in sessionStorage for the Photos module to use
-    sessionStorage.setItem('selectedChantierId', chantierId);
-    sessionStorage.setItem('selectedChantierNom', chantierNom);
-    
-    // Navigate to the Photos module
-    window.dispatchEvent(new CustomEvent('navigate', { 
-      detail: { section: 'photos', id: chantierId }
-    }));
-  };
-
   const handleDelete = async (id: string) => {
     if (confirm('Êtes-vous sûr de vouloir supprimer ce chantier ?')) {
       try {
@@ -1090,13 +1079,6 @@ export const Chantiers: React.FC = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <div className="flex space-x-2">
-                            <button
-                              onClick={() => handleNavigateToPhotos(chantier.id, chantier.nom)}
-                              className="text-purple-600 hover:text-purple-900"
-                              title="Gérer les photos"
-                            >
-                              <Image className="w-4 h-4" />
-                            </button>
                             <button
                               onClick={() => handleEdit(chantier)}
                               className="text-blue-600 hover:text-blue-900"
