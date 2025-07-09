@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Edit, Trash2, Clock, Download, Filter, Search, Calendar, CheckCircle, X, User, Building2, Wrench, AlertTriangle, FileText, Check, CalendarRange, DollarSign } from 'lucide-react';
+import { Plus, Edit, Trash2, Clock, Download, Filter, Search, Calendar, CheckCircle, X, User, Building2, Wrench, AlertTriangle, FileText, Check, CalendarRange, Euro } from 'lucide-react';
 import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
 import { saisieHeureService } from '../../services/saisieHeureService';
 import { ouvrierService } from '../../services/ouvrierService';
@@ -503,7 +503,7 @@ export const SaisieHeures: React.FC = () => {
               <div>
                 <div className="font-medium text-gray-900">Total : {totalHeures.toFixed(1)} heures</div>
                 <div className="text-sm text-gray-600 flex items-center mt-1">
-                  <DollarSign className="w-4 h-4 mr-1 text-green-600" />
+                  <Euro className="w-4 h-4 mr-1 text-green-600" />
                   <span>Coût : {totalCout.toLocaleString()}€</span>
                 </div>
               </div>
@@ -533,7 +533,7 @@ export const SaisieHeures: React.FC = () => {
                         </span>
                         {ouvrier && (
                           <span className="text-green-600 font-medium">
-                            {((saisie.heuresNormales + saisie.heuresSupplementaires + (saisie.heuresExceptionnelles || 0)) * ouvrier.tauxHoraire).toLocaleString()}€
+                            {((saisie.heuresNormales + saisie.heuresSupplementaires + (saisie.heuresExceptionnelles || 0)) * ouvrier.tauxHoraire).toLocaleString()} €
                           </span>
                         )}
                       </div>
@@ -597,7 +597,7 @@ export const SaisieHeures: React.FC = () => {
             }}
             variant="secondary"
           >
-            <DollarSign className="w-4 h-4 mr-2" />
+            <Euro className="w-4 h-4 mr-2" />
             Résumé Coûts
           </Button>
           <Button onClick={handleValidation} disabled={selectedSaisies.length === 0} variant="success">
@@ -636,8 +636,8 @@ export const SaisieHeures: React.FC = () => {
             </div>
           </div>
           <div className="text-sm text-gray-600 flex items-center">
-            <DollarSign className="w-4 h-4 mr-1 text-blue-500" />
-            <span>Coût: <span className="font-medium">{getTotalCost().toLocaleString()}€</span></span>
+            <Euro className="w-4 h-4 mr-1 text-blue-500" />
+            <span>Coût: <span className="font-medium">{getTotalCost().toLocaleString()} €</span></span>
           </div>
         </div>
 
@@ -654,8 +654,8 @@ export const SaisieHeures: React.FC = () => {
             </div>
           </div>
           <div className="text-sm text-gray-600 flex items-center">
-            <DollarSign className="w-4 h-4 mr-1 text-green-500" />
-            <span>Coût: <span className="font-medium">{getValidatedCost().toLocaleString()}€</span></span>
+            <Euro className="w-4 h-4 mr-1 text-green-500" />
+            <span>Coût: <span className="font-medium">{getValidatedCost().toLocaleString()} €</span></span>
           </div>
         </div>
 
@@ -672,8 +672,8 @@ export const SaisieHeures: React.FC = () => {
             </div>
           </div>
           <div className="text-sm text-gray-600 flex items-center">
-            <DollarSign className="w-4 h-4 mr-1 text-orange-500" />
-            <span>Coût: <span className="font-medium">{getPendingCost().toLocaleString()}€</span></span>
+            <Euro className="w-4 h-4 mr-1 text-orange-500" />
+            <span>Coût: <span className="font-medium">{getPendingCost().toLocaleString()} €</span></span>
           </div>
         </div>
       </div>)}
@@ -877,7 +877,7 @@ export const SaisieHeures: React.FC = () => {
                           </div>
                           <div className="text-sm text-gray-500">{ouvrier?.qualification}</div>
                           <div className="text-xs text-blue-600 font-medium mt-1">
-                            {ouvrier?.tauxHoraire}€/h
+                            {ouvrier?.tauxHoraire} €/h
                           </div>
                         </div>
                       </div>
@@ -904,8 +904,8 @@ export const SaisieHeures: React.FC = () => {
                           const cout = Math.round(totalHeures * ouvrier.tauxHoraire * 100) / 100;
                           return (
                             <span className="flex items-center">
-                              <DollarSign className="w-3 h-3 mr-1 text-green-600" />
-                              <span className="font-medium">{cout.toLocaleString()}€</span>
+                              <Euro className="w-3 h-3 mr-1 text-green-600" />
+                              <span className="font-medium">{cout.toLocaleString()} €</span>
                             </span>
                           );
                         })()}
