@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Image, Download, Filter, Search, Calendar, Eye, ArrowLeft, Building2 } from 'lucide-react';
 import { 
   Image, Plus, Edit, Trash2, Download, Filter, Search, Calendar, 
   CheckCircle, X, Building2, Tag, Info, Upload, Eye, EyeOff, 
