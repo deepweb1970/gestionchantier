@@ -3,7 +3,7 @@ import { Clock, Plus, Save, Calendar, User, Building, Wrench } from 'lucide-reac
 import { Button } from '../Common/Button';
 import { Modal } from '../Common/Modal';
 import { StatusBadge } from '../Common/StatusBadge';
-import { supabase } from '../../lib/supabase';
+import { useSupabase } from '../../hooks/useSupabase';
 
 interface SaisieHeure {
   id: string;
@@ -65,6 +65,8 @@ export const SaisieHeures: React.FC = () => {
     heure_fin: '17:00',
     description: '',
   });
+
+  const { supabase } = useSupabase();
 
   useEffect(() => {
     loadData();
