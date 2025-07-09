@@ -14,6 +14,7 @@ interface PointageState {
   chantierId: string;
   ouvrierId: string;
   materielId: string;
+  heureTable: string;
   description: string;
 }
 
@@ -23,6 +24,7 @@ export const PointageDigital: React.FC = () => {
     startTime: null,
     elapsedTime: 0,
     chantierId: '',
+    heureTable: '01:00',
     ouvrierId: '',
     materielId: '',
     description: ''
@@ -119,6 +121,7 @@ export const PointageDigital: React.FC = () => {
       const saisieData = {
         ouvrierId: pointage.ouvrierId,
         chantierId: pointage.chantierId,
+        heureTable: pointage.heureTable,
         materielId: pointage.materielId || undefined,
         date: startTime.toISOString().split('T')[0], // YYYY-MM-DD
         heureDebut: formattedStartTime,
@@ -137,6 +140,7 @@ export const PointageDigital: React.FC = () => {
         isActive: false,
         startTime: null,
         elapsedTime: 0,
+        heureTable: '01:00',
         chantierId: '',
         ouvrierId: '',
         materielId: '',
@@ -156,6 +160,7 @@ export const PointageDigital: React.FC = () => {
         isActive: false,
         startTime: null,
         elapsedTime: 0,
+        heureTable: '01:00',
         chantierId: '',
         ouvrierId: '',
         materielId: '',
@@ -265,6 +270,22 @@ export const PointageDigital: React.FC = () => {
               </select>
             </div>
           </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Pause déjeuner</label>
+            <div className="relative">
+              <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <input
+                type="time"
+                value={pointage.heureTable}
+                onChange={(e) => setPointage({ ...pointage, heureTable: e.target.value })}
+                disabled={pointage.isActive}
+                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
+                placeholder="01:00"
+              />
+              <p className="text-xs text-gray-500 mt-1">Format: HH:MM (ex: 01:00 pour 1 heure)</p>
+            </div>
+          </div>
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Description des travaux</label>
@@ -332,6 +353,7 @@ export const PointageDigital: React.FC = () => {
                   return ouvrier ? `${ouvrier.prenom} ${ouvrier.nom}` : '';
                 })()
               }</p>
+              <p>Pause déjeuner: {pointage.heureTable}</p>
               {pointage.materielId && (
                 <p>Matériel: {materiel?.find(m => m.id === pointage.materielId)?.nom}</p>
               )}
