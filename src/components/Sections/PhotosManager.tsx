@@ -3,7 +3,7 @@ import {
   Image, Plus, Edit, Trash2, Download, Filter, Search, Calendar, 
   CheckCircle, X, Building2, Tag, Info, Upload, Eye, EyeOff, 
   ArrowLeft, ArrowRight, Maximize, Minimize, Copy, Link, Share2,
-  AlertTriangle, LinkOff
+  AlertTriangle, Unlink
 } from 'lucide-react';
 import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
 import { chantierService } from '../../services/chantierService';
@@ -483,7 +483,7 @@ export const PhotosManager: React.FC = () => {
                 </>
               ) : (
                 <>
-                  <LinkOff className="w-3 h-3 mr-1 text-gray-400" />
+                  <Unlink className="w-3 h-3 mr-1 text-gray-400" />
                   <span className="text-gray-400">Non associée</span>
                 </>
               )}
@@ -558,7 +558,7 @@ export const PhotosManager: React.FC = () => {
                     </>
                   ) : (
                     <>
-                      <LinkOff className="w-3 h-3 mr-1 text-gray-400" />
+                      <Unlink className="w-3 h-3 mr-1 text-gray-400" />
                       <span className="text-gray-400">Non associée</span>
                     </>
                   )}
@@ -1282,7 +1282,7 @@ export const PhotosManager: React.FC = () => {
                 </>
               ) : (
                 <>
-                  <LinkOff className="w-4 h-4 mr-2" />
+                  <Unlink className="w-4 h-4 mr-2" />
                   Dissocier
                 </>
               )}
