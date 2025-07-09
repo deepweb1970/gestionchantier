@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Edit, Trash2, Clock, Download, Filter, Search, Calendar, CheckCircle, X, User, Building2, Wrench, AlertTriangle, FileText, Check, CalendarRange, DollarSign } from 'lucide-react';
+import { Plus, Edit, Trash2, Clock, Download, Filter, Search, Calendar, CheckCircle, X, User, Building2, Wrench, AlertTriangle, FileText, Check, CalendarRange, DollarSign, PieChart, TrendingUp } from 'lucide-react';
 import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
 import { saisieHeureService } from '../../services/saisieHeureService';
 import { ouvrierService } from '../../services/ouvrierService';
@@ -262,10 +262,31 @@ export const SaisieHeures: React.FC = () => {
     return (filteredSaisies || []).reduce((total, saisie) => {
       const ouvrier = getOuvrier(saisie.ouvrierId);
       if (!ouvrier) return total;
-      
       const totalHeures = saisie.heuresNormales + saisie.heuresSupplementaires + (saisie.heuresExceptionnelles || 0);
       return total + (totalHeures * ouvrier.tauxHoraire);
     }, 0);
+  };
+
+  const getValidatedCost = () => {
+    return (filteredSaisies || [])
+      .filter(saisie => saisie.valide)
+      .reduce((total, saisie) => {
+        const ouvrier = getOuvrier(saisie.ouvrierId);
+        if (!ouvrier) return total;
+        const totalHeures = saisie.heuresNormales + saisie.heuresSupplementaires + (saisie.heuresExceptionnelles || 0);
+        return total + (totalHeures * ouvrier.tauxHoraire);
+      }, 0);
+  };
+
+  const getPendingCost = () => {
+    return (filteredSaisies || [])
+      .filter(saisie => !saisie.valide)
+      .reduce((total, saisie) => {
+        const ouvrier = getOuvrier(saisie.ouvrierId);
+        if (!ouvrier) return total;
+        const totalHeures = saisie.heuresNormales + saisie.heuresSupplementaires + (saisie.heuresExceptionnelles || 0);
+        return total + (totalHeures * ouvrier.tauxHoraire);
+      }, 0);
   };
 
   const getValidatedHours = () => {
@@ -486,11 +507,11 @@ export const SaisieHeures: React.FC = () => {
                       <div className="text-sm text-gray-600">
                         {ouvrier?.qualification}
                       </div>
-                      <div className="text-sm text-gray-600">
+                      <div className="text-sm text-gray-500">
                         {chantier?.nom} - {new Date(saisie.date).toLocaleDateString()}
                       </div>
-                      <div className="text-sm text-gray-500">
-                        {ouvrier?.tauxHoraire}€/h
+                      <div className="text-sm font-medium text-blue-600">
+                        {ouvrier?.tauxHoraire} €/h
                       </div>
                     </div>
                     <button
@@ -526,12 +547,15 @@ export const SaisieHeures: React.FC = () => {
         <div className="flex space-x-3">
           <Button 
             variant="secondary"
-            onClick={() => {
-              alert(`Coût total: ${getTotalCost().toLocaleString()}€`);
-            }}
+            onClick={() => alert(`
+Résumé des coûts:
+- Total: ${getTotalCost().toLocaleString()}€
+- Validé: ${getValidatedCost().toLocaleString()}€
+- En attente: ${getPendingCost().toLocaleString()}€
+            `)}
           >
             <DollarSign className="w-4 h-4 mr-2" />
-            Coût Total
+            Résumé Coûts
           </Button>
           <Button 
             onClick={() => setShowPointageDigital(!showPointageDigital)} 
@@ -578,11 +602,11 @@ export const SaisieHeures: React.FC = () => {
               <p className="text-2xl font-bold text-gray-900">{getTotalHours().toFixed(1)}h</p>
             </div>
             <div className="p-3 rounded-full bg-blue-500">
-              <Clock className="w-6 h-6 text-white" />
+              <TrendingUp className="w-6 h-6 text-white" />
             </div>
           </div>
-          <div className="text-sm text-gray-500">
-            Coût: {getTotalCost().toLocaleString()}€
+          <div className="text-sm font-medium text-blue-600">
+            Coût: {getTotalCost().toLocaleString()} €
           </div>
         </div>
 
@@ -593,8 +617,11 @@ export const SaisieHeures: React.FC = () => {
               <p className="text-2xl font-bold text-green-600">{getValidatedHours().toFixed(1)}h</p>
             </div>
             <div className="p-3 rounded-full bg-green-500">
-              <CheckCircle className="w-6 h-6 text-white" />
+              <DollarSign className="w-6 h-6 text-white" />
             </div>
+          </div>
+          <div className="text-sm font-medium text-green-600">
+            Coût: {getValidatedCost().toLocaleString()} €
           </div>
         </div>
 
@@ -605,8 +632,11 @@ export const SaisieHeures: React.FC = () => {
               <p className="text-2xl font-bold text-orange-600">{getPendingHours().toFixed(1)}h</p>
             </div>
             <div className="p-3 rounded-full bg-orange-500">
-              <AlertTriangle className="w-6 h-6 text-white" />
+              <PieChart className="w-6 h-6 text-white" />
             </div>
+          </div>
+          <div className="text-sm font-medium text-orange-600">
+            Coût: {getPendingCost().toLocaleString()} €
           </div>
         </div>
       </div>)}
@@ -734,11 +764,21 @@ export const SaisieHeures: React.FC = () => {
                     value={validationFilter}
                     onChange={(e) => setValidationFilter(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
+                <div className="text-sm text-gray-500">
                     <option value="all">Tous les statuts</option>
                     <option value="valide">Validées</option>
-                    <option value="non_valide">Non validées</option>
-                  </select>
+                <div className="flex justify-between mt-1">
+                  <span className="text-sm font-medium text-blue-600">
+                    {saisie.heuresNormales + saisie.heuresSupplementaires + (saisie.heuresExceptionnelles || 0)} heures
+                  </span>
+                  <span className="text-sm font-medium text-green-600">
+                    {(() => {
+                      const ouvrier = getOuvrier(saisie.ouvrierId);
+                      if (!ouvrier) return '';
+                      const totalHeures = saisie.heuresNormales + saisie.heuresSupplementaires + (saisie.heuresExceptionnelles || 0);
+                      return `${(totalHeures * ouvrier.tauxHoraire).toLocaleString()} €`;
+                    })()}
+                  </span>
                 </div>
               </div>
             )}
@@ -826,13 +866,14 @@ export const SaisieHeures: React.FC = () => {
                       <div className="text-xs text-gray-500">
                         {saisie.heureDebut} - {saisie.heureFin}
                       </div>
-                      <div className="text-xs text-gray-500 mt-1">
+                      <div className="text-xs font-medium text-green-600 mt-1 flex items-center">
+                        <DollarSign className="w-3 h-3 mr-1" />
                         {(() => {
                           const ouvrier = getOuvrier(saisie.ouvrierId);
                           if (!ouvrier) return '';
                           const totalHeures = saisie.heuresNormales + saisie.heuresSupplementaires + (saisie.heuresExceptionnelles || 0);
                           const cout = totalHeures * ouvrier.tauxHoraire;
-                          return `${cout.toLocaleString()}€ (${ouvrier.tauxHoraire}€/h)`;
+                          return `${cout.toLocaleString()} € (${totalHeures.toFixed(1)}h)`;
                         })()}
                       </div>
                     </td>
