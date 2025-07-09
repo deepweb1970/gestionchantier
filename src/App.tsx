@@ -23,6 +23,20 @@ function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [lastSaved, setLastSaved] = useState<Date>(new Date());
+  
+  // Listen for navigation events from components
+  useEffect(() => {
+    const handleNavigate = (e: CustomEvent) => {
+      if (e.detail && e.detail.section) {
+        setActiveSection(e.detail.section);
+      }
+    };
+    
+    window.addEventListener('navigate', handleNavigate as EventListener);
+    return () => {
+      window.removeEventListener('navigate', handleNavigate as EventListener);
+    };
+  }, []);
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);

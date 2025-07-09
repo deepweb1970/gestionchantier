@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { 
+import { Plus, Edit, Trash2, Image, Download, Filter, Search, Calendar, Eye, ArrowLeft, Building2 } from 'lucide-react';
   Image, Plus, Edit, Trash2, Download, Filter, Search, Calendar, 
   CheckCircle, X, Building2, Tag, Info, Upload, Eye, EyeOff, 
   ArrowLeft, ArrowRight, Maximize, Minimize, Copy, Link, Share2,
@@ -21,6 +21,25 @@ export const PhotosManager: React.FC = () => {
   // Filters and search
   const [searchTerm, setSearchTerm] = useState('');
   const [chantierFilter, setChantierFilter] = useState('all');
+  
+  // Check if we were directed here from the Chantiers module
+  useEffect(() => {
+    const chantierId = sessionStorage.getItem('selectedChantierId');
+    const chantierNom = sessionStorage.getItem('selectedChantierNom');
+    
+    if (chantierId) {
+      setSelectedChantierId(chantierId);
+      setChantierFilter(chantierId);
+    }
+    
+    if (chantierNom) {
+      setSelectedChantierNom(chantierNom);
+    }
+    
+    // Clear the session storage
+    sessionStorage.removeItem('selectedChantierId');
+    sessionStorage.removeItem('selectedChantierNom');
+  }, []);
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
   const [dateRangeStart, setDateRangeStart] = useState('');
@@ -33,6 +52,8 @@ export const PhotosManager: React.FC = () => {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isLinkChantierModalOpen, setIsLinkChantierModalOpen] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
+  const [selectedChantierId, setSelectedChantierId] = useState<string | null>(null);
+  const [selectedChantierNom, setSelectedChantierNom] = useState<string | null>(null);
   const [isGalleryView, setIsGalleryView] = useState(true);
   
   // Form states
@@ -641,7 +662,15 @@ export const PhotosManager: React.FC = () => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-800">Gestion des Photos</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">Gestion des Photos</h1>
+          {selectedChantierNom && (
+            <div className="flex items-center mt-1 text-blue-600">
+              <Building2 className="w-4 h-4 mr-1" />
+              <span>Filtré pour: {selectedChantierNom}</span>
+            </div>
+          )}
+        </div>
         <div className="flex space-x-3">
           <Button onClick={() => setIsAddModalOpen(true)}>
             <Plus className="w-4 h-4 mr-2" />
