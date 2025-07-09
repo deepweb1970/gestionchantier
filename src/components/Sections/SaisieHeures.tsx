@@ -40,6 +40,7 @@ export const SaisieHeures: React.FC = () => {
   const [selectedSaisies, setSelectedSaisies] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [lunchBreak, setLunchBreak] = useState('00:30');
+  const [lunchBreak, setLunchBreak] = useState('00:30');
   const [ouvrierFilter, setOuvrierFilter] = useState('all');
   const [chantierFilter, setChantierFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
@@ -116,13 +117,17 @@ export const SaisieHeures: React.FC = () => {
     const [debutHours, debutMinutes] = heureDebut.split(':').map(Number);
     const [finHours, finMinutes] = heureFin.split(':').map(Number);
     const [pauseHours, pauseMinutes] = pauseDejeuner.split(':').map(Number);
+    const [pauseHours, pauseMinutes] = pauseDejeuner.split(':').map(Number);
     
     const debutMinutesTotal = debutHours * 60 + debutMinutes;
     const finMinutesTotal = finHours * 60 + finMinutes;
     const pauseMinutesTotal = pauseHours * 60 + pauseMinutes;
+    const pauseMinutesTotal = pauseHours * 60 + pauseMinutes;
     
     const totalMinutes = finMinutesTotal - debutMinutesTotal;
     // Subtract lunch break
+    const netMinutes = totalMinutes - pauseMinutesTotal;
+    return netMinutes / 60;
     const netMinutes = totalMinutes - pauseMinutesTotal;
     return netMinutes / 60;
   };
@@ -185,6 +190,7 @@ export const SaisieHeures: React.FC = () => {
     const heureFin = formData.get('heureFin') as string;
     const pauseDejeuner = formData.get('pauseDejeuner') as string;
     const heuresTotal = calculateHours(heureDebut, heureFin, pauseDejeuner);
+    const heuresTotal = calculateHours(heureDebut, heureFin, pauseDejeuner);
     
     const saisieData: SimpleSaisieHeure = {
       id: editingSaisie?.id || Date.now().toString(),
@@ -217,6 +223,42 @@ export const SaisieHeures: React.FC = () => {
       console.error('Erreur lors de l\'enregistrement:', error);
       alert('Erreur lors de l\'enregistrement de la saisie');
     }
+  };
+
+  const getTotalCost = () => {
+    const totalCost = (filteredSaisies || []).reduce((total, saisie) => {
+      const ouvrier = getOuvrier(saisie.ouvrierId);
+      if (!ouvrier) return total;
+      
+      const totalHeures = saisie.heuresNormales + saisie.heuresSupplementaires + (saisie.heuresExceptionnelles || 0);
+      return total + (totalHeures * ouvrier.tauxHoraire);
+    }, 0);
+    
+    return totalCost;
+  };
+  
+  const getValidatedCost = () => {
+    return (filteredSaisies || [])
+      .filter(saisie => saisie.valide)
+      .reduce((total, saisie) => {
+        const ouvrier = getOuvrier(saisie.ouvrierId);
+        if (!ouvrier) return total;
+        
+        const totalHeures = saisie.heuresNormales + saisie.heuresSupplementaires + (saisie.heuresExceptionnelles || 0);
+        return total + (totalHeures * ouvrier.tauxHoraire);
+      }, 0);
+  };
+  
+  const getPendingCost = () => {
+    return (filteredSaisies || [])
+      .filter(saisie => !saisie.valide)
+      .reduce((total, saisie) => {
+        const ouvrier = getOuvrier(saisie.ouvrierId);
+        if (!ouvrier) return total;
+        
+        const totalHeures = saisie.heuresNormales + saisie.heuresSupplementaires + (saisie.heuresExceptionnelles || 0);
+        return total + (totalHeures * ouvrier.tauxHoraire);
+      }, 0);
   };
 
   const handleValidation = async () => {
@@ -457,6 +499,20 @@ export const SaisieHeures: React.FC = () => {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+              <Coffee className="w-4 h-4 mr-1 text-orange-500" />
+              Pause déjeuner
+            </label>
+            <input
+              name="pauseDejeuner"
+              type="time"
+              required
+              defaultValue={lunchBreak}
+              onChange={(e) => setLunchBreak(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
         </div>
         
         <div>
@@ -541,10 +597,33 @@ export const SaisieHeures: React.FC = () => {
       <div className="space-y-6">
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <div className="flex items-center">
-            <CheckCircle className="w-5 h-5 text-blue-600 mr-2" />
-            <p className="text-sm text-blue-800">
-              Vous êtes sur le point de valider {selectedSaisies.length} saisie(s) d'heures.
-            </p>
+            <div className="flex-1">
+              <Clock className="w-5 h-5 text-blue-500 mb-2" />
+              <p className="text-sm text-blue-600">
+                Les heures sont calculées automatiquement en fonction des horaires saisis.
+              </p>
+              <p className="text-sm text-blue-600 mt-2">
+                <span className="font-medium">Exemple:</span> 8h00 - 17h00 avec pause de 30min = 8.5h travaillées
+              </p>
+            </div>
+            <div className="flex-1 bg-white p-3 rounded-lg">
+              <p className="text-sm font-medium text-gray-700 mb-1">Aperçu du calcul:</p>
+              {(() => {
+                const debut = editingSaisie?.heureDebut || '08:00';
+                const fin = editingSaisie?.heureFin || '17:00';
+                const pause = lunchBreak;
+                const totalBrut = calculateHours(debut, fin, '00:00');
+                const totalNet = calculateHours(debut, fin, pause);
+                const pauseHours = totalBrut - totalNet;
+                
+                return (
+                  <div className="text-sm">
+                    <div className="flex justify-between">
+                      <span>Durée totale:</span>
+                      <span className="font-medium">{totalBrut.toFixed(2)}h</span>
+                    </div>
+                    <div className="flex justify-between text-orange-600">
+                      <span>Pause déjeuner:</span>
           </div>
         </div>
 
