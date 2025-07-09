@@ -1,5 +1,8 @@
 import { useEffect, useRef } from 'react';
 
+// Flag to completely disable auto-save functionality
+const DISABLE_AUTO_SAVE = true;
+
 interface UseAutoSaveOptions {
   data: any;
   onSave: (data: any) => Promise<void> | void;
@@ -10,14 +13,14 @@ interface UseAutoSaveOptions {
 export const useAutoSave = ({ 
   data, 
   onSave, 
-  delay = 30000, // 30 secondes par défaut
-  enabled = true 
+  delay = 30000,
+  enabled = false
 }: UseAutoSaveOptions) => {
   const timeoutRef = useRef<NodeJS.Timeout>();
   const lastDataRef = useRef(data);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || DISABLE_AUTO_SAVE) return;
 
     // Vérifier si les données ont changé
     const hasChanged = JSON.stringify(data) !== JSON.stringify(lastDataRef.current);

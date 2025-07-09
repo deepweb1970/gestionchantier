@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Save, Download, Upload, Clock, CheckCircle, AlertTriangle, RefreshCw, Database, Shield } from 'lucide-react';
 import { Button } from './Button';
 
+// Flag to completely disable automatic backups
+const DISABLE_AUTO_BACKUP = true;
+
 interface BackupInfo {
   id: string;
   timestamp: Date;
@@ -47,7 +50,7 @@ export const BackupSystem: React.FC<BackupSystemProps> = ({ isOpen, onClose }) =
 
   // Simulation de sauvegarde automatique
   useEffect(() => {
-    if (!autoBackupEnabled) return;
+    if (!autoBackupEnabled || DISABLE_AUTO_BACKUP) return;
 
     const interval = setInterval(() => {
       setLastAutoSave(new Date());
