@@ -39,7 +39,6 @@ export const MaterielSection: React.FC = () => {
   const getMaterielUsageHours = (materielId: string) => {
     const materielItem = materiel?.find(m => m.id === materielId);
     return materielItem?.usageHours || 0;
-  };
 
   // Fonction pour calculer le revenu généré par un matériel
   const getMaterielRevenue = (item: Materiel) => {
@@ -51,9 +50,6 @@ export const MaterielSection: React.FC = () => {
   const getMaterielUtilizationRate = (materielId: string) => {
     const materielItem = materiel?.find(m => m.id === materielId);
     return materielItem?.utilizationRate || 0;
-  };
-
-  const handleEdit = async (item: Materiel) => {
     setEditingMateriel(item);
     setIsModalOpen(true);
   };
@@ -464,9 +460,9 @@ export const MaterielSection: React.FC = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <StatusBadge status={item.statut} type="materiel" />
-                          {item.localisation && (
+                          {item.tarifHoraire && item.usageHours && item.tarifHoraire * item.usageHours > 0 && (
                             <div className="text-xs text-gray-500 mt-1 flex items-center">
-                              <span className="inline-block w-2 h-2 bg-blue-500 rounded-full mr-1"></span>
+                              <span className="font-medium text-green-600">{(item.tarifHoraire * item.usageHours).toLocaleString()}€</span>
                               {item.localisation}
                             </div>
                           )}
