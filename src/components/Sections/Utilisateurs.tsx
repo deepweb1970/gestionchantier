@@ -1,5 +1,32 @@
 import React, { useState } from 'react';
-import { Plus, Edit, Trash2, User, Shield, Key, Eye, EyeOff, Clock, Settings, Download, Filter, Search, Mail, Phone, Calendar, AlertTriangle, CheckCircle, Lock, Unlock, UserCheck, UserX, Smartphone, QrCode, Copy, RefreshCw } from 'lucide-react';
+import { 
+  Plus, 
+  Edit, 
+  Trash2, 
+  User, 
+  Shield, 
+  Key, 
+  Eye, 
+  EyeOff, 
+  Clock, 
+  Settings, 
+  Download, 
+  Filter, 
+  Search, 
+  Mail, 
+  Phone, 
+  Calendar, 
+  AlertTriangle, 
+  CheckCircle, 
+  Lock, 
+  Unlock, 
+  UserCheck, 
+  UserX, 
+  Smartphone, 
+  QrCode, 
+  Copy, 
+  RefreshCw 
+} from 'lucide-react';
 import { mockUtilisateurs } from '../../data/mockData';
 import { Utilisateur } from '../../types';
 import { Modal } from '../Common/Modal';

@@ -1,5 +1,25 @@
 import React, { useState } from 'react';
-import { Plus, Edit, Trash2, Clock, Download, Filter, Search, Calendar, CheckCircle, X, User, Building2, Wrench, AlertTriangle, FileText, Check, CalendarRange, Euro, Coffee } from 'lucide-react';
+import { 
+  Plus, 
+  Edit, 
+  Trash2, 
+  Clock, 
+  Download, 
+  Filter, 
+  Search, 
+  Calendar, 
+  CheckCircle, 
+  X, 
+  User, 
+  Building2, 
+  Wrench, 
+  AlertTriangle, 
+  FileText, 
+  Check, 
+  CalendarRange, 
+  Euro, 
+  Coffee 
+} from 'lucide-react';
 import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
 import { saisieHeureService } from '../../services/saisieHeureService';
 import { ouvrierService } from '../../services/ouvrierService';

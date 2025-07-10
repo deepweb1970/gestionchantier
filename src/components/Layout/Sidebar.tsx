@@ -1,22 +1,7 @@
 import React, { useState } from 'react';
 import { 
-  Building2, 
-  Image,
-  Users, 
-  Wrench,
-  UserCheck,
-  FileText,
-  Clock,
-  BarChart3,
-  Shield,
-  Calendar,
-  Menu, 
-  X, 
-  Settings,
-  UserCog,
-  LogOut,
-  Bell,
-  HelpCircle
+  Building2, Image, Users, Wrench, UserCheck, FileText, Clock, BarChart3, 
+  Shield, Calendar, Menu, X, Settings, UserCog, LogOut, Bell, HelpCircle
 } from 'lucide-react';
 import { useAuth } from '../Auth/AuthProvider';
 

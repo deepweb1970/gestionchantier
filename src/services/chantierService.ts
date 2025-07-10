@@ -41,6 +41,10 @@ const toChantierInsert = (chantier: Omit<Chantier, 'id' | 'client' | 'photos'>, 
   statut: chantier.statut,
   avancement: chantier.avancement,
   budget: chantier.budget,
+  heures_ouvriers_total: chantier.heuresOuvriersTotal || 0,
+  heures_materiel_total: chantier.heuresMaterielTotal || 0,
+  cout_main_oeuvre: chantier.coutMainOeuvre || 0,
+  cout_materiel: chantier.coutMateriel || 0,
   latitude: chantier.coordinates?.lat || null,
   longitude: chantier.coordinates?.lng || null
 });
@@ -57,6 +61,10 @@ const toChantierUpdate = (chantier: Partial<Omit<Chantier, 'id' | 'client' | 'ph
   if (chantier.statut !== undefined) update.statut = chantier.statut;
   if (chantier.avancement !== undefined) update.avancement = chantier.avancement;
   if (chantier.budget !== undefined) update.budget = chantier.budget;
+  if (chantier.heuresOuvriersTotal !== undefined) update.heures_ouvriers_total = chantier.heuresOuvriersTotal;
+  if (chantier.heuresMaterielTotal !== undefined) update.heures_materiel_total = chantier.heuresMaterielTotal;
+  if (chantier.coutMainOeuvre !== undefined) update.cout_main_oeuvre = chantier.coutMainOeuvre;
+  if (chantier.coutMateriel !== undefined) update.cout_materiel = chantier.coutMateriel;
   if (chantier.coordinates !== undefined) {
     update.latitude = chantier.coordinates?.lat || null;
     update.longitude = chantier.coordinates?.lng || null;

@@ -1,5 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Building2, MapPin, Calendar, Download, Eye, Image, BarChart3, Search, Filter, CheckCircle, Clock, AlertTriangle, Map, Users, Wrench, DollarSign } from 'lucide-react';
+import { 
+  Plus, 
+  Edit, 
+  Trash2, 
+  Building2, 
+  MapPin, 
+  Calendar, 
+  Download, 
+  Eye, 
+  Image, 
+  BarChart3, 
+  Search, 
+  Filter, 
+  CheckCircle, 
+  Clock, 
+  AlertTriangle, 
+  Map, 
+  Users, 
+  Wrench, 
+  DollarSign,
+  User,
+  Euro
+} from 'lucide-react';
 import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
 import { chantierService } from '../../services/chantierService';
 import { clientService } from '../../services/clientService';
@@ -962,48 +984,5 @@ export const Chantiers: React.FC = () => {
         {selectedChantier && <PhotosManager chantierId={selectedChantier.id} />}
       </Modal>
     </div>
-  );
-};
-
-// Missing User component
-const User = ({ className }: { className?: string }) => {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-      <circle cx="12" cy="7" r="4" />
-    </svg>
-  );
-};
-
-// Missing Euro component
-const Euro = ({ className }: { className?: string }) => {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <path d="M4 10h12" />
-      <path d="M4 14h9" />
-      <path d="M19 6a7.7 7.7 0 0 0-5.2-2A7.9 7.9 0 0 0 6 12c0 4.4 3.5 8 7.8 8 2 0 3.8-.8 5.2-2" />
-    </svg>
   );
 };

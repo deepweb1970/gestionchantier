@@ -1,5 +1,29 @@
 import React, { useState } from 'react';
-import { Plus, Edit, Trash2, BarChart3, Download, Filter, Search, Calendar, TrendingUp, TrendingDown, DollarSign, Clock, Users, Building2, Wrench, FileText, Eye, Settings, PieChart, Activity, Target, AlertCircle, CheckCircle } from 'lucide-react';
+import { 
+  Plus, 
+  Edit, 
+  Trash2, 
+  BarChart3, 
+  Download, 
+  Filter, 
+  Search, 
+  Calendar, 
+  TrendingUp, 
+  TrendingDown, 
+  DollarSign, 
+  Clock, 
+  Users, 
+  Building2, 
+  Wrench, 
+  FileText, 
+  Eye, 
+  Settings, 
+  PieChart, 
+  Activity, 
+  Target, 
+  AlertCircle, 
+  CheckCircle 
+} from 'lucide-react';
 import { mockChantiers, mockOuvriers, mockMateriel, mockSaisiesHeures, mockFactures, mockClients } from '../../data/mockData';
 import { Rapport, RapportType } from '../../types';
 import { Modal } from '../Common/Modal';

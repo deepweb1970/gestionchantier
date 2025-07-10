@@ -1,5 +1,19 @@
 import React, { useState } from 'react';
-import { Plus, Edit, Trash2, Settings, Clock, Calculator, AlertTriangle, CheckCircle, Save, X, Copy, ToggleLeft, ToggleRight } from 'lucide-react';
+import { 
+  Plus, 
+  Edit, 
+  Trash2, 
+  Settings, 
+  Clock, 
+  Calculator, 
+  AlertTriangle, 
+  CheckCircle, 
+  Save, 
+  X, 
+  Copy, 
+  ToggleLeft, 
+  ToggleRight 
+} from 'lucide-react';
 import { Modal } from '../Common/Modal';
 import { Button } from '../Common/Button';
 

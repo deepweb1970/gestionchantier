@@ -1,5 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Search, X, Building2, Users, Wrench, UserCheck, FileText, Calendar, Clock, BarChart3 } from 'lucide-react';
+import { 
+  Search, 
+  X, 
+  Building2, 
+  Users, 
+  Wrench, 
+  UserCheck, 
+  FileText, 
+  Calendar, 
+  Clock, 
+  BarChart3 
+} from 'lucide-react';
 import { mockChantiers, mockOuvriers, mockMateriel, mockClients, mockFactures, mockSaisiesHeures, mockPlanningEvents } from '../../data/mockData';
 
 interface SearchResult {

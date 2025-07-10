@@ -1,5 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Calendar, Clock, Building2, User, Wrench, Filter, Search, Download, Eye, AlertCircle, CheckCircle, X, CalendarDays, CalendarRange, ArrowLeft, ArrowRight } from 'lucide-react';
+import { 
+  Plus, 
+  Edit, 
+  Trash2, 
+  Calendar, 
+  Clock, 
+  Building2, 
+  User, 
+  Wrench, 
+  Filter, 
+  Search, 
+  Download, 
+  Eye, 
+  AlertCircle, 
+  CheckCircle, 
+  X, 
+  CalendarDays, 
+  CalendarRange, 
+  ArrowLeft, 
+  ArrowRight 
+} from 'lucide-react';
 import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
 import { PlanningEvent, Chantier, Ouvrier, Materiel } from '../../types';
 import { Modal } from '../Common/Modal';

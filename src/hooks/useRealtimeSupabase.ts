@@ -42,7 +42,7 @@ export function useRealtimeSupabase<T>({
       .on('postgres_changes', { 
         event: 'INSERT', 
         schema: 'public', 
-        table 
+        table
       }, () => {
         console.log(`Nouvelle insertion dans ${table}, rechargement des données`);
         fetchData();
@@ -50,7 +50,7 @@ export function useRealtimeSupabase<T>({
       .on('postgres_changes', { 
         event: 'UPDATE', 
         schema: 'public', 
-        table 
+        table
       }, () => {
         console.log(`Mise à jour dans ${table}, rechargement des données`);
         fetchData();
@@ -58,7 +58,7 @@ export function useRealtimeSupabase<T>({
       .on('postgres_changes', { 
         event: 'DELETE', 
         schema: 'public', 
-        table 
+        table
       }, () => {
         console.log(`Suppression dans ${table}, rechargement des données`);
         fetchData();

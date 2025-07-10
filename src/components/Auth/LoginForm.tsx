@@ -1,5 +1,9 @@
 import React, { useState } from 'react';
-import { Mail, Lock, AlertTriangle } from 'lucide-react';
+import { 
+  Mail, 
+  Lock, 
+  AlertTriangle 
+} from 'lucide-react';
 import { Button } from '../Common/Button';
 import { useAuth } from './AuthProvider';
 

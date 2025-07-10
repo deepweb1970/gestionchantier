@@ -1,5 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Play, Square, Clock, Building2, User, Wrench, CheckCircle, AlertTriangle } from 'lucide-react';
+import { 
+  Play, 
+  Square, 
+  Clock, 
+  Building2, 
+  User, 
+  Wrench, 
+  CheckCircle, 
+  AlertTriangle 
+} from 'lucide-react';
 import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
 import { saisieHeureService } from '../../services/saisieHeureService';
 import { ouvrierService } from '../../services/ouvrierService';

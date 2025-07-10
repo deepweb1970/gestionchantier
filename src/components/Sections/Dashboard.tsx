@@ -1,5 +1,14 @@
 import React from 'react';
-import { Building2, Users, Wrench, FileText, TrendingUp, Clock, AlertTriangle, CheckCircle } from 'lucide-react';
+import { 
+  Building2, 
+  Users, 
+  Wrench, 
+  FileText, 
+  TrendingUp, 
+  Clock, 
+  AlertTriangle, 
+  CheckCircle 
+} from 'lucide-react';
 import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
 import { clientService } from '../../services/clientService';
 import { chantierService } from '../../services/chantierService';
@@ -43,7 +52,17 @@ export const Dashboard: React.FC = () => {
   // Calculer les statistiques en temps réel
   const chantiersActifs = (chantiers || []).filter(c => c.statut === 'actif').length;
   const ouvriersDisponibles = (ouvriers || []).filter(o => o.statut === 'actif').length;
-  const materielEnService = (materiel || []).filter(m => m.statut === 'en_service' || m.statut === 'disponible').length;
+  
+  // Calculer les statistiques des statuts de chantiers
+  const statusCounts = {
+    actif: (chantiers || []).filter(c => c.statut === 'actif').length,
+    planifie: (chantiers || []).filter(c => c.statut === 'planifie').length,
+    termine: (chantiers || []).filter(c => c.statut === 'termine').length,
+    pause: (chantiers || []).filter(c => c.statut === 'pause').length
+  };
+  
+  const materielDisponible = (materiel || []).filter(m => m.statut === 'disponible').length;
+  const materielEnService = (materiel || []).filter(m => m.statut === 'en_service').length;
   const totalHeuresTravaillees = (saisiesHeures || []).reduce((sum, s) => 
     sum + s.heuresNormales + s.heuresSupplementaires + (s.heuresExceptionnelles || 0), 0);
   const facturesEnAttente = (factures || []).filter(f => f.statut === 'envoyee').length;
@@ -52,6 +71,12 @@ export const Dashboard: React.FC = () => {
   const avgMaterielUtilization = (materiel || []).length > 0 
     ? (materiel || []).reduce((sum, m) => sum + (m.utilizationRate || 0), 0) / (materiel || []).length 
     : 0;
+    
+  // Calculer le total des heures ouvriers et matériel sur les chantiers
+  const totalHeuresOuvriers = (chantiers || []).reduce((sum, c) => sum + (c.heuresOuvriersTotal || 0), 0);
+  const totalHeuresMateriel = (chantiers || []).reduce((sum, c) => sum + (c.heuresMaterielTotal || 0), 0);
+  const totalCoutMainOeuvre = (chantiers || []).reduce((sum, c) => sum + (c.coutMainOeuvre || 0), 0);
+  const totalCoutMateriel = (chantiers || []).reduce((sum, c) => sum + (c.coutMateriel || 0), 0);
 
   const stats = [
     {

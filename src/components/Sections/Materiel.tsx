@@ -1,5 +1,26 @@
 import React, { useState } from 'react';
-import { Plus, Edit, Trash2, Wrench, Calendar, Download, Euro, Clock, TrendingUp, Calculator, Search, Filter, Eye, AlertTriangle, CheckCircle, PenTool as Tool, Truck, MapPin, BarChart3, Percent } from 'lucide-react';
+import { 
+  Plus, 
+  Edit, 
+  Trash2, 
+  Wrench, 
+  Calendar, 
+  Download, 
+  Euro, 
+  Clock, 
+  TrendingUp, 
+  Calculator, 
+  Search, 
+  Filter, 
+  Eye, 
+  AlertTriangle, 
+  CheckCircle, 
+  PenTool as Tool, 
+  Truck, 
+  MapPin, 
+  BarChart3, 
+  Percent 
+} from 'lucide-react';
 import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
 import { materielService } from '../../services/materielService';
 import { chantierService } from '../../services/chantierService';

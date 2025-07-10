@@ -1,5 +1,22 @@
 import React, { useState } from 'react';
-import { Plus, Edit, Trash2, FileText, Download, Send, Eye, Calendar, AlertTriangle, CheckCircle, Clock, Filter, Search, Euro, Calculator, Printer } from 'lucide-react';
+import { 
+  Plus, 
+  Edit, 
+  Trash2, 
+  FileText, 
+  Download, 
+  Send, 
+  Eye, 
+  Calendar, 
+  AlertTriangle, 
+  CheckCircle, 
+  Clock, 
+  Filter, 
+  Search, 
+  Euro, 
+  Calculator, 
+  Printer 
+} from 'lucide-react';
 import { mockFactures, mockClients, mockChantiers } from '../../data/mockData';
 import { Facture, Client, Chantier, FactureItem } from '../../types';
 import { Modal } from '../Common/Modal';

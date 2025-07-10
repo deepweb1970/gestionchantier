@@ -1,5 +1,27 @@
 import React, { useState } from 'react';
-import { Plus, Edit, Trash2, User, Building, Phone, Mail, FileText, MessageSquare, Calendar, Download, Filter, Search, Eye, Send, MapPin, CheckCircle, AlertTriangle, Building2, CreditCard, Clock } from 'lucide-react';
+import { 
+  Plus, 
+  Edit, 
+  Trash2, 
+  User, 
+  Building, 
+  Phone, 
+  Mail, 
+  FileText, 
+  MessageSquare, 
+  Calendar, 
+  Download, 
+  Filter, 
+  Search, 
+  Eye, 
+  Send, 
+  MapPin, 
+  CheckCircle, 
+  AlertTriangle, 
+  Building2, 
+  CreditCard, 
+  Clock 
+} from 'lucide-react';
 import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
 import { clientService } from '../../services/clientService';
 import { chantierService } from '../../services/chantierService';

@@ -1,5 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Wifi, WifiOff, Database, RefreshCw } from 'lucide-react';
+import { 
+  Wifi, 
+  WifiOff, 
+  Database, 
+  RefreshCw 
+} from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface RealtimeStatusProps {

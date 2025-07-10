@@ -1,5 +1,15 @@
 import React, { useState } from 'react';
-import { Menu, Bell, User, Search, Database, History, Download, Wifi, WifiOff } from 'lucide-react';
+import { 
+  Menu, 
+  Bell, 
+  User, 
+  Search, 
+  Database, 
+  History, 
+  Download, 
+  Wifi, 
+  WifiOff 
+} from 'lucide-react';
 import { GlobalSearch } from '../Common/GlobalSearch';
 import { NotificationCenter } from '../Common/NotificationCenter';
 import { BackupSystem } from '../Common/BackupSystem';
