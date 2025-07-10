@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Camera, MapPin, Filter, Download, Clock, Users, Upload, X, Eye, Calendar, Tag, Image, ImagePlus, Layers, Search, Share2, ArrowUpDown, SlidersHorizontal, Euro } from 'lucide-react';
+import { Plus, Edit, Trash2, Building2, MapPin, Calendar, Download, Eye, Image, BarChart3, Search, Filter, CheckCircle, Clock, AlertTriangle, Map } from 'lucide-react';
 import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
 import { chantierService } from '../../services/chantierService';
 import { clientService } from '../../services/clientService';
-import { saisieHeureService } from '../../services/saisieHeureService'; 
-import { ouvrierService } from '../../services/ouvrierService'; 
-import { Chantier, Photo } from '../../types';
+import { Chantier, Client } from '../../types';
 import { Modal } from '../Common/Modal';
 import { Button } from '../Common/Button';
 import { StatusBadge } from '../Common/StatusBadge';
+import { PhotosManager } from './PhotosManager';
 
 export const Chantiers: React.FC = () => {
   const { data: chantiers, loading, error, refresh } = useRealtimeSupabase<Chantier>({
@@ -16,165 +15,64 @@ export const Chantiers: React.FC = () => {
     fetchFunction: chantierService.getAll
   });
   
-  const { data: clients } = useRealtimeSupabase({
+  const { data: clients } = useRealtimeSupabase<Client>({
     table: 'clients',
     fetchFunction: clientService.getAll
   });
   
-  const { data: saisiesHeures } = useRealtimeSupabase({
-    table: 'saisies_heures',
-    fetchFunction: saisieHeureService.getAll
-  });
-  
-  const { data: ouvriers } = useRealtimeSupabase({
-    table: 'ouvriers',
-    fetchFunction: ouvrierService.getAll
-  });
-  
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false);
-  const [isPhotoViewerOpen, setIsPhotoViewerOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isPhotosModalOpen, setIsPhotosModalOpen] = useState(false);
   const [editingChantier, setEditingChantier] = useState<Chantier | null>(null);
   const [selectedChantier, setSelectedChantier] = useState<Chantier | null>(null);
-  const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [newPhotos, setNewPhotos] = useState<File[]>([]);
-  const [photoDescription, setPhotoDescription] = useState('');
-  const [photoCategory, setPhotoCategory] = useState('avancement');
-
-  // État pour le mode d'affichage des photos
-  const [photoViewMode, setPhotoViewMode] = useState<'grid' | 'carousel' | 'list'>('grid');
-  const [photoSortBy, setPhotoSortBy] = useState<'date' | 'category'>('date');
-  const [photoFilter, setPhotoFilter] = useState('');
-
-  const photoCategories = [
-    { value: 'avancement', label: 'État d\'avancement', color: 'bg-blue-500' },
-    { value: 'probleme', label: 'Problème/Défaut', color: 'bg-red-500' },
-    { value: 'materiel', label: 'Matériel', color: 'bg-orange-500' },
-    { value: 'securite', label: 'Sécurité', color: 'bg-yellow-500' },
-    { value: 'finition', label: 'Finitions', color: 'bg-green-500' },
-    { value: 'avant', label: 'Avant travaux', color: 'bg-gray-500' },
-    { value: 'apres', label: 'Après travaux', color: 'bg-purple-500' }
-  ];
+  const [clientFilter, setClientFilter] = useState('all');
+  const [sortBy, setSortBy] = useState<'date' | 'budget' | 'avancement'>('date');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [mapView, setMapView] = useState(false);
 
   const filteredChantiers = (chantiers || []).filter(chantier => {
     const matchesSearch = chantier.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (chantier.client && chantier.client.toLowerCase().includes(searchTerm.toLowerCase()));
+                         chantier.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         chantier.adresse.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         chantier.client.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || chantier.statut === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
-
-  // Fonction pour calculer les heures totales d'un chantier
-  const getChantierTotalHours = (chantierId: string) => {
-    if (!saisiesHeures) return { totalHeures: 0, heuresValidees: 0 };
-
-    const saisiesChantier = saisiesHeures.filter(saisie => saisie.chantier_id === chantierId);
-    const totalHeures = saisiesChantier.reduce((sum, saisie) => sum + (saisie.heures_total || 0), 0);
-    const heuresValidees = saisiesChantier
-      .filter(saisie => saisie.valide)
-      .reduce((sum, saisie) => sum + (saisie.heures_total || 0), 0);
-    
-    return { totalHeures, heuresValidees };
-  };
-
-  // Fonction pour obtenir le nombre d'ouvriers uniques sur un chantier
-  const getChantierWorkersCount = (chantierId: string) => {
-    if (!saisiesHeures) return 0;
-
-    const saisiesChantier = saisiesHeures.filter(saisie => saisie.chantier_id === chantierId);
-    const uniqueWorkers = new Set(saisiesChantier.map(saisie => saisie.ouvrier_id));
-    return uniqueWorkers.size;
-  };
-
-  // Fonction pour calculer le coût de main d'œuvre d'un chantier
-  const getChantierLaborCost = (chantierId: string) => {
-    if (!saisiesHeures || !ouvriers) return 0;
-
-    const saisiesChantier = saisiesHeures.filter(saisie => saisie.chantier_id === chantierId);
-    return saisiesChantier.reduce((sum, saisie) => {
-      const ouvrier = ouvriers.find(o => o.id === saisie.ouvrier_id);
-      if (!ouvrier) return sum;
-      
-      // Utiliser le total des heures avec le taux horaire de l'ouvrier
-      return sum + (saisie.heures_total || 0) * ouvrier.taux_horaire;
-    }, 0);
-  };
-
-  // Fonction pour mettre à jour automatiquement l'avancement du chantier en fonction des heures travaillées
-  const calculateChantierProgress = (chantier: Chantier) => {
-    if (!saisiesHeures || !chantier.budget) return chantier.avancement;
-
-    const { totalHeures } = getChantierTotalHours(chantier.id);
-    const laborCost = getChantierLaborCost(chantier.id);
-
-    // Calcul basé sur le coût de main d'oeuvre par rapport au budget
-    if (chantier.budget > 0) {
-      // On considère que le coût de main d'oeuvre représente environ 40% du budget total
-      const estimatedTotalLaborCost = chantier.budget * 0.4;
-      if (estimatedTotalLaborCost > 0) {
-        const progressByLabor = Math.min(100, Math.round((laborCost / estimatedTotalLaborCost) * 100));
-
-        // Si le chantier est déjà marqué comme terminé, on garde 100%
-        if (chantier.statut === 'termine') {
-          return 100;
-        }
-
-        // Si le chantier est en pause, on ne met pas à jour l'avancement automatiquement
-        if (chantier.statut === 'pause') {
-          return chantier.avancement;
-        }
-
-        // Pour les chantiers actifs ou planifiés, on met à jour l'avancement
-        return progressByLabor;
-      }
+    const matchesClient = clientFilter === 'all' || chantier.client === clientFilter;
+    return matchesSearch && matchesStatus && matchesClient;
+  }).sort((a, b) => {
+    if (sortBy === 'date') {
+      return sortDirection === 'asc' 
+        ? new Date(a.dateDebut).getTime() - new Date(b.dateDebut).getTime()
+        : new Date(b.dateDebut).getTime() - new Date(a.dateDebut).getTime();
+    } else if (sortBy === 'budget') {
+      return sortDirection === 'asc' ? a.budget - b.budget : b.budget - a.budget;
+    } else { // avancement
+      return sortDirection === 'asc' ? a.avancement - b.avancement : b.avancement - a.avancement;
     }
-
-    return chantier.avancement;
-  };
-
-  // Mettre à jour l'avancement des chantiers en fonction des heures travaillées
-  useEffect(() => {
-    if (!chantiers || !saisiesHeures || !ouvriers) return;
-
-    const updateChantierProgress = async () => {
-      for (const chantier of chantiers) {
-        const calculatedProgress = calculateChantierProgress(chantier);
-
-        // Si l'avancement calculé est différent de l'avancement actuel, mettre à jour
-        if (calculatedProgress !== chantier.avancement) {
-          try {
-            await chantierService.update(chantier.id, { avancement: calculatedProgress });
-          } catch (error) {
-            console.error(`Erreur lors de la mise à jour de l'avancement du chantier ${chantier.id}:`, error);
-          }
-        }
-      }
-    };
-
-    updateChantierProgress();
-  }, [chantiers, saisiesHeures, ouvriers]);
+  });
 
   const handleEdit = (chantier: Chantier) => {
     setEditingChantier(chantier);
     setIsModalOpen(true);
   };
 
-  const handlePhotoManagement = (chantier: Chantier) => {
+  const handleViewDetails = (chantier: Chantier) => {
     setSelectedChantier(chantier);
-    setIsPhotoModalOpen(true);
+    setIsDetailModalOpen(true);
   };
 
-  const handlePhotoView = (photo: Photo, chantier: Chantier) => {
-    setSelectedPhoto(photo);
+  const handleViewPhotos = (chantier: Chantier) => {
     setSelectedChantier(chantier);
-    setIsPhotoViewerOpen(true);
+    setIsPhotosModalOpen(true);
   };
 
   const handleDelete = async (id: string) => {
     if (confirm('Êtes-vous sûr de vouloir supprimer ce chantier ?')) {
       try {
         await chantierService.delete(id);
+        // Force refresh immediately
+        refresh();
         refresh();
       } catch (error) {
         console.error('Erreur lors de la suppression:', error);
@@ -183,114 +81,93 @@ export const Chantiers: React.FC = () => {
     }
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    const imageFiles = files.filter(file => file.type.startsWith('image/'));
-    setNewPhotos([...newPhotos, ...imageFiles]);
-  };
-
-  const removeNewPhoto = (index: number) => {
-    setNewPhotos(newPhotos.filter((_, i) => i !== index));
-  };
-
-  const uploadPhotos = async () => {
-    if (!selectedChantier || newPhotos.length === 0) return;
-
-    // Simulation d'upload
-    const uploadedPhotos: Photo[] = newPhotos.map((file, index) => ({
-      id: `${Date.now()}-${index}`,
-      url: URL.createObjectURL(file), // En production, ce serait l'URL du serveur
-      description: photoDescription || `Photo ${photoCategory}`,
-      date: new Date().toISOString().split('T')[0],
-      category: photoCategory,
-      filename: file.name,
-      size: file.size
-    }));
-
-    // Mettre à jour le chantier avec les nouvelles photos
-    // Refresh data from Supabase to get updated photos
-    refresh();
-
-    // Réinitialiser le formulaire
-    setNewPhotos([]);
-    setPhotoDescription('');
-    setPhotoCategory('avancement');
-  };
-
-  const deletePhoto = (photoId: string) => {
-    if (!selectedChantier) return;
-    
-    if (confirm('Êtes-vous sûr de vouloir supprimer cette photo ?')) {
-      // Refresh data from Supabase after photo deletion
-      refresh();
-      
-      // Mettre à jour selectedChantier pour refléter les changements
-      setSelectedChantier({
-        ...selectedChantier,
-        photos: selectedChantier.photos.filter(p => p.id !== photoId)
-      });
-    }
-  };
-
-  const updatePhotoDescription = (photoId: string, newDescription: string) => {
-    if (!selectedChantier) return;
-
-    // Refresh data from Supabase after photo description update
-    refresh();
-
-    setSelectedChantier({
-      ...selectedChantier,
-      photos: selectedChantier.photos.map(p => 
-        p.id === photoId ? { ...p, description: newDescription } : p
-      )
-    });
-  };
-
-  const getCategoryInfo = (category: string) => {
-    return photoCategories.find(cat => cat.value === category) || photoCategories[0];
-  };
-
   const handleSave = async (formData: FormData) => {
-    try {
-      const clientId = formData.get('clientId') as string;
-      
-      const chantierData = {
-        nom: formData.get('nom') as string,
-        description: formData.get('description') as string,
-        adresse: formData.get('adresse') as string,
-        dateDebut: formData.get('dateDebut') as string,
-        dateFin: formData.get('dateFin') as string || undefined,
-        statut: formData.get('statut') as Chantier['statut'],
-        avancement: parseInt(formData.get('avancement') as string),
-        budget: parseInt(formData.get('budget') as string),
-        photos: editingChantier?.photos || [],
-      };
+    const clientId = formData.get('clientId') as string;
+    
+    const chantierData = {
+      nom: formData.get('nom') as string,
+      description: formData.get('description') as string,
+      adresse: formData.get('adresse') as string,
+      dateDebut: formData.get('dateDebut') as string,
+      dateFin: formData.get('dateFin') as string || undefined,
+      statut: formData.get('statut') as Chantier['statut'],
+      avancement: parseInt(formData.get('avancement') as string),
+      budget: parseInt(formData.get('budget') as string),
+      coordinates: {
+        lat: parseFloat(formData.get('latitude') as string) || undefined,
+        lng: parseFloat(formData.get('longitude') as string) || undefined
+      }
+    };
 
+    try {
       if (editingChantier) {
-        await chantierService.update(editingChantier.id, chantierData, clientId);
+        const updatedChantier = await chantierService.update(editingChantier.id, chantierData, clientId);
+        console.log('Chantier mis à jour:', updatedChantier);
       } else {
-        await chantierService.create(chantierData, clientId);
+        const newChantier = await chantierService.create(chantierData, clientId);
+        console.log('Nouveau chantier créé:', newChantier);
       }
       
+      // Force refresh immediately
+      refresh();
+      
+      // Le refresh est automatique grâce à l'abonnement en temps réel
       setIsModalOpen(false);
       setEditingChantier(null);
     } catch (error) {
       console.error('Erreur lors de l\'enregistrement:', error);
       alert('Erreur lors de l\'enregistrement du chantier');
-    };
+    }
   };
 
-  const ChantierForm = () => {
-    // Trouver le client correspondant au chantier en cours d'édition
-    const currentClientId = editingChantier ? 
-      clients?.find(c => c.nom === editingChantier.client)?.id || '' : '';
+  const toggleSort = (field: 'date' | 'budget' | 'avancement') => {
+    if (sortBy === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(field);
+      setSortDirection('desc');
+    }
+  };
 
-    return (
-      <form onSubmit={(e) => {
-        e.preventDefault();
-        handleSave(new FormData(e.currentTarget));
-      }}>
-        <div className="space-y-4">
+  const getStatusCounts = () => {
+    const counts = {
+      actif: 0,
+      planifie: 0,
+      termine: 0,
+      pause: 0
+    };
+    
+    (chantiers || []).forEach(chantier => {
+      counts[chantier.statut]++;
+    });
+    
+    return counts;
+  };
+
+  const getTotalBudget = () => {
+    return (chantiers || []).reduce((sum, chantier) => sum + chantier.budget, 0);
+  };
+
+  const getAverageProgress = () => {
+    const activeChantiers = (chantiers || []).filter(c => c.statut === 'actif');
+    if (activeChantiers.length === 0) return 0;
+    return Math.round(activeChantiers.reduce((sum, c) => sum + c.avancement, 0) / activeChantiers.length);
+  };
+
+  const statusCounts = getStatusCounts();
+
+  const ChantierForm = () => (
+    <form onSubmit={(e) => {
+      e.preventDefault();
+      handleSave(new FormData(e.currentTarget));
+    }}>
+      <div className="space-y-6">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-5">
+          <h3 className="text-lg font-semibold text-blue-800 mb-4 flex items-center">
+            <Building2 className="w-5 h-5 mr-2" />
+            Informations générales
+          </h3>
+          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Nom du chantier</label>
@@ -299,7 +176,8 @@ export const Chantiers: React.FC = () => {
                 type="text"
                 required
                 defaultValue={editingChantier?.nom || ''}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                placeholder="Ex: Villa Moderne Dupont"
               />
             </div>
             <div>
@@ -307,69 +185,112 @@ export const Chantiers: React.FC = () => {
               <select
                 name="clientId"
                 required
-                defaultValue={currentClientId}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                defaultValue={clients?.find(c => c.nom === editingChantier?.client)?.id || ''}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
               >
                 <option value="">Sélectionner un client</option>
-                {(clients || []).map(client => (
+                {clients?.map(client => (
                   <option key={client.id} value={client.id}>
-                    {client.nom} {client.type === 'entreprise' ? '(Entreprise)' : '(Particulier)'}
+                    {client.nom} ({client.type === 'particulier' ? 'Particulier' : 'Entreprise'})
                   </option>
                 ))}
               </select>
-              <p className="text-xs text-gray-500 mt-1">
-                {clients?.length || 0} client(s) disponible(s)
-              </p>
             </div>
           </div>
           
-          <div>
+          <div className="mt-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
             <textarea
               name="description"
               rows={3}
+              required
               defaultValue={editingChantier?.description || ''}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+              placeholder="Description détaillée du projet..."
             />
           </div>
+        </div>
+        
+        <div className="bg-green-50 border border-green-200 rounded-lg p-5">
+          <h3 className="text-lg font-semibold text-green-800 mb-4 flex items-center">
+            <MapPin className="w-5 h-5 mr-2" />
+            Localisation
+          </h3>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Adresse</label>
-            <input
+            <label className="block text-sm font-medium text-gray-700 mb-1">Adresse complète</label>
+            <textarea
               name="adresse"
-              type="text"
+              rows={2}
               required
               defaultValue={editingChantier?.adresse || ''}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
+              placeholder="Numéro, rue, code postal, ville"
             />
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Date début</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Latitude (optionnel)</label>
+              <input
+                name="latitude"
+                type="number"
+                step="0.00000001"
+                defaultValue={editingChantier?.coordinates?.lat || ''}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
+                placeholder="Ex: 48.8566"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Longitude (optionnel)</label>
+              <input
+                name="longitude"
+                type="number"
+                step="0.00000001"
+                defaultValue={editingChantier?.coordinates?.lng || ''}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
+                placeholder="Ex: 2.3522"
+              />
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-5">
+          <h3 className="text-lg font-semibold text-purple-800 mb-4 flex items-center">
+            <Calendar className="w-5 h-5 mr-2" />
+            Planification
+          </h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Date de début</label>
               <input
                 name="dateDebut"
                 type="date"
                 required
                 defaultValue={editingChantier?.dateDebut || ''}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Date fin</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Date de fin (prévisionnelle)</label>
               <input
                 name="dateFin"
                 type="date"
                 defaultValue={editingChantier?.dateFin || ''}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
               />
             </div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Statut</label>
               <select
                 name="statut"
+                required
                 defaultValue={editingChantier?.statut || 'planifie'}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
               >
                 <option value="planifie">Planifié</option>
                 <option value="actif">Actif</option>
@@ -377,19 +298,27 @@ export const Chantiers: React.FC = () => {
                 <option value="termine">Terminé</option>
               </select>
             </div>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Avancement (%)</label>
-              <input
-                name="avancement"
-                type="number"
-                min="0"
-                max="100"
-                defaultValue={editingChantier?.avancement || 0}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              <div className="flex items-center">
+                <input
+                  name="avancement"
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="5"
+                  defaultValue={editingChantier?.avancement || 0}
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    const output = e.currentTarget.parentElement?.querySelector('output');
+                    if (output) output.value = value;
+                  }}
+                />
+                <output className="ml-2 w-12 text-center font-medium text-gray-700">
+                  {editingChantier?.avancement || 0}
+                </output>
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Budget (€)</label>
@@ -397,486 +326,239 @@ export const Chantiers: React.FC = () => {
                 name="budget"
                 type="number"
                 min="0"
+                step="1000"
+                required
                 defaultValue={editingChantier?.budget || 0}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
+                placeholder="Ex: 150000"
               />
             </div>
           </div>
-
-          {/* Aperçu du client sélectionné */}
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <h4 className="text-sm font-medium text-gray-700 mb-2">Informations du client sélectionné</h4>
-            <div id="client-preview" className="text-sm text-gray-600">
-              <p>Sélectionnez un client pour voir ses informations</p>
-            </div>
-          </div>
         </div>
-        
-        <div className="flex justify-end space-x-3 mt-6">
-          <Button variant="secondary" onClick={() => setIsModalOpen(false)}>
-            Annuler
-          </Button>
-          <Button type="submit">
-            {editingChantier ? 'Mettre à jour' : 'Créer'}
-          </Button>
-        </div>
-      </form>
-    );
-  };
+      </div>
+      
+      <div className="flex justify-end space-x-3 mt-6">
+        <Button variant="secondary" onClick={() => setIsModalOpen(false)}>
+          Annuler
+        </Button>
+        <Button type="submit">
+          {editingChantier ? 'Mettre à jour' : 'Créer'}
+        </Button>
+      </div>
+    </form>
+  );
 
-  const PhotoManagementModal = () => {
+  const ChantierDetailModal = () => {
     if (!selectedChantier) return null;
 
-    // Filtrer et trier les photos
-    const filteredPhotos = selectedChantier.photos
-      .filter(photo => 
-        photoFilter === '' || 
-        photo.description.toLowerCase().includes(photoFilter.toLowerCase()) ||
-        (photo.category && photo.category.includes(photoFilter.toLowerCase()))
-      )
-      .sort((a, b) => {
-        if (photoSortBy === 'date') {
-          return new Date(b.date).getTime() - new Date(a.date).getTime();
-        } else {
-          // Tri par catégorie
-          const catA = a.category || 'avancement';
-          const catB = b.category || 'avancement';
-          return catA.localeCompare(catB);
-        }
-      });
+    const client = clients?.find(c => c.nom === selectedChantier.client);
+    const startDate = new Date(selectedChantier.dateDebut);
+    const endDate = selectedChantier.dateFin ? new Date(selectedChantier.dateFin) : null;
+    
+    // Calculate duration in days
+    const durationDays = endDate 
+      ? Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+      : null;
+    
+    // Calculate days elapsed
+    const today = new Date();
+    const elapsedDays = Math.ceil((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    
+    // Calculate days remaining
+    const remainingDays = endDate && today < endDate
+      ? Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+      : 0;
+    
+    // Calculate if project is on time, ahead, or behind schedule
+    let scheduleStatus = 'on-time';
+    if (selectedChantier.statut === 'actif' && endDate) {
+      const expectedProgress = Math.min(100, Math.round((elapsedDays / durationDays!) * 100));
+      if (selectedChantier.avancement > expectedProgress + 10) {
+        scheduleStatus = 'ahead';
+      } else if (selectedChantier.avancement < expectedProgress - 10) {
+        scheduleStatus = 'behind';
+      }
+    }
 
     return (
       <div className="space-y-6">
-        {/* Upload de nouvelles photos */}
-        <div className="bg-gray-50 p-6 rounded-lg">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Ajouter des photos</h3>
-          
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Catégorie</label>
-                <select
-                  value={photoCategory}
-                  onChange={(e) => setPhotoCategory(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  {photoCategories.map(cat => (
-                    <option key={cat.value} value={cat.value}>{cat.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                <input
-                  type="text"
-                  value={photoDescription}
-                  onChange={(e) => setPhotoDescription(e.target.value)}
-                  placeholder="Description de la photo..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-
+        {/* Header */}
+        <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg p-6">
+          <div className="flex justify-between items-start">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Sélectionner des photos</label>
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-400 transition-colors">
-                <input
-                  type="file"
-                  multiple
-                  accept="image/*"
-                  onChange={handleFileSelect}
-                  className="hidden"
-                  id="photo-upload"
-                />
-                <label htmlFor="photo-upload" className="cursor-pointer">
-                  <Upload className="w-12 h-12 mx-auto text-gray-400 mb-4" />
-                  <p className="text-gray-600">Cliquez pour sélectionner des photos</p>
-                  <p className="text-sm text-gray-500 mt-1">PNG, JPG, GIF jusqu'à 10MB</p>
-                </label>
+              <h2 className="text-2xl font-bold">{selectedChantier.nom}</h2>
+              <p className="mt-1 text-blue-100">{selectedChantier.description}</p>
+              <div className="mt-3 flex items-center">
+                <StatusBadge status={selectedChantier.statut} type="chantier" />
+                <span className="ml-3 text-sm bg-white/20 px-2 py-1 rounded">
+                  {selectedChantier.avancement}% complété
+                </span>
               </div>
             </div>
+            <div className="text-right">
+              <div className="text-3xl font-bold">{selectedChantier.budget.toLocaleString()} €</div>
+              <div className="text-sm text-blue-100">Budget total</div>
+            </div>
+          </div>
+        </div>
 
-            {/* Aperçu des nouvelles photos */}
-            {newPhotos.length > 0 && (
-              <div>
-                <h4 className="text-sm font-medium text-gray-700 mb-2">Photos à ajouter ({newPhotos.length})</h4>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {newPhotos.map((file, index) => (
-                    <div key={index} className="relative">
-                      <img
-                        src={URL.createObjectURL(file)}
-                        alt={file.name}
-                        className="w-full h-24 object-cover rounded-lg"
-                      />
-                      <button
-                        onClick={() => removeNewPhoto(index)}
-                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-600"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                      <p className="text-xs text-gray-600 mt-1 truncate">{file.name}</p>
-                    </div>
-                  ))}
+        {/* Progress bar */}
+        <div className="bg-white border rounded-lg p-4">
+          <div className="flex justify-between items-center mb-2">
+            <h3 className="font-medium text-gray-700">Avancement du projet</h3>
+            <span className="text-sm text-gray-500">{selectedChantier.avancement}%</span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-4">
+            <div 
+              className={`h-4 rounded-full ${
+                selectedChantier.avancement < 30 ? 'bg-red-500' :
+                selectedChantier.avancement < 70 ? 'bg-yellow-500' :
+                'bg-green-500'
+              }`}
+              style={{ width: `${selectedChantier.avancement}%` }}
+            ></div>
+          </div>
+          <div className="mt-2 flex justify-between text-xs text-gray-500">
+            <span>0%</span>
+            <span>50%</span>
+            <span>100%</span>
+          </div>
+        </div>
+
+        {/* Client and Location */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-white border rounded-lg p-4">
+            <h3 className="font-medium text-gray-700 mb-3 flex items-center">
+              <User className="w-5 h-5 mr-2 text-blue-500" />
+              Client
+            </h3>
+            <div className="space-y-2">
+              <p className="text-gray-800 font-medium">{selectedChantier.client}</p>
+              {client && (
+                <>
+                  <p className="text-gray-600">{client.email}</p>
+                  <p className="text-gray-600">{client.telephone}</p>
+                  <p className="text-gray-600">{client.adresse}</p>
+                </>
+              )}
+            </div>
+          </div>
+          
+          <div className="bg-white border rounded-lg p-4">
+            <h3 className="font-medium text-gray-700 mb-3 flex items-center">
+              <MapPin className="w-5 h-5 mr-2 text-red-500" />
+              Localisation
+            </h3>
+            <p className="text-gray-800">{selectedChantier.adresse}</p>
+            {selectedChantier.coordinates && (
+              <div className="mt-2 text-sm text-gray-600">
+                <p>Latitude: {selectedChantier.coordinates.lat}</p>
+                <p>Longitude: {selectedChantier.coordinates.lng}</p>
+              </div>
+            )}
+            <div className="mt-3">
+              <a 
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedChantier.adresse)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
+              >
+                <Map className="w-4 h-4 mr-1" />
+                Voir sur Google Maps
+              </a>
+            </div>
+          </div>
+        </div>
+
+        {/* Timeline */}
+        <div className="bg-white border rounded-lg p-4">
+          <h3 className="font-medium text-gray-700 mb-3 flex items-center">
+            <Calendar className="w-5 h-5 mr-2 text-purple-500" />
+            Calendrier
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-blue-50 p-3 rounded-lg">
+              <div className="text-sm text-blue-700">Date de début</div>
+              <div className="font-medium">{startDate.toLocaleDateString()}</div>
+              <div className="text-xs text-blue-600 mt-1">Il y a {elapsedDays} jours</div>
+            </div>
+            
+            {endDate && (
+              <div className="bg-purple-50 p-3 rounded-lg">
+                <div className="text-sm text-purple-700">Date de fin prévue</div>
+                <div className="font-medium">{endDate.toLocaleDateString()}</div>
+                <div className="text-xs text-purple-600 mt-1">
+                  {remainingDays > 0 
+                    ? `Dans ${remainingDays} jours` 
+                    : 'Date dépassée'}
                 </div>
-                <div className="flex justify-end mt-4">
-                  <Button onClick={uploadPhotos} disabled={newPhotos.length === 0}>
-                    <Upload className="w-4 h-4 mr-2" />
-                    Ajouter {newPhotos.length} photo(s)
-                  </Button>
+              </div>
+            )}
+            
+            {durationDays && (
+              <div className="bg-green-50 p-3 rounded-lg">
+                <div className="text-sm text-green-700">Durée totale</div>
+                <div className="font-medium">{durationDays} jours</div>
+                <div className={`text-xs mt-1 flex items-center ${
+                  scheduleStatus === 'ahead' ? 'text-green-600' :
+                  scheduleStatus === 'behind' ? 'text-red-600' :
+                  'text-gray-600'
+                }`}>
+                  {scheduleStatus === 'ahead' && <CheckCircle className="w-3 h-3 mr-1" />}
+                  {scheduleStatus === 'behind' && <AlertTriangle className="w-3 h-3 mr-1" />}
+                  {scheduleStatus === 'on-time' && <Clock className="w-3 h-3 mr-1" />}
+                  {scheduleStatus === 'ahead' ? 'En avance' :
+                   scheduleStatus === 'behind' ? 'En retard' :
+                   'Dans les temps'}
                 </div>
               </div>
             )}
           </div>
         </div>
 
-        {/* Photos existantes */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center">
-              <h3 className="text-lg font-semibold text-gray-800 mr-2">
-                Photos du chantier ({selectedChantier.photos.length})
-              </h3>
-              <span className="text-sm text-gray-500">
-                {filteredPhotos.length !== selectedChantier.photos.length && 
-                  `(${filteredPhotos.length} affichées)`}
-              </span>
-            </div>
-            <div className="flex items-center space-x-3">
-              {/* Recherche */}
-              <div className="relative">
-                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <input
-                  type="text"
-                  placeholder="Rechercher..."
-                  value={photoFilter}
-                  onChange={(e) => setPhotoFilter(e.target.value)}
-                  className="pl-8 pr-3 py-1 border border-gray-300 rounded text-sm w-40"
+        {/* Photos */}
+        <div className="bg-white border rounded-lg p-4">
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="font-medium text-gray-700 flex items-center">
+              <Image className="w-5 h-5 mr-2 text-indigo-500" />
+              Photos
+            </h3>
+            <Button 
+              size="sm" 
+              onClick={() => handleViewPhotos(selectedChantier)}
+            >
+              Voir toutes les photos
+            </Button>
+          </div>
+          
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {selectedChantier.photos.slice(0, 4).map(photo => (
+              <div key={photo.id} className="aspect-square rounded-lg overflow-hidden border">
+                <img 
+                  src={photo.url} 
+                  alt={photo.description} 
+                  className="w-full h-full object-cover hover:scale-105 transition-transform"
                 />
               </div>
-              
-              {/* Options d'affichage */}
-              <div className="flex bg-gray-100 rounded-lg p-1">
-                <button
-                  onClick={() => setPhotoViewMode('grid')}
-                  className={`p-1 rounded ${photoViewMode === 'grid' ? 'bg-white shadow-sm' : ''}`}
-                  title="Vue grille"
-                >
-                  <Layers className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => setPhotoViewMode('carousel')}
-                  className={`p-1 rounded ${photoViewMode === 'carousel' ? 'bg-white shadow-sm' : ''}`}
-                  title="Vue carousel"
-                >
-                  <Image className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => setPhotoViewMode('list')}
-                  className={`p-1 rounded ${photoViewMode === 'list' ? 'bg-white shadow-sm' : ''}`}
-                  title="Vue liste"
-                >
-                  <ArrowUpDown className="w-4 h-4" />
-                </button>
+            ))}
+            {selectedChantier.photos.length === 0 && (
+              <div className="col-span-4 py-8 text-center text-gray-500">
+                Aucune photo disponible
               </div>
-              
-              {/* Options de tri */}
-              <div className="flex items-center space-x-1">
-                <SlidersHorizontal className="w-4 h-4 text-gray-500" />
-                <select 
-                  className="px-2 py-1 border border-gray-300 rounded text-sm"
-                  value={photoSortBy}
-                  onChange={(e) => setPhotoSortBy(e.target.value as 'date' | 'category')}
-                >
-                  <option value="date">Trier par date</option>
-                  <option value="category">Trier par catégorie</option>
-                </select>
-              </div>
-            </div>
+            )}
           </div>
-
-          {selectedChantier.photos.length === 0 ? (
-            <div className="text-center py-12 bg-gray-50 rounded-lg">
-              <Camera className="w-12 h-12 mx-auto text-gray-300 mb-4" />
-              <p className="text-gray-500">Aucune photo pour ce chantier</p>
-              <p className="text-sm text-gray-400">Ajoutez des photos pour suivre l'avancement</p>
-            </div>
-          ) : (
-            <>
-              {photoViewMode === 'grid' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {filteredPhotos.map(photo => {
-                    const categoryInfo = getCategoryInfo(photo.category || 'avancement');
-                    return (
-                      <div key={photo.id} className="bg-white border rounded-lg overflow-hidden hover:shadow-md transition-shadow">
-                        <div className="relative">
-                          <img
-                            src={photo.url}
-                            alt={photo.description}
-                            className="w-full h-48 object-cover cursor-pointer"
-                            onClick={() => handlePhotoView(photo, selectedChantier)}
-                          />
-                          <div className="absolute top-2 left-2">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${categoryInfo.color}`}>
-                              {categoryInfo.label}
-                            </span>
-                          </div>
-                          <div className="absolute top-2 right-2">
-                            <button
-                              onClick={() => deletePhoto(photo.id)}
-                              className="bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-600"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
-                          </div>
-                        </div>
-                        <div className="p-3">
-                          <div className="flex items-center text-xs text-gray-500 mb-2">
-                            <Calendar className="w-3 h-3 mr-1" />
-                            {new Date(photo.date).toLocaleDateString()}
-                          </div>
-                          <input
-                            type="text"
-                            value={photo.description}
-                            onChange={(e) => updatePhotoDescription(photo.id, e.target.value)}
-                            className="w-full text-sm border-none p-0 focus:outline-none focus:ring-1 focus:ring-blue-500 rounded"
-                            placeholder="Description..."
-                          />
-                          {photo.filename && (
-                            <p className="text-xs text-gray-400 mt-1 truncate">{photo.filename}</p>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-              
-              {photoViewMode === 'carousel' && (
-                <div className="relative bg-gray-900 rounded-lg overflow-hidden">
-                  {filteredPhotos.length > 0 && (
-                    <>
-                      <div className="relative">
-                        <img 
-                          src={filteredPhotos[0].url} 
-                          alt={filteredPhotos[0].description}
-                          className="w-full h-96 object-contain mx-auto"
-                        />
-                        <div className="absolute top-4 left-4">
-                          <span className={`px-3 py-1 rounded-full text-sm font-medium text-white ${getCategoryInfo(filteredPhotos[0].category || 'avancement').color}`}>
-                            {getCategoryInfo(filteredPhotos[0].category || 'avancement').label}
-                          </span>
-                        </div>
-                        <div className="absolute bottom-4 left-0 right-0 bg-black bg-opacity-50 text-white p-4">
-                          <p className="font-medium">{filteredPhotos[0].description}</p>
-                          <p className="text-sm text-gray-300">{new Date(filteredPhotos[0].date).toLocaleDateString()}</p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex overflow-x-auto py-4 px-2 bg-gray-800 gap-2">
-                        {filteredPhotos.map((photo, index) => (
-                          <div 
-                            key={photo.id} 
-                            className={`flex-shrink-0 w-20 h-20 cursor-pointer ${index === 0 ? 'ring-2 ring-blue-500' : ''}`}
-                            onClick={() => {
-                              // Move this photo to the first position
-                              const newPhotos = [...filteredPhotos];
-                              const [selectedPhoto] = newPhotos.splice(index, 1);
-                              newPhotos.unshift(selectedPhoto);
-                              // This is just for UI update in this demo
-                              setPhotoFilter(photoFilter + ' ');
-                              setTimeout(() => setPhotoFilter(photoFilter), 10);
-                            }}
-                          >
-                            <img 
-                              src={photo.url} 
-                              alt={photo.description}
-                              className="w-full h-full object-cover rounded"
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-              
-              {photoViewMode === 'list' && (
-                <div className="overflow-hidden border rounded-lg">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Photo</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Catégorie</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {filteredPhotos.map(photo => {
-                        const categoryInfo = getCategoryInfo(photo.category || 'avancement');
-                        return (
-                          <tr key={photo.id} className="hover:bg-gray-50">
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="w-16 h-16 relative">
-                                <img 
-                                  src={photo.url} 
-                                  alt={photo.description}
-                                  className="w-full h-full object-cover rounded cursor-pointer"
-                                  onClick={() => handlePhotoView(photo, selectedChantier)}
-                                />
-                              </div>
-                            </td>
-                            <td className="px-6 py-4">
-                              <input
-                                type="text"
-                                value={photo.description}
-                                onChange={(e) => updatePhotoDescription(photo.id, e.target.value)}
-                                className="w-full text-sm border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500"
-                              />
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${categoryInfo.color}`}>
-                                {categoryInfo.label}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {new Date(photo.date).toLocaleDateString()}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                              <div className="flex space-x-2">
-                                <button
-                                  onClick={() => handlePhotoView(photo, selectedChantier)}
-                                  className="text-blue-600 hover:text-blue-900"
-                                  title="Voir"
-                                >
-                                  <Eye className="w-4 h-4" />
-                                </button>
-                                <button
-                                  onClick={() => deletePhoto(photo.id)}
-                                  className="text-red-600 hover:text-red-900"
-                                  title="Supprimer"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </div>
-    );
-  };
-
-  const PhotoViewerModal = () => {
-    if (!selectedPhoto || !selectedChantier) return null;
-
-    const currentIndex = selectedChantier.photos.findIndex(p => p.id === selectedPhoto.id);
-    const canNavigate = selectedChantier.photos.length > 1;
-
-    const navigatePhoto = (direction: 'prev' | 'next') => {
-      const newIndex = direction === 'next' 
-        ? (currentIndex + 1) % selectedChantier.photos.length
-        : (currentIndex - 1 + selectedChantier.photos.length) % selectedChantier.photos.length;
-      
-      setSelectedPhoto(selectedChantier.photos[newIndex]);
-    };
-
-    const categoryInfo = getCategoryInfo(selectedPhoto.category || 'avancement');
-
-    return (
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <span className={`px-3 py-1 rounded-full text-sm font-medium text-white ${categoryInfo.color}`}>
-              {categoryInfo.label}
-            </span>
-            <div className="flex items-center text-sm text-gray-500">
-              <Calendar className="w-4 h-4 mr-1" />
-              {new Date(selectedPhoto.date).toLocaleDateString()}
-            </div>
-          </div>
-          {canNavigate && (
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => navigatePhoto('prev')}
-                className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full"
-              >
-                ←
-              </button>
-              <span className="text-sm text-gray-500">
-                {currentIndex + 1} / {selectedChantier.photos.length}
-              </span>
-              <button
-                onClick={() => navigatePhoto('next')}
-                className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full"
-              >
-                →
-              </button>
-            </div>
-          )}
         </div>
 
-        <div className="text-center">
-          <img
-            src={selectedPhoto.url}
-            alt={selectedPhoto.description}
-            className="max-w-full max-h-96 mx-auto rounded-lg shadow-lg"
-          />
-        </div>
-
-        <div className="bg-gray-50 p-4 rounded-lg">
-          <h4 className="font-medium text-gray-900 mb-2">Description</h4>
-          <p className="text-gray-700">{selectedPhoto.description}</p>
-          
-          {selectedPhoto.filename && (
-            <div className="mt-3 pt-3 border-t">
-              <div className="flex justify-between text-sm text-gray-500">
-                <span>Fichier: {selectedPhoto.filename}</span>
-                {selectedPhoto.size && (
-                  <span>Taille: {(selectedPhoto.size / 1024 / 1024).toFixed(2)} MB</span>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="flex justify-between">
-          <Button
-            variant="secondary"
-            onClick={() => setIsPhotoViewerOpen(false)}
-            size="sm"
-          >
-            Fermer
+        {/* Actions */}
+        <div className="flex justify-end space-x-3">
+          <Button variant="secondary" onClick={() => handleEdit(selectedChantier)}>
+            <Edit className="w-4 h-4 mr-2" />
+            Modifier
           </Button>
-          <div className="flex space-x-2">
-            <Button variant="secondary" size="sm">
-              <Download className="w-4 h-4 mr-2" />
-              Télécharger
-            </Button>
-            <Button variant="secondary" size="sm">
-              <Share2 className="w-4 h-4 mr-2" />
-              Partager
-            </Button>
-            <Button
-              variant="danger"
-              size="sm"
-              onClick={() => {
-                deletePhoto(selectedPhoto.id);
-                setIsPhotoViewerOpen(false);
-              }}
-            >
-              <Trash2 className="w-4 h-4 mr-2" />
-              Supprimer
-            </Button>
-          </div>
+          <Button variant="danger" onClick={() => handleDelete(selectedChantier.id)}>
+            <Trash2 className="w-4 h-4 mr-2" />
+            Supprimer
+          </Button>
         </div>
       </div>
     );
@@ -887,22 +569,119 @@ export const Chantiers: React.FC = () => {
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-800">Gestion des Chantiers</h1>
         <div className="flex space-x-3">
-          <Button onClick={() => setIsModalOpen(true)} disabled={loading}>
+          <Button onClick={() => setIsModalOpen(true)}>
             <Plus className="w-4 h-4 mr-2" />
-            Nouveau chantier
-          </Button>
-          <Button onClick={() => handlePhotoManagement(filteredChantiers[0])} disabled={loading || filteredChantiers.length === 0} variant="success">
-            <ImagePlus className="w-4 h-4 mr-2" />
-            Gérer les photos
+            Nouveau Chantier
           </Button>
           <Button variant="secondary">
             <Download className="w-4 h-4 mr-2" />
             Exporter
           </Button>
+          <Button 
+            variant="secondary" 
+            onClick={() => setMapView(!mapView)}
+          >
+            <Map className="w-4 h-4 mr-2" />
+            {mapView ? 'Vue Liste' : 'Vue Carte'}
+          </Button>
+        </div>
+      </div>
+
+      {/* Statistiques */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="bg-white rounded-lg shadow-sm border p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Chantiers Actifs</p>
+              <p className="text-2xl font-bold text-blue-600">{statusCounts.actif}</p>
+              <p className="text-xs text-gray-500">sur {chantiers?.length || 0} total</p>
+            </div>
+            <div className="p-3 rounded-full bg-blue-100">
+              <Building2 className="w-6 h-6 text-blue-600" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-sm border p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Avancement Moyen</p>
+              <p className="text-2xl font-bold text-green-600">{getAverageProgress()}%</p>
+              <p className="text-xs text-gray-500">chantiers actifs</p>
+            </div>
+            <div className="p-3 rounded-full bg-green-100">
+              <BarChart3 className="w-6 h-6 text-green-600" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-sm border p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Budget Total</p>
+              <p className="text-2xl font-bold text-purple-600">{getTotalBudget().toLocaleString()} €</p>
+              <p className="text-xs text-gray-500">tous chantiers</p>
+            </div>
+            <div className="p-3 rounded-full bg-purple-100">
+              <Euro className="w-6 h-6 text-purple-600" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-sm border p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Chantiers Planifiés</p>
+              <p className="text-2xl font-bold text-orange-600">{statusCounts.planifie}</p>
+              <p className="text-xs text-gray-500">à démarrer</p>
+            </div>
+            <div className="p-3 rounded-full bg-orange-100">
+              <Calendar className="w-6 h-6 text-orange-600" />
+            </div>
+          </div>
         </div>
       </div>
 
       <div className="bg-white rounded-lg shadow-sm border">
+        <div className="p-4 border-b">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <input
+                type="text"
+                placeholder="Rechercher un chantier..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex items-center space-x-2">
+              <Filter className="w-4 h-4 text-gray-500" />
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="all">Tous les statuts</option>
+                <option value="actif">Actifs</option>
+                <option value="planifie">Planifiés</option>
+                <option value="termine">Terminés</option>
+                <option value="pause">En pause</option>
+              </select>
+              <select
+                value={clientFilter}
+                onChange={(e) => setClientFilter(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="all">Tous les clients</option>
+                {clients?.map(client => (
+                  <option key={client.id} value={client.nom}>{client.nom}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+
         {loading ? (
           <div className="text-center py-8">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
@@ -915,78 +694,77 @@ export const Chantiers: React.FC = () => {
           </div>
         ) : (
           <>
-            <div className="p-4 border-b">
-              <div className="flex flex-col sm:flex-row gap-4">
-                <div className="flex-1">
-                  <input
-                    type="text"
-                    placeholder="Rechercher un chantier..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Filter className="w-4 h-4 text-gray-500" />
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="all">Tous les statuts</option>
-                    <option value="planifie">Planifié</option>
-                    <option value="actif">Actif</option>
-                    <option value="pause">En pause</option>
-                    <option value="termine">Terminé</option>
-                  </select>
+            {mapView ? (
+              <div className="p-4">
+                <div className="bg-gray-100 rounded-lg h-[500px] flex items-center justify-center">
+                  <p className="text-gray-500">Carte des chantiers (non implémentée)</p>
                 </div>
               </div>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Chantier
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Client
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Statut
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Avancement
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Heures Travaillées
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Budget / Coût M.O.
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Photos
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredChantiers.map((chantier) => {
-                    const { totalHeures, heuresValidees } = getChantierTotalHours(chantier.id);
-                    const workersCount = getChantierWorkersCount(chantier.id);
-                    const laborCost = getChantierLaborCost(chantier.id);
-                    
-                    return (
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Chantier
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Client
+                      </th>
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                        onClick={() => toggleSort('date')}
+                      >
+                        <div className="flex items-center">
+                          <span>Dates</span>
+                          {sortBy === 'date' && (
+                            <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                          )}
+                        </div>
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Statut
+                      </th>
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                        onClick={() => toggleSort('avancement')}
+                      >
+                        <div className="flex items-center">
+                          <span>Avancement</span>
+                          {sortBy === 'avancement' && (
+                            <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                          )}
+                        </div>
+                      </th>
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                        onClick={() => toggleSort('budget')}
+                      >
+                        <div className="flex items-center">
+                          <span>Budget</span>
+                          {sortBy === 'budget' && (
+                            <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                          )}
+                        </div>
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {filteredChantiers.map((chantier) => (
                       <tr key={chantier.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">{chantier.nom}</div>
-                            <div className="text-sm text-gray-500 flex items-center">
-                              <MapPin className="w-3 h-3 mr-1" />
-                              {chantier.adresse}
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0 h-10 w-10">
+                              <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center">
+                                <Building2 className="h-5 w-5 text-white" />
+                              </div>
+                            </div>
+                            <div className="ml-4">
+                              <div className="text-sm font-medium text-gray-900">{chantier.nom}</div>
+                              <div className="text-sm text-gray-500 truncate max-w-xs">{chantier.description}</div>
                             </div>
                           </div>
                         </td>
@@ -994,104 +772,58 @@ export const Chantiers: React.FC = () => {
                           {chantier.client}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">
+                            {new Date(chantier.dateDebut).toLocaleDateString()}
+                          </div>
+                          {chantier.dateFin && (
+                            <div className="text-sm text-gray-500">
+                              → {new Date(chantier.dateFin).toLocaleDateString()}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
                           <StatusBadge status={chantier.statut} type="chantier" />
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
-                            <div className="w-full bg-gray-200 rounded-full h-2 mr-2">
+                            <div className="w-full bg-gray-200 rounded-full h-2.5 mr-2 max-w-[100px]">
                               <div 
-                                className="bg-blue-600 h-2 rounded-full" 
+                                className={`h-2.5 rounded-full ${
+                                  chantier.avancement < 30 ? 'bg-red-500' :
+                                  chantier.avancement < 70 ? 'bg-yellow-500' :
+                                  'bg-green-500'
+                                }`}
                                 style={{ width: `${chantier.avancement}%` }}
-                              />
+                              ></div>
                             </div>
-                            <span className="text-sm text-gray-700">{chantier.avancement}%</span>
+                            <span className="text-sm font-medium text-gray-900">{chantier.avancement}%</span>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="space-y-1">
-                            <div className="flex items-center text-sm">
-                              <Clock className="w-4 h-4 mr-1 text-blue-500" />
-                              <span className="font-medium text-gray-900">{totalHeures.toFixed(1)}h</span>
-                              <span className="text-gray-500 ml-1">total</span>
-                            </div>
-                            <div className="flex items-center text-xs">
-                              <div className="w-4 h-4 mr-1 flex items-center justify-center">
-                                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                              </div>
-                              <span className="text-green-600 font-medium">{heuresValidees.toFixed(1)}h</span>
-                              <span className="text-gray-500 ml-1">validées</span>
-                            </div>
-                            {workersCount > 0 && (
-                              <div className="flex items-center text-xs">
-                                <Users className="w-3 h-3 mr-1 text-gray-400" />
-                                <span className="text-gray-600">{workersCount} ouvrier(s)</span>
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="space-y-1">
-                            <div className="text-sm">
-                              <span className="font-medium text-gray-900">{chantier.budget.toLocaleString()} €</span>
-                              <span className="text-gray-500 text-xs ml-1">budget</span>
-                            </div>
-                            <div className="text-sm">
-                              <span className="font-medium text-orange-600">{laborCost.toLocaleString()} €</span>
-                              <span className="text-gray-500 text-xs ml-1">coût M.O.</span>
-                            </div>
-                            {laborCost > 0 && (
-                              <div className="text-xs">
-                                <span className={`font-medium ${
-                                  laborCost <= chantier.budget ? 'text-green-600' : 'text-red-600'
-                                }`}>
-                                  {((chantier.budget - laborCost) / chantier.budget * 100).toFixed(1)}%
-                                </span>
-                                <span className="text-gray-500 ml-1">marge</span>
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center space-x-2">
-                            <div className="flex items-center">
-                              <Camera className="w-4 h-4 text-gray-400 mr-1" />
-                              <span className="text-sm font-medium text-gray-900">{chantier.photos.length}</span>
-                            </div>
-                            {chantier.photos.length > 0 && (
-                              <div className="flex -space-x-1">
-                                {chantier.photos.slice(0, 3).map((photo, index) => (
-                                  <img
-                                    key={photo.id}
-                                    src={photo.url}
-                                    alt={photo.description}
-                                    className="w-6 h-6 rounded-full border-2 border-white object-cover cursor-pointer hover:scale-110 transition-transform"
-                                    onClick={() => handlePhotoView(photo, chantier)}
-                                  />
-                                ))}
-                                {chantier.photos.length > 3 && (
-                                  <div className="w-6 h-6 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center text-xs text-gray-600">
-                                    +{chantier.photos.length - 3}
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {chantier.budget.toLocaleString()} €
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <div className="flex space-x-2">
+                            <button
+                              onClick={() => handleViewDetails(chantier)}
+                              className="text-green-600 hover:text-green-900"
+                              title="Voir détails"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleViewPhotos(chantier)}
+                              className="text-purple-600 hover:text-purple-900"
+                              title="Voir photos"
+                            >
+                              <Image className="w-4 h-4" />
+                            </button>
                             <button
                               onClick={() => handleEdit(chantier)}
                               className="text-blue-600 hover:text-blue-900"
                               title="Modifier"
                             >
                               <Edit className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handlePhotoManagement(chantier)}
-                              className="text-green-600 hover:text-green-900"
-                              title="Gérer les photos"
-                            >
-                              <Camera className="w-4 h-4" />
                             </button>
                             <button
                               onClick={() => handleDelete(chantier.id)}
@@ -1103,25 +835,24 @@ export const Chantiers: React.FC = () => {
                           </div>
                         </td>
                       </tr>
-                    );
-                  })}
-                </tbody>
-                {filteredChantiers.length === 0 && (
-                  <tfoot>
-                    <tr>
-                      <td colSpan={8} className="px-6 py-10 text-center text-gray-500 bg-gray-50">
-                        Aucun chantier trouvé
-                      </td>
-                    </tr>
-                  </tfoot>
-                )}
-              </table>
-            </div>
+                    ))}
+                  </tbody>
+                  {filteredChantiers.length === 0 && (
+                    <tfoot>
+                      <tr>
+                        <td colSpan={7} className="px-6 py-10 text-center text-gray-500 bg-gray-50">
+                          Aucun chantier trouvé
+                        </td>
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </div>
+            )}
           </>
         )}
       </div>
 
-      {/* Modal de création/modification */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => {
@@ -1129,39 +860,77 @@ export const Chantiers: React.FC = () => {
           setEditingChantier(null);
         }}
         title={editingChantier ? 'Modifier le chantier' : 'Nouveau chantier'}
-        size="lg"
+        size="xl"
       >
         {!loading && <ChantierForm />}
       </Modal>
 
-      {/* Modal de gestion des photos */}
       <Modal
-        isOpen={isPhotoModalOpen}
+        isOpen={isDetailModalOpen}
         onClose={() => {
-          setIsPhotoModalOpen(false);
+          setIsDetailModalOpen(false);
           setSelectedChantier(null);
-          setNewPhotos([]);
-          setPhotoDescription('');
-          setPhotoCategory('avancement');
+        }}
+        title={`Détails - ${selectedChantier?.nom}`}
+        size="xl"
+      >
+        {selectedChantier && <ChantierDetailModal />}
+      </Modal>
+
+      <Modal
+        isOpen={isPhotosModalOpen}
+        onClose={() => {
+          setIsPhotosModalOpen(false);
+          setSelectedChantier(null);
         }}
         title={`Photos - ${selectedChantier?.nom}`}
         size="xl"
       >
-        <PhotoManagementModal />
-      </Modal>
-
-      {/* Modal de visualisation des photos */}
-      <Modal
-        isOpen={isPhotoViewerOpen}
-        onClose={() => {
-          setIsPhotoViewerOpen(false);
-          setSelectedPhoto(null);
-        }}
-        title="Visualisation de photo"
-        size="lg"
-      >
-        <PhotoViewerModal />
+        {selectedChantier && <PhotosManager chantierId={selectedChantier.id} />}
       </Modal>
     </div>
+  );
+};
+
+// Missing User component
+const User = ({ className }: { className?: string }) => {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  );
+};
+
+// Missing Euro component
+const Euro = ({ className }: { className?: string }) => {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M4 10h12" />
+      <path d="M4 14h9" />
+      <path d="M19 6a7.7 7.7 0 0 0-5.2-2A7.9 7.9 0 0 0 6 12c0 4.4 3.5 8 7.8 8 2 0 3.8-.8 5.2-2" />
+    </svg>
   );
 };
