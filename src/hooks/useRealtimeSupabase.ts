@@ -6,12 +6,14 @@ type UseRealtimeSupabaseOptions<T> = {
   table: string;
   fetchFunction: () => Promise<T[]>;
   initialData?: T[];
+  refreshInterval?: number;
 };
 
 export function useRealtimeSupabase<T>({ 
   table, 
   fetchFunction,
   initialData = [],
+  refreshInterval = 0
   refreshInterval = 0
 }: UseRealtimeSupabaseOptions<T>) {
   const [data, setData] = useState<T[]>(initialData);
@@ -61,14 +63,9 @@ export function useRealtimeSupabase<T>({
       .on('postgres_changes', { 
         event: 'DELETE', 
         schema: 'public', 
-        table
+        table 
       }, () => {
         console.log(`Suppression dans ${table}, rechargement des données`);
-        fetchData();
-      })
-      // Listen for form refresh events
-      .on('broadcast', { event: 'form_refresh' }, (payload) => {
-        console.log(`Événement de rafraîchissement reçu pour ${table}:`, payload);
         fetchData();
       })
       .subscribe();
@@ -78,7 +75,7 @@ export function useRealtimeSupabase<T>({
     // Nettoyage lors du démontage du composant
     return () => {
       if (realtimeChannel) {
-        supabase.removeChannel(realtimeChannel);
+        realtimeChannel.unsubscribe();
       }
     };
   }, [table]);

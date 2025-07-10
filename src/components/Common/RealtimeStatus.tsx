@@ -112,24 +112,6 @@ export const RealtimeStatus: React.FC<RealtimeStatusProps> = ({ className = '' }
       setIsConnected(true);
       setLastSynced(new Date());
       setSyncStatus('success');
-      
-      // Broadcast a refresh event to all components
-      const channel = supabase.channel('custom-all-channel');
-      channel.subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          channel.send({
-            type: 'broadcast',
-            event: 'form_refresh',
-            payload: { message: 'Manual refresh triggered' },
-          });
-        }
-      });
-      
-      // Clean up the channel after sending
-      setTimeout(() => {
-        supabase.removeChannel(channel);
-      }, 1000);
-      
     } catch (err) {
       setIsConnected(false);
       setSyncStatus('error');
