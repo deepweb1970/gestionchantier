@@ -36,7 +36,7 @@ export const Facturation: React.FC = () => {
     table: 'chantiers',
     fetchFunction: chantierService.getAll
   });
-  const { data: factures, setData: setFactures } = useRealtimeSupabase({
+  const { data: factures, refresh: refreshFactures } = useRealtimeSupabase({
     table: 'factures',
     fetchFunction: factureService.getAll
   });
@@ -177,7 +177,7 @@ export const Facturation: React.FC = () => {
 
   const handleDelete = (id: string) => {
     if (confirm('Êtes-vous sûr de vouloir supprimer cette facture ?')) {
-      setFactures((factures || []).filter(f => f.id !== id));
+      factureService.delete(id).then(() => refreshFactures());
     }
   };
 
@@ -202,36 +202,26 @@ export const Facturation: React.FC = () => {
     };
 
     if (editingFacture?.id) {
-      setFactures((factures || []).map(f => f.id === editingFacture.id ? factureData : f));
+      factureService.update(editingFacture.id, factureData).then(() => refreshFactures());
     } else {
-      setFactures([...(factures || []), factureData]);
+      factureService.create(factureData).then(() => refreshFactures());
     }
     
     setIsModalOpen(false);
     setEditingFacture(null);
     setItems([]);
-    
-    // Force refresh of the UI
-    setTimeout(() => {
-      setFactures([...(factures || [])]);
-    }, 100);
   };
 
   const markAsPaid = () => {
     if (!selectedFacture) return;
     
-    setFactures((factures || []).map(f => 
-      f.id === selectedFacture.id 
-        ? { ...f, statut: 'payee' as Facture['statut'] }
-        : f
-    ));
+    factureService.update(selectedFacture.id, { 
+      ...selectedFacture, 
+      statut: 'payee' as Facture['statut'] 
+    }).then(() => refreshFactures());
+    
     setIsPaymentModalOpen(false);
     setSelectedFacture(null);
-    
-    // Force refresh of the UI
-    setTimeout(() => {
-      setFactures([...(factures || [])]);
-    }, 100);
   };
 
   const getOverdueInvoices = () => {
