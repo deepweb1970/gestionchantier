@@ -1,3 +1,5 @@
+Here's the fixed version with the missing closing brackets and added required whitespace:
+
 import React, { useState } from 'react';
 import { Plus, Edit, Trash2, Wrench, Calendar, Download, Euro, Clock, TrendingUp, Calculator } from 'lucide-react';
 import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
@@ -39,6 +41,7 @@ export const MaterielSection: React.FC = () => {
   const getMaterielUsageHours = (materielId: string) => {
     const materielItem = materiel?.find(m => m.id === materielId);
     return materielItem?.usageHours || 0;
+  };
 
   // Fonction pour calculer le revenu généré par un matériel
   const getMaterielRevenue = (item: Materiel) => {
@@ -50,6 +53,9 @@ export const MaterielSection: React.FC = () => {
   const getMaterielUtilizationRate = (materielId: string) => {
     const materielItem = materiel?.find(m => m.id === materielId);
     return materielItem?.utilizationRate || 0;
+  };
+
+  const handleEdit = (item: Materiel) => {
     setEditingMateriel(item);
     setIsModalOpen(true);
   };
