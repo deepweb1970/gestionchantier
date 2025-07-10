@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Plus, Edit, Trash2, Wrench, Calendar, Download, Euro, Clock, TrendingUp, Calculator, Search, Filter, Eye, AlertTriangle, CheckCircle, PenTool as Tool, Truck, MapPin, BarChart3, Percent } from 'lucide-react'Service } from '../../services/materielService';
+import { Plus, Edit, Trash2, Wrench, Calendar, Download, Euro, Clock, TrendingUp, Calculator, Search, Filter, Eye, AlertTriangle, CheckCircle, PenTool as Tool, Truck, MapPin, BarChart3, Percent } from 'lucide-react';
+import { materielService } from '../../services/materielService';
 import { chantierService } from '../../services/chantierService';
 import { saisieHeureService } from '../../services/saisieHeureService';
 import { Materiel } from '../../types';

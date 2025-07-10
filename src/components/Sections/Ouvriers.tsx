@@ -618,7 +618,8 @@ export const Ouvriers: React.FC = () => {
                           </div>
                         </div>
                       </td>
-                          <div className="text-sm font-medium text-gray-900 hover:text-blue-600 cursor-pointer" onClick={() => handleViewDetails(ouvrier)}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900 hover:text-blue-600 cursor-pointer" onClick={() => handleViewDetails(ouvrier)}>
                         <div className="flex items-center space-x-2">
                           <Mail className="w-4 h-4 text-gray-400" />
                           <span>{ouvrier.email}</span>
@@ -626,6 +627,7 @@ export const Ouvriers: React.FC = () => {
                         <div className="flex items-center space-x-2 mt-1">
                           <Phone className="w-4 h-4 text-gray-400" />
                           <span>{ouvrier.telephone}</span>
+                        </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
