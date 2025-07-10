@@ -6,14 +6,13 @@ type UseRealtimeSupabaseOptions<T> = {
   table: string;
   fetchFunction: () => Promise<T[]>;
   initialData?: T[];
-  refreshInterval?: number;
 };
 
 export function useRealtimeSupabase<T>({ 
   table, 
   fetchFunction,
   initialData = [],
-  refreshInterval
+  refreshInterval = 0
 }: UseRealtimeSupabaseOptions<T>) {
   const [data, setData] = useState<T[]>(initialData);
   const [loading, setLoading] = useState(true);
@@ -76,25 +75,13 @@ export function useRealtimeSupabase<T>({
 
     setChannel(realtimeChannel);
 
-    // Set up refresh interval if specified
-    let intervalId: NodeJS.Timeout | undefined;
-    if (refreshInterval && refreshInterval > 0) {
-      intervalId = setInterval(() => {
-        console.log(`Rafraîchissement périodique pour ${table}`);
-        fetchData();
-      }, refreshInterval);
-    }
-
     // Nettoyage lors du démontage du composant
     return () => {
       if (realtimeChannel) {
         supabase.removeChannel(realtimeChannel);
       }
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
     };
-  }, [table, refreshInterval]);
+  }, [table]);
 
   // Fonction pour forcer un rechargement des données
   const refresh = () => {
