@@ -169,11 +169,14 @@ export const Facturation: React.FC = () => {
   const handleSave = (formData: FormData) => {
     const totals = calculateTotals();
     
+    const clientId = formData.get('clientId') as string;
+    const chantierId = formData.get('chantierId') as string;
+    
     const factureData: Facture = {
       id: editingFacture?.id || Date.now().toString(),
       numero: formData.get('numero') as string,
-      clientId: formData.get('clientId') as string,
-      chantierId: formData.get('chantierId') as string,
+      clientId: clientId,
+      chantierId: chantierId || undefined,
       dateEmission: formData.get('dateEmission') as string,
       dateEcheance: formData.get('dateEcheance') as string,
       montantHT: totals.montantHT,
@@ -270,30 +273,38 @@ export const Facturation: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Client</label>
-              <select
-                name="clientId"
-                required
-                defaultValue={editingFacture?.clientId || ''}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Sélectionner un client</option>
-                {mockClients.map(client => (
-                  <option key={client.id} value={client.id}>{client.nom}</option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  name="clientId"
+                  required
+                  defaultValue={editingFacture?.clientId || ''}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Sélectionner un client</option>
+                  {clients?.map(client => (
+                    <option key={client.id} value={client.id}>
+                      {client.nom} ({client.type === 'particulier' ? 'Particulier' : 'Entreprise'})
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Chantier (optionnel)</label>
-              <select
-                name="chantierId"
-                defaultValue={editingFacture?.chantierId || ''}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Aucun chantier</option>
-                {mockChantiers.map(chantier => (
-                  <option key={chantier.id} value={chantier.id}>{chantier.nom}</option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  name="chantierId"
+                  defaultValue={editingFacture?.chantierId || ''}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Aucun chantier</option>
+                  {chantiers?.filter(c => c.statut !== 'termine').map(chantier => (
+                    <option key={chantier.id} value={chantier.id}>
+                      {chantier.nom} ({chantier.statut})
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 
