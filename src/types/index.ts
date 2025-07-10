@@ -56,6 +56,8 @@ export interface Materiel {
   prochaineMaintenance?: string;
   localisation?: string;
   tarifHoraire?: number;
+  usageHours?: number;
+  utilizationRate?: number;
 }
 
 export interface Client {
