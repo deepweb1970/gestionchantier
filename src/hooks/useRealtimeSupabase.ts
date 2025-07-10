@@ -20,7 +20,6 @@ export function useRealtimeSupabase<T>({
   const [error, setError] = useState<Error | null>(null);
   const [channel, setChannel] = useState<RealtimeChannel | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
-  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
   // Fonction pour charger les données
   const fetchData = async () => {
@@ -28,7 +27,6 @@ export function useRealtimeSupabase<T>({
       setLoading(true);
       const result = await fetchFunction();
       setData(result);
-      setLastRefresh(new Date());
       setLastRefresh(new Date());
     } catch (err) {
       console.error(`Erreur lors du chargement des données de ${table}:`, err);
@@ -74,23 +72,9 @@ export function useRealtimeSupabase<T>({
         console.log(`Événement de rafraîchissement reçu pour ${table}:`, payload);
         fetchData();
       })
-      // Listen for form refresh events
-      .on('broadcast', { event: 'form_refresh' }, () => {
-        console.log(`Événement de rafraîchissement reçu:`, payload);
-        fetchData();
-      })
       .subscribe();
 
     setChannel(realtimeChannel);
-
-    // Set up refresh interval if specified
-    let intervalId: NodeJS.Timeout | undefined;
-    if (refreshInterval && refreshInterval > 0) {
-      intervalId = setInterval(() => {
-        console.log(`Rafraîchissement périodique pour ${table}`);
-        fetchData();
-      }, refreshInterval);
-    }
 
     // Set up refresh interval if specified
     let intervalId: NodeJS.Timeout | undefined;
@@ -105,9 +89,6 @@ export function useRealtimeSupabase<T>({
     return () => {
       if (realtimeChannel) {
         supabase.removeChannel(realtimeChannel);
-      }
-      if (intervalId) {
-        clearInterval(intervalId);
       }
       if (intervalId) {
         clearInterval(intervalId);

@@ -5,8 +5,6 @@ import {
   Database, 
   RefreshCw,
   CheckCircle,
-  AlertTriangle,
-  CheckCircle,
   AlertTriangle
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
