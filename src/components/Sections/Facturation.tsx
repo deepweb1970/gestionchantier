@@ -19,11 +19,13 @@ import {
 } from 'lucide-react';
 import { mockFactures, mockClients, mockChantiers } from '../../data/mockData';
 import { Facture, Client, Chantier, FactureItem } from '../../types';
+import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
 import { Modal } from '../Common/Modal';
 import { Button } from '../Common/Button';
 import { StatusBadge } from '../Common/StatusBadge';
 
 export const Facturation: React.FC = () => {
+  const { clients, chantiers } = useRealtimeSupabase();
   const [factures, setFactures] = useState<Facture[]>(mockFactures);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -113,10 +115,10 @@ export const Facturation: React.FC = () => {
   };
 
   const createFromChantier = (chantierId: string) => {
-    const chantier = getChantier(chantierId);
+    const chantier = chantiers?.find(c => c.id === chantierId);
     if (!chantier) return;
 
-    const client = mockClients.find(c => c.nom === chantier.client);
+    const client = clients?.find(c => c.id === chantier.clientId);
     if (!client) return;
 
     const newItem: FactureItem = {
@@ -233,7 +235,7 @@ export const Facturation: React.FC = () => {
     return { total, paid, pending, overdue };
   };
 
-  const FactureForm = () => {
+  const FactureForm = ({ clients, chantiers }: { clients: Client[] | null, chantiers: Chantier[] | null }) => {
     const totals = calculateTotals();
     
     return (
@@ -654,7 +656,7 @@ export const Facturation: React.FC = () => {
       <div className="bg-white rounded-lg shadow-sm border p-4">
         <h3 className="text-lg font-semibold text-gray-800 mb-3">Création rapide depuis un chantier</h3>
         <div className="flex flex-wrap gap-2">
-          {mockChantiers.map(chantier => (
+          {chantiers?.filter(c => c.statut !== 'termine').map(chantier => (
             <button
               key={chantier.id}
               onClick={() => createFromChantier(chantier.id)}
@@ -663,7 +665,7 @@ export const Facturation: React.FC = () => {
               <Calculator className="w-4 h-4 inline mr-1" />
               {chantier.nom}
             </button>
-          ))}
+          )) || []}
         </div>
       </div>
 
@@ -827,7 +829,7 @@ export const Facturation: React.FC = () => {
         title={editingFacture?.id ? 'Modifier la facture' : 'Nouvelle facture'}
         size="xl"
       >
-        <FactureForm />
+        <FactureForm clients={clients} chantiers={chantiers} />
       </Modal>
 
       {/* Modal de détails */}
