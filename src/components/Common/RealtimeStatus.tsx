@@ -18,7 +18,6 @@ export const RealtimeStatus: React.FC<RealtimeStatusProps> = ({ className = '' }
   const [isConnected, setIsConnected] = useState(true);
   const [lastSynced, setLastSynced] = useState<Date>(new Date());
   const [syncStatus, setSyncStatus] = useState<'success' | 'error' | 'syncing' | 'idle'>('idle');
-  const [syncStatus, setSyncStatus] = useState<'success' | 'error' | 'syncing' | 'idle'>('idle');
   const [showDetails, setShowDetails] = useState(false);
 
   // Gestion du statut en ligne/hors ligne
