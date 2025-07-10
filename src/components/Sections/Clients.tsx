@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Edit, Trash2, User, Building, Phone, Mail, FileText, MessageSquare, Calendar, Download, Filter, Search, Eye, Send } from 'lucide-react';
+import { Plus, Edit, Trash2, User, Building, Phone, Mail, FileText, MessageSquare, Calendar, Download, Filter, Search, Eye, Send, MapPin, CheckCircle, AlertTriangle, Building2, CreditCard, Clock } from 'lucide-react';
 import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
 import { clientService } from '../../services/clientService';
 import { chantierService } from '../../services/chantierService';
@@ -33,6 +33,8 @@ export const Clients: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [newMessage, setNewMessage] = useState('');
+  const [sortBy, setSortBy] = useState<'nom' | 'type' | 'projets'>('nom');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [communications, setCommunications] = useState<any[]>([
     {
       id: '1',
@@ -56,13 +58,38 @@ export const Clients: React.FC = () => {
     }
   ]);
 
-  const filteredClients = (clients || []).filter(client => {
+  const filteredClients = (clients || [])
+  .filter(client => {
     const matchesSearch = client.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          client.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          client.contactPrincipal.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = typeFilter === 'all' || client.type === typeFilter;
     return matchesSearch && matchesType;
+  })
+  .sort((a, b) => {
+    if (sortBy === 'nom') {
+      return sortDirection === 'asc' 
+        ? a.nom.localeCompare(b.nom)
+        : b.nom.localeCompare(a.nom);
+    } else if (sortBy === 'type') {
+      return sortDirection === 'asc' 
+        ? a.type.localeCompare(b.type)
+        : b.type.localeCompare(a.type);
+    } else { // projets
+      const aProjects = getClientProjects(a.id).length;
+      const bProjects = getClientProjects(b.id).length;
+      return sortDirection === 'asc' ? aProjects - bProjects : bProjects - aProjects;
+    }
   });
+
+  const toggleSort = (field: 'nom' | 'type' | 'projets') => {
+    if (sortBy === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(field);
+      setSortDirection('asc');
+    }
+  };
 
   const handleEdit = (client: Client) => {
     setEditingClient(client);
@@ -154,6 +181,18 @@ export const Clients: React.FC = () => {
     return factures.filter(facture => facture.client_id === clientId);
   };
 
+  // Calculate statistics
+  const getStatistics = () => {
+    const total = (clients || []).length;
+    const particuliers = (clients || []).filter(c => c.type === 'particulier').length;
+    const entreprises = (clients || []).filter(c => c.type === 'entreprise').length;
+    const withProjects = (clients || []).filter(c => getClientProjects(c.id).length > 0).length;
+    
+    return { total, particuliers, entreprises, withProjects };
+  };
+
+  const stats = getStatistics();
+
   const getClientCommunications = (clientId: string) => {
     return communications.filter(comm => comm.clientId === clientId);
   };
@@ -163,95 +202,138 @@ export const Clients: React.FC = () => {
       e.preventDefault();
       handleSave(new FormData(e.currentTarget));
     }}>
-      <div className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Nom/Raison sociale</label>
-            <input
-              name="nom"
-              type="text"
-              required
-              defaultValue={editingClient?.nom || ''}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+      <div className="space-y-6">
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-5">
+          <h3 className="text-lg font-semibold text-purple-800 mb-4 flex items-center">
+            <User className="w-5 h-5 mr-2" />
+            Informations générales
+          </h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nom/Raison sociale</label>
+              <input
+                name="nom"
+                type="text"
+                required
+                defaultValue={editingClient?.nom || ''}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
+                placeholder="Ex: Martin Dupont ou Entreprise ABC"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+              <select
+                name="type"
+                defaultValue={editingClient?.type || 'particulier'}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
+              >
+                <option value="particulier">Particulier</option>
+                <option value="entreprise">Entreprise</option>
+              </select>
+            </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-            <select
-              name="type"
-              defaultValue={editingClient?.type || 'particulier'}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="particulier">Particulier</option>
-              <option value="entreprise">Entreprise</option>
-            </select>
-          </div>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-            <input
-              name="email"
-              type="email"
-              required
-              defaultValue={editingClient?.email || ''}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Téléphone</label>
-            <input
-              name="telephone"
-              type="tel"
-              required
-              defaultValue={editingClient?.telephone || ''}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-        </div>
-        
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Adresse</label>
-          <textarea
-            name="adresse"
-            rows={2}
-            required
-            defaultValue={editingClient?.adresse || ''}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">SIRET (si entreprise)</label>
-            <input
-              name="siret"
-              type="text"
-              defaultValue={editingClient?.siret || ''}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Contact principal</label>
-            <input
-              name="contactPrincipal"
-              type="text"
-              required
-              defaultValue={editingClient?.contactPrincipal || ''}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <input
+                  name="email"
+                  type="email"
+                  required
+                  defaultValue={editingClient?.email || ''}
+                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
+                  placeholder="email@exemple.com"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Téléphone</label>
+              <div className="relative">
+                <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <input
+                  name="telephone"
+                  type="tel"
+                  required
+                  defaultValue={editingClient?.telephone || ''}
+                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
+                  placeholder="01 23 45 67 89"
+                />
+              </div>
+            </div>
           </div>
         </div>
         
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-          <textarea
-            name="notes"
-            rows={3}
-            defaultValue={editingClient?.notes || ''}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-5">
+          <h3 className="text-lg font-semibold text-blue-800 mb-4 flex items-center">
+            <MapPin className="w-5 h-5 mr-2" />
+            Adresse et contact
+          </h3>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Adresse</label>
+            <div className="relative">
+              <MapPin className="absolute left-3 top-3 text-gray-400" />
+              <textarea
+                name="adresse"
+                rows={2}
+                required
+                defaultValue={editingClient?.adresse || ''}
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                placeholder="Adresse complète"
+              />
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Contact principal</label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <input
+                  name="contactPrincipal"
+                  type="text"
+                  required
+                  defaultValue={editingClient?.contactPrincipal || ''}
+                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  placeholder="Nom du contact principal"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">SIRET (si entreprise)</label>
+              <div className="relative">
+                <Building className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <input
+                  name="siret"
+                  type="text"
+                  defaultValue={editingClient?.siret || ''}
+                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  placeholder="Numéro SIRET (14 chiffres)"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-5">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+            <MessageSquare className="w-5 h-5 mr-2" />
+            Notes et informations complémentaires
+          </h3>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+            <textarea
+              name="notes"
+              rows={3}
+              defaultValue={editingClient?.notes || ''}
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-colors"
+              placeholder="Informations complémentaires, préférences, historique..."
+            />
+          </div>
         </div>
       </div>
       
@@ -265,7 +347,7 @@ export const Clients: React.FC = () => {
       </div>
     </form>
   );
-
+  
   const ClientDetailModal = () => {
     if (!selectedClient) return null;
 
@@ -273,53 +355,117 @@ export const Clients: React.FC = () => {
     const invoices = getClientInvoices(selectedClient.id);
     const clientCommunications = getClientCommunications(selectedClient.id);
 
+    // Calculate total invoiced amount and paid amount
+    const totalInvoiced = invoices.reduce((sum, invoice) => sum + invoice.montantTTC, 0);
+    const totalPaid = invoices.filter(invoice => invoice.statut === 'payee').reduce((sum, invoice) => sum + invoice.montantTTC, 0);
+    const paymentRate = totalInvoiced > 0 ? (totalPaid / totalInvoiced) * 100 : 0;
+
     return (
       <div className="space-y-6">
-        {/* Informations générales */}
-        <div className="bg-gray-50 p-4 rounded-lg">
-          <h3 className="text-lg font-semibold text-gray-800 mb-3">Informations générales</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Header */}
+        <div className={`bg-gradient-to-r ${
+          selectedClient.type === 'entreprise' 
+            ? 'from-purple-500 to-purple-600' 
+            : 'from-blue-500 to-blue-600'
+        } text-white rounded-lg p-6`}>
+          <div className="flex justify-between items-start">
             <div>
-              <p className="text-sm text-gray-600">Type</p>
-              <p className="font-medium">{selectedClient.type === 'particulier' ? 'Particulier' : 'Entreprise'}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Contact principal</p>
-              <p className="font-medium">{selectedClient.contactPrincipal}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Email</p>
-              <p className="font-medium">{selectedClient.email}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Téléphone</p>
-              <p className="font-medium">{selectedClient.telephone}</p>
-            </div>
-            <div className="md:col-span-2">
-              <p className="text-sm text-gray-600">Adresse</p>
-              <p className="font-medium">{selectedClient.adresse}</p>
-            </div>
-            {selectedClient.siret && (
-              <div>
-                <p className="text-sm text-gray-600">SIRET</p>
-                <p className="font-medium">{selectedClient.siret}</p>
+              <h2 className="text-2xl font-bold">{selectedClient.nom}</h2>
+              <p className="mt-1 text-blue-100">{selectedClient.contactPrincipal}</p>
+              <div className="mt-3 flex items-center">
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                  selectedClient.type === 'entreprise' 
+                    ? 'bg-purple-100 text-purple-800' 
+                    : 'bg-blue-100 text-blue-800'
+                }`}>
+                  {selectedClient.type === 'entreprise' ? 'Entreprise' : 'Particulier'}
+                </span>
+                <span className="ml-3 text-sm bg-white/20 px-2 py-1 rounded">
+                  {projects.length} projet{projects.length !== 1 ? 's' : ''}
+                </span>
               </div>
+            </div>
+            <div className="text-right">
+              {invoices.length > 0 && (
+                <>
+                  <div className="text-3xl font-bold">{totalInvoiced.toLocaleString()} €</div>
+                  <div className="text-sm text-blue-100">Total facturé</div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Informations générales */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-white border rounded-lg p-4">
+            <h3 className="font-medium text-gray-700 mb-3 flex items-center">
+              <User className="w-5 h-5 mr-2 text-blue-500" />
+              Coordonnées
+            </h3>
+            <div className="space-y-3">
+              <div className="flex items-center">
+                <Mail className="w-4 h-4 text-gray-400 mr-2" />
+                <span className="text-gray-800">{selectedClient.email}</span>
+              </div>
+              <div className="flex items-center">
+                <Phone className="w-4 h-4 text-gray-400 mr-2" />
+                <span className="text-gray-800">{selectedClient.telephone}</span>
+              </div>
+              <div className="flex items-start">
+                <MapPin className="w-4 h-4 text-gray-400 mr-2 mt-1" />
+                <span className="text-gray-800">{selectedClient.adresse}</span>
+              </div>
+              {selectedClient.siret && (
+                <div className="flex items-center">
+                  <Building className="w-4 h-4 text-gray-400 mr-2" />
+                  <span className="text-gray-800">SIRET: {selectedClient.siret}</span>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          <div className="bg-white border rounded-lg p-4">
+            <h3 className="font-medium text-gray-700 mb-3 flex items-center">
+              <FileText className="w-5 h-5 mr-2 text-purple-500" />
+              Facturation
+            </h3>
+            {invoices.length > 0 ? (
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">Total facturé:</span>
+                  <span className="font-medium text-gray-900">{totalInvoiced.toLocaleString()} €</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">Montant payé:</span>
+                  <span className="font-medium text-green-600">{totalPaid.toLocaleString()} €</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">Taux de paiement:</span>
+                  <span className="font-medium">{paymentRate.toFixed(1)}%</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2.5 mt-2">
+                  <div 
+                    className="h-2.5 rounded-full bg-green-500"
+                    style={{ width: `${paymentRate}%` }}
+                  ></div>
+                </div>
+              </div>
+            ) : (
+              <p className="text-gray-500">Aucune facture pour ce client</p>
             )}
           </div>
-          {selectedClient.notes && (
-            <div className="mt-4">
-              <p className="text-sm text-gray-600">Notes</p>
-              <p className="font-medium">{selectedClient.notes}</p>
-            </div>
-          )}
         </div>
 
         {/* Projets */}
-        <div>
-          <h3 className="text-lg font-semibold text-gray-800 mb-3">Projets ({projects.length})</h3>
+        <div className="bg-white border rounded-lg p-4">
+          <h3 className="font-medium text-gray-700 mb-3 flex items-center">
+            <Building2 className="w-5 h-5 mr-2 text-blue-500" />
+            Projets ({projects.length})
+          </h3>
           <div className="space-y-3">
             {projects.map(project => (
-              <div key={project.id} className="border rounded-lg p-4">
+              <div key={project.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
                 <div className="flex justify-between items-start">
                   <div>
                     <h4 className="font-medium text-gray-900">{project.nom}</h4>
@@ -334,6 +480,16 @@ export const Clients: React.FC = () => {
                     <p className="text-sm font-medium text-gray-900 mt-1">
                       {project.budget.toLocaleString()} €
                     </p>
+                    <div className="w-24 bg-gray-200 rounded-full h-1.5 mt-1 ml-auto">
+                      <div 
+                        className={`h-1.5 rounded-full ${
+                          project.avancement < 30 ? 'bg-red-500' :
+                          project.avancement < 70 ? 'bg-yellow-500' :
+                          'bg-green-500'
+                        }`}
+                        style={{ width: `${project.avancement}%` }}
+                      ></div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -345,11 +501,14 @@ export const Clients: React.FC = () => {
         </div>
 
         {/* Factures */}
-        <div>
-          <h3 className="text-lg font-semibold text-gray-800 mb-3">Factures ({invoices.length})</h3>
+        <div className="bg-white border rounded-lg p-4">
+          <h3 className="font-medium text-gray-700 mb-3 flex items-center">
+            <CreditCard className="w-5 h-5 mr-2 text-green-500" />
+            Factures ({invoices.length})
+          </h3>
           <div className="space-y-3">
             {invoices.map(invoice => (
-              <div key={invoice.id} className="border rounded-lg p-4">
+              <div key={invoice.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
                 <div className="flex justify-between items-center">
                   <div>
                     <h4 className="font-medium text-gray-900">{invoice.numero}</h4>
@@ -376,13 +535,14 @@ export const Clients: React.FC = () => {
         </div>
 
         {/* Historique des communications */}
-        <div>
-          <h3 className="text-lg font-semibold text-gray-800 mb-3">
+        <div className="bg-white border rounded-lg p-4">
+          <h3 className="font-medium text-gray-700 mb-3 flex items-center">
+            <MessageSquare className="w-5 h-5 mr-2 text-indigo-500" />
             Historique des communications ({clientCommunications.length})
           </h3>
           <div className="space-y-3">
             {clientCommunications.map(comm => (
-              <div key={comm.id} className="border rounded-lg p-4">
+              <div key={comm.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
                 <div className="flex items-start space-x-3">
                   <div className={`p-2 rounded-full ${
                     comm.type === 'email' ? 'bg-blue-100 text-blue-600' :
@@ -411,6 +571,22 @@ export const Clients: React.FC = () => {
               <p className="text-gray-500 text-center py-4">Aucune communication enregistrée</p>
             )}
           </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex justify-end space-x-3">
+          <Button variant="secondary" onClick={() => handleCommunication(selectedClient)}>
+            <MessageSquare className="w-4 h-4 mr-2" />
+            Communiquer
+          </Button>
+          <Button variant="secondary" onClick={() => handleEdit(selectedClient)}>
+            <Edit className="w-4 h-4 mr-2" />
+            Modifier
+          </Button>
+          <Button variant="danger" onClick={() => handleDelete(selectedClient.id)}>
+            <Trash2 className="w-4 h-4 mr-2" />
+            Supprimer
+          </Button>
         </div>
       </div>
     );
@@ -483,6 +659,60 @@ export const Clients: React.FC = () => {
         </div>
       </div>
 
+      {/* Statistiques */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="bg-white rounded-lg shadow-sm border p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Total Clients</p>
+              <p className="text-2xl font-bold text-blue-600">{stats.total}</p>
+            </div>
+            <div className="p-3 rounded-full bg-blue-100">
+              <User className="w-6 h-6 text-blue-600" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-sm border p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Particuliers</p>
+              <p className="text-2xl font-bold text-green-600">{stats.particuliers}</p>
+              <p className="text-xs text-gray-500">sur {stats.total} total</p>
+            </div>
+            <div className="p-3 rounded-full bg-green-100">
+              <User className="w-6 h-6 text-green-600" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-sm border p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Entreprises</p>
+              <p className="text-2xl font-bold text-purple-600">{stats.entreprises}</p>
+              <p className="text-xs text-gray-500">sur {stats.total} total</p>
+            </div>
+            <div className="p-3 rounded-full bg-purple-100">
+              <Building className="w-6 h-6 text-purple-600" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-sm border p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Avec projets</p>
+              <p className="text-2xl font-bold text-orange-600">{stats.withProjects}</p>
+              <p className="text-xs text-gray-500">sur {stats.total} total</p>
+            </div>
+            <div className="p-3 rounded-full bg-orange-100">
+              <Building2 className="w-6 h-6 text-orange-600" />
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="bg-white rounded-lg shadow-sm border">
         {loading ? (
           <div className="text-center py-8">
@@ -496,7 +726,7 @@ export const Clients: React.FC = () => {
           </div>
         ) : (
           <>
-            <div className="p-4 border-b">
+            <div className="p-4 border-b space-y-4">
               <div className="flex flex-col sm:flex-row gap-4">
                 <div className="flex-1 relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -533,11 +763,27 @@ export const Clients: React.FC = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Contact
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Type
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                      onClick={() => toggleSort('type')}
+                    >
+                      <div className="flex items-center">
+                        <span>Type</span>
+                        {sortBy === 'type' && (
+                          <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </div>
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Projets
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                      onClick={() => toggleSort('projets')}
+                    >
+                      <div className="flex items-center">
+                        <span>Projets</span>
+                        {sortBy === 'projets' && (
+                          <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </div>
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Actions
@@ -562,7 +808,9 @@ export const Clients: React.FC = () => {
                               </div>
                             </div>
                             <div className="ml-4">
-                              <div className="text-sm font-medium text-gray-900">{client.nom}</div>
+                              <div className="text-sm font-medium text-gray-900 hover:text-blue-600 cursor-pointer" onClick={() => handleViewDetails(client)}>
+                                {client.nom}
+                              </div>
                               <div className="text-sm text-gray-500">{client.contactPrincipal}</div>
                             </div>
                           </div>
