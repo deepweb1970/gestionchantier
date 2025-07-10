@@ -9,6 +9,10 @@ export interface Chantier {
   statut: 'actif' | 'termine' | 'pause' | 'planifie';
   avancement: number;
   budget: number;
+  heuresOuvriersTotal?: number;
+  heuresMaterielTotal?: number;
+  coutMainOeuvre?: number;
+  coutMateriel?: number;
   photos: Photo[];
   coordinates?: {
     lat: number;
