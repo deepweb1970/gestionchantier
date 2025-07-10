@@ -195,6 +195,8 @@ export const Rapports: React.FC = () => {
     const tauxUtilisationMateriel = (materiel || []).length > 0 
       ? (materiel || []).reduce((sum, m) => sum + (m.utilizationRate || 0), 0) / (materiel || []).length 
       : 0;
+      ? (materiel || []).reduce((sum, m) => sum + (m.utilizationRate || 0), 0) / (materiel || []).length 
+      : 0;
 
     return {
       tauxOccupationOuvriers,

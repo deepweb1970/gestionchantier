@@ -257,8 +257,8 @@ export const Dashboard: React.FC = () => {
             <div className="text-center">
               <div className="text-2xl font-bold text-orange-600">94%</div>
               <div className="text-sm text-gray-600">Matériel utilisé</div>
-              <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
-                <div className="bg-orange-600 h-2 rounded-full" style={{ width: '94%' }}></div>
+              <div className="w-full bg-gray-200 rounded-full h-2 mt-2"> 
+                <div className="bg-orange-600 h-2 rounded-full" style={{ width: `${avgMaterielUtilization}%` }}></div>
               </div>
             </div>
             <div className="text-center">
