@@ -3,6 +3,13 @@ import {
   Wifi, 
   WifiOff, 
   Database, 
+  RefreshCw,
+  CheckCircle,
+  AlertTriangle
+} from 'lucide-react';
+  Wifi, 
+  WifiOff, 
+  Database, 
   RefreshCw 
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -15,6 +22,7 @@ export const RealtimeStatus: React.FC<RealtimeStatusProps> = ({ className = '' }
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isConnected, setIsConnected] = useState(true);
   const [lastSynced, setLastSynced] = useState<Date>(new Date());
+  const [syncStatus, setSyncStatus] = useState<'success' | 'error' | 'syncing' | 'idle'>('idle');
   const [showDetails, setShowDetails] = useState(false);
 
   // Gestion du statut en ligne/hors ligne
@@ -34,14 +42,23 @@ export const RealtimeStatus: React.FC<RealtimeStatusProps> = ({ className = '' }
   // Vérification de la connexion à Supabase
   useEffect(() => {
     const checkConnection = async () => {
+      if (!isOnline) {
+        setIsConnected(false);
+        return;
+      }
+      
       try {
         const { error } = await supabase.from('clients').select('id').limit(1);
         setIsConnected(!error);
         if (!error) {
           setLastSynced(new Date());
+          setSyncStatus('success');
+        } else {
+          setSyncStatus('error');
         }
       } catch (err) {
         setIsConnected(false);
+        setSyncStatus('error');
       }
     };
 
@@ -83,18 +100,40 @@ export const RealtimeStatus: React.FC<RealtimeStatusProps> = ({ className = '' }
   const handleManualSync = async () => {
     try {
       setIsConnected(false); // Afficher l'état de synchronisation
-      setLastSynced(new Date()); // Mettre à jour la date de dernière synchronisation
+      setSyncStatus('syncing');
       
       // Simuler une synchronisation en récupérant des données
       await supabase.from('clients').select('id').limit(1);
       await supabase.from('chantiers').select('id').limit(1);
       await supabase.from('ouvriers').select('id').limit(1);
+      await supabase.from('materiel').select('id').limit(1);
+      await supabase.from('factures').select('id').limit(1);
       
       setIsConnected(true);
-      console.log('Synchronisation réussie à', new Date().toLocaleTimeString());
+      setLastSynced(new Date());
+      setSyncStatus('success');
+      
+      // Broadcast a refresh event to all components
+      const channel = supabase.channel('custom-all-channel');
+      channel.subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          channel.send({
+            type: 'broadcast',
+            event: 'form_refresh',
+            payload: { message: 'Manual refresh triggered' },
+          });
+        }
+      });
+      
+      // Clean up the channel after sending
+      setTimeout(() => {
+        supabase.removeChannel(channel);
+      }, 1000);
+      
     } catch (err) {
       setIsConnected(false);
-      console.error('Erreur de synchronisation:', err);
+      setSyncStatus('error');
+      console.error('Erreur lors de la synchronisation:', error);
     }
   };
 
@@ -103,30 +142,40 @@ export const RealtimeStatus: React.FC<RealtimeStatusProps> = ({ className = '' }
       <div 
         className={`px-3 py-2 rounded-lg text-sm transition-all duration-300 cursor-pointer ${
           isOnline && isConnected
-            ? 'bg-green-100 text-green-800 border border-green-200' 
+            ? 'bg-green-100 text-green-800 border border-green-200 shadow-sm' 
             : !isOnline
-            ? 'bg-red-100 text-red-800 border border-red-200'
-            : 'bg-yellow-100 text-yellow-800 border border-yellow-200'
+            ? 'bg-red-100 text-red-800 border border-red-200 shadow-sm'
+            : 'bg-yellow-100 text-yellow-800 border border-yellow-200 shadow-sm'
         }`}
         onClick={() => setShowDetails(!showDetails)}
       >
         <div className="flex items-center space-x-2">
           {isOnline ? (
             isConnected ? (
-              <Wifi className="w-4 h-4 text-green-500" />
+              <CheckCircle className="w-4 h-4 text-green-500" />
             ) : (
               <RefreshCw className="w-4 h-4 text-yellow-500 animate-spin" />
             )
           ) : (
-            <WifiOff className="w-4 h-4 text-red-500" />
+            <AlertTriangle className="w-4 h-4 text-red-500" />
           )}
           <span>
             {isOnline 
               ? isConnected
-                ? `Synchronisé ${formatLastSynced()}`
+            className="w-full mt-2 px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 transition-colors flex items-center justify-center shadow-sm"
+            disabled={syncStatus === 'syncing'}
                 : 'Synchronisation...'
-              : 'Hors ligne'
-            }
+            {syncStatus === 'syncing' ? (
+              <>
+                <RefreshCw className="w-3 h-3 mr-2 animate-spin" />
+                Synchronisation...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="w-3 h-3 mr-2" />
+                Synchroniser maintenant
+              </>
+            )}
           </span>
         </div>
       </div>
@@ -142,12 +191,23 @@ export const RealtimeStatus: React.FC<RealtimeStatusProps> = ({ className = '' }
               <span className="text-gray-600">Internet:</span>
               <span className={isOnline ? 'text-green-600' : 'text-red-600'}>
                 {isOnline ? 'Connecté' : 'Déconnecté'}
+                {isOnline && <Wifi className="w-3 h-3 ml-1 inline" />}
+                {!isOnline && <WifiOff className="w-3 h-3 ml-1 inline" />}
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Base de données:</span>
-              <span className={isConnected ? 'text-green-600' : 'text-yellow-600'}>
-                {isConnected ? 'Connecté' : 'Synchronisation...'}
+              <span className={
+                syncStatus === 'success' ? 'text-green-600' : 
+                syncStatus === 'error' ? 'text-red-600' : 
+                'text-yellow-600'
+              }>
+                {syncStatus === 'success' ? 'Connecté' : 
+                 syncStatus === 'error' ? 'Erreur' : 
+                 'Synchronisation...'}
+                {syncStatus === 'success' && <CheckCircle className="w-3 h-3 ml-1 inline" />}
+                {syncStatus === 'error' && <AlertTriangle className="w-3 h-3 ml-1 inline" />}
+                {syncStatus === 'syncing' && <RefreshCw className="w-3 h-3 ml-1 inline animate-spin" />}
               </span>
             </div>
             <div className="flex justify-between">
