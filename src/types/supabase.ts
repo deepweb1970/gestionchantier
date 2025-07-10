@@ -62,6 +62,10 @@ export interface Database {
           statut: 'actif' | 'termine' | 'pause' | 'planifie'
           avancement: number | null
           budget: number | null
+          heures_ouvriers_total: number | null
+          heures_materiel_total: number | null
+          cout_main_oeuvre: number | null
+          cout_materiel: number | null
           latitude: number | null
           longitude: number | null
           created_at: string | null
@@ -78,6 +82,10 @@ export interface Database {
           statut?: 'actif' | 'termine' | 'pause' | 'planifie'
           avancement?: number | null
           budget?: number | null
+          heures_ouvriers_total?: number | null
+          heures_materiel_total?: number | null
+          cout_main_oeuvre?: number | null
+          cout_materiel?: number | null
           latitude?: number | null
           longitude?: number | null
           created_at?: string | null
@@ -94,6 +102,10 @@ export interface Database {
           statut?: 'actif' | 'termine' | 'pause' | 'planifie'
           avancement?: number | null
           budget?: number | null
+          heures_ouvriers_total?: number | null
+          heures_materiel_total?: number | null
+          cout_main_oeuvre?: number | null
+          cout_materiel?: number | null
           latitude?: number | null
           longitude?: number | null
           created_at?: string | null

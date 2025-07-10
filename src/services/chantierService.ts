@@ -20,6 +20,10 @@ const toChantier = (row: ChantierRow, photos: Photo[] = []): Chantier => ({
   statut: row.statut,
   avancement: row.avancement || 0,
   budget: row.budget || 0,
+  heuresOuvriersTotal: row.heures_ouvriers_total || 0,
+  heuresMaterielTotal: row.heures_materiel_total || 0,
+  coutMainOeuvre: row.cout_main_oeuvre || 0,
+  coutMateriel: row.cout_materiel || 0,
   photos: photos,
   coordinates: row.latitude && row.longitude 
     ? { lat: row.latitude, lng: row.longitude } 
