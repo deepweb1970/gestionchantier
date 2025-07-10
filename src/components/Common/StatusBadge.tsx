@@ -47,6 +47,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, type = 'defaul
           case 'en_service': return { bg: 'bg-blue-100 border border-blue-200', text: 'text-blue-800', label: 'En service' };
           case 'maintenance': return { bg: 'bg-yellow-100 border border-yellow-200', text: 'text-yellow-800', label: 'Maintenance' };
           case 'hors_service': return { bg: 'bg-red-100 border border-red-200', text: 'text-red-800', label: 'Hors service' };
+        }
         return { bg: 'bg-gray-100 border border-gray-200', text: 'text-gray-800', label: status };
     }
   };
