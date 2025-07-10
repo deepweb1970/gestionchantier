@@ -128,7 +128,7 @@ export const factureService = {
     return facture;
   },
   
-  create: async (facture: Omit<Facture, 'id'>, items: Omit<FactureItem, 'id'>[]): Promise<Facture> => {
+  create: async (facture: Omit<Facture, 'id'>, items: Omit<FactureItem, 'id'>[] = []): Promise<Facture> => {
     // Créer la facture
     const { data: factureData, error: factureError } = await supabase
       .from('factures')
