@@ -83,6 +83,7 @@ export const RealtimeStatus: React.FC<RealtimeStatusProps> = ({ className = '' }
   const handleManualSync = async () => {
     try {
       setIsConnected(false); // Afficher l'état de synchronisation
+      setLastSynced(new Date()); // Mettre à jour la date de dernière synchronisation
       
       // Simuler une synchronisation en récupérant des données
       await supabase.from('clients').select('id').limit(1);
@@ -90,9 +91,10 @@ export const RealtimeStatus: React.FC<RealtimeStatusProps> = ({ className = '' }
       await supabase.from('ouvriers').select('id').limit(1);
       
       setIsConnected(true);
-      setLastSynced(new Date());
+      console.log('Synchronisation réussie à', new Date().toLocaleTimeString());
     } catch (err) {
       setIsConnected(false);
+      console.error('Erreur de synchronisation:', err);
     }
   };
 

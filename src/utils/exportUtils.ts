@@ -113,7 +113,7 @@ export const printData = (data: any[], title: string) => {
 };
 
 const generateTableHTML = (data: any[]): string => {
-  if (!data.length) return '<p>Aucune donnée à afficher</p>';
+  if (!data || !data.length) return '<p>Aucune donnée à afficher</p>';
 
   const headers = Object.keys(data[0]);
   
@@ -127,7 +127,21 @@ const generateTableHTML = (data: any[]): string => {
       <tbody>
         ${data.map(row => `
           <tr>
-            ${headers.map(header => `<td>${row[header] || ''}</td>`).join('')}
+            ${headers.map(header => {
+              const value = row[header];
+              // Format values appropriately
+              if (value === null || value === undefined) {
+                return '<td>-</td>';
+              } else if (typeof value === 'number') {
+                return `<td>${value.toLocaleString()}</td>`;
+              } else if (value instanceof Date) {
+                return `<td>${value.toLocaleString()}</td>`;
+              } else if (typeof value === 'boolean') {
+                return `<td>${value ? 'Oui' : 'Non'}</td>`;
+              } else {
+                return `<td>${value}</td>`;
+              }
+            }).join('')}
           </tr>
         `).join('')}
       </tbody>

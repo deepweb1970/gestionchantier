@@ -70,14 +70,24 @@ class ApiClient {
   }
 
   async put<T>(endpoint: string, data: any): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
+    try {
+      return await this.request<T>(endpoint, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
+    } catch (error) {
+      console.error(`PUT ${endpoint} failed:`, error);
+      throw error;
+    }
   }
 
   async delete<T>(endpoint: string): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint, { method: 'DELETE' });
+    try {
+      return await this.request<T>(endpoint, { method: 'DELETE' });
+    } catch (error) {
+      console.error(`DELETE ${endpoint} failed:`, error);
+      throw error;
+    }
   }
 
   // Méthodes spécifiques pour l'application

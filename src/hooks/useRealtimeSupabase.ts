@@ -6,6 +6,7 @@ type UseRealtimeSupabaseOptions<T> = {
   table: string;
   fetchFunction: () => Promise<T[]>;
   initialData?: T[];
+  refreshInterval?: number;
 };
 
 export function useRealtimeSupabase<T>({ 

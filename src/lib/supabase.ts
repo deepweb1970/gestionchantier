@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '../types/supabase';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Variables d\'environnement Supabase manquantes. Veuillez configurer VITE_SUPABASE_URL et VITE_SUPABASE_ANON_KEY dans votre fichier .env');
@@ -24,7 +24,7 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
 export const testConnection = async () => {
   try {
     const { data, error } = await supabase.from('clients').select('count').limit(1);
-    if (error) {
+    if (error || !data) {
       console.error('Erreur de connexion Supabase:', error);
       return false;
     }

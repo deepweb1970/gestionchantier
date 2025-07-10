@@ -84,17 +84,17 @@ export const PointageDigital: React.FC = () => {
   const handleStart = () => {
     // Validate form
     if (!pointage.chantierId) {
-      setError('Veuillez sélectionner un chantier');
+      setError('Veuillez sélectionner un chantier actif');
       return;
     }
     
     if (!pointage.ouvrierId) {
-      setError('Veuillez sélectionner un ouvrier');
+      setError('Veuillez sélectionner un ouvrier disponible');
       return;
     }
     
     if (!pointage.description) {
-      setError('Veuillez entrer une description des travaux');
+      setError('Veuillez entrer une description détaillée des travaux');
       return;
     }
     
@@ -126,14 +126,14 @@ export const PointageDigital: React.FC = () => {
     try {
       // Create saisie heure record
       const saisieData = {
-        ouvrierId: pointage.ouvrierId,
-        chantierId: pointage.chantierId,
+        ouvrierId: pointage.ouvrierId.trim(),
+        chantierId: pointage.chantierId.trim(),
         materielId: pointage.materielId || undefined,
         date: startTime.toISOString().split('T')[0], // YYYY-MM-DD
         heureDebut: formattedStartTime,
         heureFin: formattedEndTime,
         heuresTotal: parseFloat(elapsedHours.toFixed(2)),
-        description: pointage.description,
+        description: pointage.description.trim(),
         valide: false
       };
       

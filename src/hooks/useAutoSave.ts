@@ -5,6 +5,7 @@ interface UseAutoSaveOptions {
   onSave: (data: any) => Promise<void> | void;
   delay?: number;
   enabled?: boolean;
+  compareFunction?: (data: any) => string;
 }
 
 export const useAutoSave = ({ 
