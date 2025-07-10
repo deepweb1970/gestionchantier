@@ -18,6 +18,23 @@ import { materielService } from '../../services/materielService';
 import { factureService } from '../../services/factureService';
 
 export const Dashboard: React.FC = () => {
+  // État de connexion
+  const [isOnline, setIsOnline] = React.useState(navigator.onLine);
+
+  // Gestion du statut en ligne/hors ligne
+  React.useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
   // Récupérer les données en temps réel
   const { data: clients, loading: clientsLoading } = useRealtimeSupabase({
     table: 'clients',
@@ -52,15 +69,6 @@ export const Dashboard: React.FC = () => {
   // Calculer les statistiques en temps réel
   const chantiersActifs = (chantiers || []).filter(c => c.statut === 'actif').length;
   const ouvriersDisponibles = (ouvriers || []).filter(o => o.statut === 'actif').length;
-  
-  // Calculer les statistiques des statuts de chantiers
-  const statusCounts = {
-    actif: (chantiers || []).filter(c => c.statut === 'actif').length,
-    planifie: (chantiers || []).filter(c => c.statut === 'planifie').length,
-    termine: (chantiers || []).filter(c => c.statut === 'termine').length,
-    pause: (chantiers || []).filter(c => c.statut === 'pause').length
-  };
-  
   const materielDisponible = (materiel || []).filter(m => m.statut === 'disponible').length;
   const materielEnService = (materiel || []).filter(m => m.statut === 'en_service').length;
   const totalHeuresTravaillees = (saisiesHeures || []).reduce((sum, s) => 
