@@ -14,7 +14,6 @@ export function useRealtimeSupabase<T>({
   fetchFunction,
   initialData = [],
   refreshInterval = 0
-  refreshInterval = 0
 }: UseRealtimeSupabaseOptions<T>) {
   const [data, setData] = useState<T[]>(initialData);
   const [loading, setLoading] = useState(true);
