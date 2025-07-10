@@ -192,11 +192,7 @@ export const Rapports: React.FC = () => {
     const tauxOccupationOuvriers = (stats.ouvriers.actifs / stats.ouvriers.total) * 100;
     const tauxValidationHeures = stats.heures.total > 0 ? (stats.heures.validees / stats.heures.total) * 100 : 0;
     const tauxPaiementFactures = stats.finances.total > 0 ? (stats.finances.payees / stats.finances.total) * 100 : 0;
-    const tauxUtilisationMateriel = (materiel || []).length > 0 
-      ? (materiel || []).reduce((sum, m) => sum + (m.utilizationRate || 0), 0) / (materiel || []).length 
-      : 0;
-      ? (materiel || []).reduce((sum, m) => sum + (m.utilizationRate || 0), 0) / (materiel || []).length 
-      : 0;
+    const tauxUtilisationMateriel = 0; // Placeholder for material utilization rate
 
     return {
       tauxOccupationOuvriers,

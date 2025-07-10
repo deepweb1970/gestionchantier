@@ -1,5 +1,3 @@
-Here's the fixed version with the missing closing brackets and added required whitespace:
-
 import React, { useState } from 'react';
 import { Plus, Edit, Trash2, Wrench, Calendar, Download, Euro, Clock, TrendingUp, Calculator } from 'lucide-react';
 import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
