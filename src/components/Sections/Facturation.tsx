@@ -20,13 +20,26 @@ import {
 import { mockFactures, mockClients, mockChantiers } from '../../data/mockData';
 import { Facture, Client, Chantier, FactureItem } from '../../types';
 import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
+import { clientService } from '../../services/clientService';
+import { chantierService } from '../../services/chantierService';
+import { factureService } from '../../services/factureService';
 import { Modal } from '../Common/Modal';
 import { Button } from '../Common/Button';
 import { StatusBadge } from '../Common/StatusBadge';
 
 export const Facturation: React.FC = () => {
-  const { clients, chantiers } = useRealtimeSupabase();
-  const [factures, setFactures] = useState<Facture[]>(mockFactures);
+  const { data: clients } = useRealtimeSupabase({
+    table: 'clients',
+    fetchFunction: clientService.getAll
+  });
+  const { data: chantiers } = useRealtimeSupabase({
+    table: 'chantiers',
+    fetchFunction: chantierService.getAll
+  });
+  const { data: factures, setData: setFactures } = useRealtimeSupabase({
+    table: 'factures',
+    fetchFunction: factureService.getAll
+  });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -38,9 +51,9 @@ export const Facturation: React.FC = () => {
   const [items, setItems] = useState<FactureItem[]>([]);
   const [tauxTVA, setTauxTVA] = useState(20);
 
-  const filteredFactures = factures.filter(facture => {
+  const filteredFactures = (factures || []).filter(facture => {
     const matchesSearch = facture.numero.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         mockClients.find(c => c.id === facture.clientId)?.nom.toLowerCase().includes(searchTerm.toLowerCase());
+                         (clients || []).find(c => c.id === facture.clientId)?.nom.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || facture.statut === statusFilter;
     
     let matchesDate = true;
@@ -66,11 +79,11 @@ export const Facturation: React.FC = () => {
   });
 
   const getClient = (clientId: string): Client | undefined => {
-    return mockClients.find(c => c.id === clientId);
+    return (clients || []).find(c => c.id === clientId);
   };
 
   const getChantier = (chantierId: string): Chantier | undefined => {
-    return mockChantiers.find(c => c.id === chantierId);
+    return (chantiers || []).find(c => c.id === chantierId);
   };
 
   const calculateTotals = () => {
@@ -110,7 +123,7 @@ export const Facturation: React.FC = () => {
 
   const generateFactureNumber = () => {
     const year = new Date().getFullYear();
-    const count = factures.length + 1;
+    const count = (factures || []).length + 1;
     return `FAC-${year}-${count.toString().padStart(3, '0')}`;
   };
 
@@ -164,7 +177,7 @@ export const Facturation: React.FC = () => {
 
   const handleDelete = (id: string) => {
     if (confirm('Êtes-vous sûr de vouloir supprimer cette facture ?')) {
-      setFactures(factures.filter(f => f.id !== id));
+      setFactures((factures || []).filter(f => f.id !== id));
     }
   };
 
@@ -189,9 +202,9 @@ export const Facturation: React.FC = () => {
     };
 
     if (editingFacture?.id) {
-      setFactures(factures.map(f => f.id === editingFacture.id ? factureData : f));
+      setFactures((factures || []).map(f => f.id === editingFacture.id ? factureData : f));
     } else {
-      setFactures([...factures, factureData]);
+      setFactures([...(factures || []), factureData]);
     }
     
     setIsModalOpen(false);
@@ -200,14 +213,14 @@ export const Facturation: React.FC = () => {
     
     // Force refresh of the UI
     setTimeout(() => {
-      setFactures([...factures]);
+      setFactures([...(factures || [])]);
     }, 100);
   };
 
   const markAsPaid = () => {
     if (!selectedFacture) return;
     
-    setFactures(factures.map(f => 
+    setFactures((factures || []).map(f => 
       f.id === selectedFacture.id 
         ? { ...f, statut: 'payee' as Facture['statut'] }
         : f
@@ -217,19 +230,19 @@ export const Facturation: React.FC = () => {
     
     // Force refresh of the UI
     setTimeout(() => {
-      setFactures([...factures]);
+      setFactures([...(factures || [])]);
     }, 100);
   };
 
   const getOverdueInvoices = () => {
     const today = new Date();
-    return factures.filter(f => new Date(f.dateEcheance) < today && f.statut !== 'payee');
+    return (factures || []).filter(f => new Date(f.dateEcheance) < today && f.statut !== 'payee');
   };
 
   const getTotalStats = () => {
-    const total = factures.reduce((sum, f) => sum + f.montantTTC, 0);
-    const paid = factures.filter(f => f.statut === 'payee').reduce((sum, f) => sum + f.montantTTC, 0);
-    const pending = factures.filter(f => f.statut === 'envoyee').reduce((sum, f) => sum + f.montantTTC, 0);
+    const total = (factures || []).reduce((sum, f) => sum + f.montantTTC, 0);
+    const paid = (factures || []).filter(f => f.statut === 'payee').reduce((sum, f) => sum + f.montantTTC, 0);
+    const pending = (factures || []).filter(f => f.statut === 'envoyee').reduce((sum, f) => sum + f.montantTTC, 0);
     const overdue = getOverdueInvoices().reduce((sum, f) => sum + f.montantTTC, 0);
     
     return { total, paid, pending, overdue };
@@ -283,7 +296,7 @@ export const Facturation: React.FC = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Sélectionner un client</option>
-                  {clients?.map(client => (
+                  {(clients || []).map(client => (
                     <option key={client.id} value={client.id}>
                       {client.nom} ({client.type === 'particulier' ? 'Particulier' : 'Entreprise'})
                     </option>
@@ -300,7 +313,7 @@ export const Facturation: React.FC = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Aucun chantier</option>
-                  {chantiers?.filter(c => c.statut !== 'termine').map(chantier => (
+                  {(chantiers || []).filter(c => c.statut !== 'termine').map(chantier => (
                     <option key={chantier.id} value={chantier.id}>
                       {chantier.nom} ({chantier.statut})
                     </option>
@@ -656,7 +669,7 @@ export const Facturation: React.FC = () => {
       <div className="bg-white rounded-lg shadow-sm border p-4">
         <h3 className="text-lg font-semibold text-gray-800 mb-3">Création rapide depuis un chantier</h3>
         <div className="flex flex-wrap gap-2">
-          {chantiers?.filter(c => c.statut !== 'termine').map(chantier => (
+          {(chantiers || []).filter(c => c.statut !== 'termine').map(chantier => (
             <button
               key={chantier.id}
               onClick={() => createFromChantier(chantier.id)}
@@ -665,7 +678,7 @@ export const Facturation: React.FC = () => {
               <Calculator className="w-4 h-4 inline mr-1" />
               {chantier.nom}
             </button>
-          )) || []}
+          ))}
         </div>
       </div>
 
