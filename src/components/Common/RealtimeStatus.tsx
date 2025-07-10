@@ -7,11 +7,6 @@ import {
   CheckCircle,
   AlertTriangle
 } from 'lucide-react';
-  Wifi, 
-  WifiOff, 
-  Database, 
-  RefreshCw 
-} from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface RealtimeStatusProps {
@@ -133,7 +128,7 @@ export const RealtimeStatus: React.FC<RealtimeStatusProps> = ({ className = '' }
     } catch (err) {
       setIsConnected(false);
       setSyncStatus('error');
-      console.error('Erreur lors de la synchronisation:', error);
+      console.error('Erreur lors de la synchronisation:', err);
     }
   };
 
@@ -162,20 +157,9 @@ export const RealtimeStatus: React.FC<RealtimeStatusProps> = ({ className = '' }
           <span>
             {isOnline 
               ? isConnected
-            className="w-full mt-2 px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 transition-colors flex items-center justify-center shadow-sm"
-            disabled={syncStatus === 'syncing'}
+                ? 'Connecté'
                 : 'Synchronisation...'
-            {syncStatus === 'syncing' ? (
-              <>
-                <RefreshCw className="w-3 h-3 mr-2 animate-spin" />
-                Synchronisation...
-              </>
-            ) : (
-              <>
-                <RefreshCw className="w-3 h-3 mr-2" />
-                Synchroniser maintenant
-              </>
-            )}
+              : 'Hors ligne'}
           </span>
         </div>
       </div>
@@ -220,9 +204,19 @@ export const RealtimeStatus: React.FC<RealtimeStatusProps> = ({ className = '' }
                 handleManualSync();
               }}
               className="w-full mt-2 px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 transition-colors flex items-center justify-center"
+              disabled={syncStatus === 'syncing'}
             >
-              <RefreshCw className="w-3 h-3 mr-2" />
-              Synchroniser maintenant
+              {syncStatus === 'syncing' ? (
+                <>
+                  <RefreshCw className="w-3 h-3 mr-2 animate-spin" />
+                  Synchronisation...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-3 h-3 mr-2" />
+                  Synchroniser maintenant
+                </>
+              )}
             </button>
           </div>
         </div>
