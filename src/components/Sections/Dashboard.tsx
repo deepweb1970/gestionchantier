@@ -43,10 +43,15 @@ export const Dashboard: React.FC = () => {
   // Calculer les statistiques en temps réel
   const chantiersActifs = (chantiers || []).filter(c => c.statut === 'actif').length;
   const ouvriersDisponibles = (ouvriers || []).filter(o => o.statut === 'actif').length;
-  const materielEnService = (materiel || []).filter(m => m.statut === 'en_service').length;
+  const materielEnService = (materiel || []).filter(m => m.statut === 'en_service' || m.statut === 'disponible').length;
   const totalHeuresTravaillees = (saisiesHeures || []).reduce((sum, s) => 
     sum + s.heuresNormales + s.heuresSupplementaires + (s.heuresExceptionnelles || 0), 0);
   const facturesEnAttente = (factures || []).filter(f => f.statut === 'envoyee').length;
+  
+  // Calculer le taux d'utilisation moyen du matériel
+  const avgMaterielUtilization = (materiel || []).length > 0 
+    ? (materiel || []).reduce((sum, m) => sum + (m.utilizationRate || 0), 0) / (materiel || []).length 
+    : 0;
 
   const stats = [
     {

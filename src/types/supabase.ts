@@ -161,6 +161,8 @@ export interface Database {
           prochaine_maintenance: string | null
           localisation: string | null
           tarif_horaire: number | null
+          usage_hours: number | null
+          utilization_rate: number | null
           created_at: string | null
           updated_at: string | null
         }
@@ -177,6 +179,8 @@ export interface Database {
           prochaine_maintenance?: string | null
           localisation?: string | null
           tarif_horaire?: number | null
+          usage_hours?: number | null
+          utilization_rate?: number | null
           created_at?: string | null
           updated_at?: string | null
         }
@@ -193,6 +197,8 @@ export interface Database {
           prochaine_maintenance?: string | null
           localisation?: string | null
           tarif_horaire?: number | null
+          usage_hours?: number | null
+          utilization_rate?: number | null
           created_at?: string | null
           updated_at?: string | null
         }

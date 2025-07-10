@@ -37,9 +37,8 @@ export const MaterielSection: React.FC = () => {
 
   // Fonction pour calculer les heures d'utilisation d'un matériel
   const getMaterielUsageHours = (materielId: string) => {
-    if (!saisiesHeures) return 0;
-    const saisiesMateriel = saisiesHeures.filter(saisie => saisie.materiel_id === materielId);
-    return saisiesMateriel.reduce((sum, saisie) => sum + (saisie.heures_total || 0), 0);
+    const materielItem = materiel?.find(m => m.id === materielId);
+    return materielItem?.usageHours || 0;
   };
 
   // Fonction pour calculer le revenu généré par un matériel
@@ -50,11 +49,8 @@ export const MaterielSection: React.FC = () => {
 
   // Fonction pour calculer le taux d'utilisation
   const getMaterielUtilizationRate = (materielId: string) => {
-    const usageHours = getMaterielUsageHours(materielId);
-    const totalDays = 30; // Période de 30 jours
-    const maxHoursPerDay = 8;
-    const maxPossibleHours = totalDays * maxHoursPerDay;
-    return maxPossibleHours > 0 ? (usageHours / maxPossibleHours) * 100 : 0;
+    const materielItem = materiel?.find(m => m.id === materielId);
+    return materielItem?.utilizationRate || 0;
   };
 
   const handleEdit = async (item: Materiel) => {

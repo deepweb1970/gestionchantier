@@ -19,7 +19,9 @@ const toMateriel = (row: MaterielRow): Materiel => ({
   statut: row.statut,
   prochaineMaintenance: row.prochaine_maintenance || undefined,
   localisation: row.localisation || undefined,
-  tarifHoraire: row.tarif_horaire || undefined
+  tarifHoraire: row.tarif_horaire || undefined,
+  usageHours: row.usage_hours || 0,
+  utilizationRate: row.utilization_rate || 0
 });
 
 // Convertir le format de l'application vers le format de la base de données
