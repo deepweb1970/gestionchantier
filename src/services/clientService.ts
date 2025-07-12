@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase';
 import type { Client } from '../types';
 import type { Database } from '../types/supabase';
+import { chantierService } from './chantierService';
 
 type ClientRow = Database['public']['Tables']['clients']['Row'];
 type ClientInsert = Database['public']['Tables']['clients']['Insert'];
@@ -17,7 +18,7 @@ const toClient = (row: ClientRow): Client => ({
   siret: row.siret || undefined,
   contactPrincipal: row.contact_principal,
   notes: row.notes || '',
-  projets: [] // À remplir séparément si nécessaire
+  projets: [] // Sera rempli par getAll ou getById
 });
 
 // Convertir le format de l'application vers le format de la base de données
@@ -51,7 +52,10 @@ export const clientService = {
   getAll: async (): Promise<Client[]> => {
     const { data, error } = await supabase
       .from('clients')
-      .select('*')
+      .select(`
+        *,
+        chantiers(id)
+      `)
       .order('nom');
     
     if (error) {
@@ -59,13 +63,23 @@ export const clientService = {
       throw error;
     }
     
-    return (data || []).map(toClient);
+    return (data || []).map(row => {
+      const client = toClient(row);
+      // Ajouter les IDs des projets
+      if (row.chantiers) {
+        client.projets = (row.chantiers as any[]).map(c => c.id);
+      }
+      return client;
+    });
   },
   
   getById: async (id: string): Promise<Client | null> => {
     const { data, error } = await supabase
       .from('clients')
-      .select('*')
+      .select(`
+        *,
+        chantiers(id, nom)
+      `)
       .eq('id', id)
       .single();
     
@@ -77,7 +91,15 @@ export const clientService = {
       throw error;
     }
     
-    return data ? toClient(data) : null;
+    if (!data) return null;
+    
+    const client = toClient(data);
+    // Ajouter les IDs des projets
+    if (data.chantiers) {
+      client.projets = (data.chantiers as any[]).map(c => c.id);
+    }
+    
+    return client;
   },
   
   create: async (client: Omit<Client, 'id' | 'projets'>): Promise<Client> => {
@@ -121,5 +143,20 @@ export const clientService = {
       console.error(`Erreur lors de la suppression du client ${id}:`, error);
       throw error;
     }
+  },
+  
+  // Méthode pour obtenir les projets d'un client
+  getClientProjects: async (clientId: string): Promise<any[]> => {
+    const { data, error } = await supabase
+      .from('chantiers')
+      .select('*')
+      .eq('client_id', clientId);
+    
+    if (error) {
+      console.error(`Erreur lors de la récupération des projets du client ${clientId}:`, error);
+      throw error;
+    }
+    
+    return data || [];
   }
 };
