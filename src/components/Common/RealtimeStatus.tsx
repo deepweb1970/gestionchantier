@@ -16,7 +16,7 @@ interface RealtimeStatusProps {
 export const RealtimeStatus: React.FC<RealtimeStatusProps> = ({ className = '' }) => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isConnected, setIsConnected] = useState(true);
-  const [lastSynced, setLastSynced] = useState<Date>(new Date());
+  const [lastSynced, setLastSynced] = useState<Date | null>(null);
   const [syncStatus, setSyncStatus] = useState<'success' | 'error' | 'syncing' | 'idle'>('idle');
   const [showDetails, setShowDetails] = useState(false);
 
@@ -50,7 +50,7 @@ export const RealtimeStatus: React.FC<RealtimeStatusProps> = ({ className = '' }
       try {
         const { data, error } = await supabase.from('clients').select('id').limit(1);
         setIsConnected(!error);
-        if (!error && data) {
+        if (!error) {
           setLastSynced(new Date());
           setSyncStatus('success');
         } else {
@@ -62,20 +62,15 @@ export const RealtimeStatus: React.FC<RealtimeStatusProps> = ({ className = '' }
       }
     };
 
-    // Vérifier la connexion toutes les 30 secondes
-    const interval = setInterval(() => {
-      if (isOnline) {
-        checkConnection();
-      }
-    }, 30000);
-
     // Vérifier immédiatement au chargement
     checkConnection();
 
-    return () => clearInterval(interval);
+    return () => {};
   }, [isOnline]);
 
   const formatLastSynced = () => {
+    if (!lastSynced) return 'Jamais';
+    
     const now = new Date();
     const diff = now.getTime() - lastSynced.getTime();
     const seconds = Math.floor(diff / 1000);
@@ -104,10 +99,6 @@ export const RealtimeStatus: React.FC<RealtimeStatusProps> = ({ className = '' }
       
       // Simuler une synchronisation en récupérant des données
       await supabase.from('clients').select('id').limit(1);
-      await supabase.from('chantiers').select('id').limit(1);
-      await supabase.from('ouvriers').select('id').limit(1);
-      await supabase.from('materiel').select('id').limit(1);
-      await supabase.from('factures').select('id').limit(1);
       
       setIsConnected(true);
       setLastSynced(new Date());

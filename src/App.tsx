@@ -22,7 +22,6 @@ function App() {
   const [activeSection, setActiveSection] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [lastSaved, setLastSaved] = useState<Date>(new Date());
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
@@ -41,19 +40,6 @@ function App() {
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
-
-  // Sauvegarde automatique simulée
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (isOnline) {
-        setLastSaved(new Date());
-        // Ici on sauvegarderait les données
-        console.log('Sauvegarde automatique effectuée');
-      }
-    }, 30000); // Toutes les 30 secondes
-
-    return () => clearInterval(interval);
-  }, [isOnline]);
 
   // Navigation programmatique
   const handleNavigate = (section: string, id?: string) => {

@@ -53,20 +53,7 @@ export const BackupSystem: React.FC<BackupSystemProps> = ({ isOpen, onClose }) =
   const [autoBackupEnabled, setAutoBackupEnabled] = useState(true);
   const [backupFrequency, setBackupFrequency] = useState('daily');
   const [isCreatingBackup, setIsCreatingBackup] = useState(false);
-  const [lastAutoSave, setLastAutoSave] = useState(new Date());
-
-  // Simulation de sauvegarde automatique
-  useEffect(() => {
-    if (!autoBackupEnabled) return;
-
-    const interval = setInterval(() => {
-      setLastAutoSave(new Date());
-      // Simulation de sauvegarde automatique des données
-      console.log('Sauvegarde automatique effectuée');
-    }, 30000); // Toutes les 30 secondes pour la démo
-
-    return () => clearInterval(interval);
-  }, [autoBackupEnabled]);
+  const [lastAutoSave, setLastAutoSave] = useState<Date | null>(null);
 
   const createManualBackup = async () => {
     setIsCreatingBackup(true);
@@ -154,7 +141,7 @@ export const BackupSystem: React.FC<BackupSystemProps> = ({ isOpen, onClose }) =
                 </div>
                 <div className="text-sm text-green-700">
                   <p>Dernière sauvegarde auto:</p>
-                  <p className="font-medium">{lastAutoSave.toLocaleString()}</p>
+                  <p className="font-medium">{lastAutoSave ? lastAutoSave.toLocaleString() : 'Aucune'}</p>
                 </div>
               </div>
 

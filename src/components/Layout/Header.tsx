@@ -4,8 +4,8 @@ import {
   Bell, 
   User, 
   Search, 
-  Database, 
-  History, 
+  Database,
+  History,
   Download, 
   Wifi, 
   WifiOff 
