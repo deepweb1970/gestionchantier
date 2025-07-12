@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   Building2, Image, Users, Wrench, UserCheck, FileText, Clock, BarChart3, 
-  Shield, Calendar, Menu, X, Settings, UserCog, LogOut, Bell, HelpCircle
+  Shield, Calendar, Menu, X, Settings, UserCog, LogOut, Bell, HelpCircle, Tool
 } from 'lucide-react';
 import { useAuth } from '../Auth/AuthProvider';
 
@@ -17,6 +17,7 @@ const menuItems = [
   { id: 'photos', label: 'Photos', icon: Image },
   { id: 'ouvriers', label: 'Ouvriers', icon: Users },
   { id: 'materiel', label: 'Matériel', icon: Wrench },
+  { id: 'maintenance', label: 'Maintenance', icon: Tool },
   { id: 'clients', label: 'Clients', icon: UserCheck },
   { id: 'facturation', label: 'Facturation', icon: FileText },
   { id: 'heures', label: 'Saisie Heures', icon: Clock },

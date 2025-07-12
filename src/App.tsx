@@ -16,6 +16,7 @@ import { Utilisateurs } from './components/Sections/Utilisateurs';
 import { RealtimeStatus } from './components/Common/RealtimeStatus';
 import { Planning } from './components/Sections/Planning';
 import { ParametresHeuresSup } from './components/Sections/ParametresHeuresSup';
+import { MaintenanceSection } from './components/Sections/Maintenance';
 
 function App() {
   const { user, loading } = useAuth();
@@ -106,6 +107,8 @@ function App() {
         return <Planning />;
       case 'parametres':
         return <ParametresHeuresSup />;
+      case 'maintenance':
+        return <MaintenanceSection />;
       default:
         return <Dashboard />;
     }

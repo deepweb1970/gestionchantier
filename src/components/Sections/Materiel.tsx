@@ -9,7 +9,8 @@ import {
   Euro, 
   Clock, 
   TrendingUp, 
-  Calculator, 
+  Calculator,
+  Tool,
   Search, 
   Filter, 
   Eye, 
@@ -73,6 +74,12 @@ export const MaterielSection: React.FC = () => {
     const materielItem = materiel?.find(m => m.id === materielId);
     return materielItem?.utilizationRate || 0;
   };
+  
+  // Fonction pour afficher les heures machine
+  const getMachineHours = (materielId: string) => {
+    const materielItem = materiel?.find(m => m.id === materielId);
+    return materielItem?.machineHours || 0;
+  };
 
   const handleEdit = (item: Materiel) => {
     setEditingMateriel(item);
@@ -106,6 +113,7 @@ export const MaterielSection: React.FC = () => {
       prochaineMaintenance: formData.get('prochaineMaintenance') as string || undefined,
       localisation: formData.get('localisation') as string || undefined,
       tarifHoraire: parseFloat(formData.get('tarifHoraire') as string) || undefined,
+      machineHours: parseFloat(formData.get('machineHours') as string) || 0,
     };
 
     try {
@@ -283,6 +291,29 @@ export const MaterielSection: React.FC = () => {
             </select>
             <p className="text-xs text-gray-500 mt-1">
               {chantiers?.length || 0} chantier(s) disponible(s)
+            </p>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Heures machine (h)
+              <span className="text-xs text-gray-500 block">Compteur d'heures du fabricant</span>
+            </label>
+            <div className="relative">
+              <input
+                name="machineHours"
+                type="number"
+                min="0"
+                step="0.1"
+                defaultValue={editingMateriel?.machineHours || 0}
+                className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <Clock className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Heures de fonctionnement selon le compteur du fabricant
             </p>
           </div>
         </div>
@@ -513,6 +544,10 @@ export const MaterielSection: React.FC = () => {
                             <div className="flex items-center text-sm">
                               <Clock className="w-4 h-4 mr-1 text-blue-500" />
                               <span className="font-medium text-gray-900">{usageHours.toFixed(1)}h</span>
+                            </div>
+                            <div className="flex items-center text-sm">
+                              <Tool className="w-4 h-4 mr-1 text-purple-500" />
+                              <span className="font-medium text-gray-900">{item.machineHours || 0}h machine</span>
                             </div>
                             <div className="text-xs text-gray-500">
                               {utilizationRate.toFixed(1)}% utilisation
