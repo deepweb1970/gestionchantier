@@ -171,6 +171,7 @@ export interface Database {
           valeur: number
           statut: 'disponible' | 'en_service' | 'maintenance' | 'hors_service'
           prochaine_maintenance: string | null
+          next_maintenance_hours: number | null
           localisation: string | null
           tarif_horaire: number | null
           usage_hours: number | null
@@ -190,6 +191,7 @@ export interface Database {
           valeur: number
           statut?: 'disponible' | 'en_service' | 'maintenance' | 'hors_service'
           prochaine_maintenance?: string | null
+          next_maintenance_hours?: number | null
           localisation?: string | null
           tarif_horaire?: number | null
           usage_hours?: number | null
@@ -209,6 +211,7 @@ export interface Database {
           valeur?: number
           statut?: 'disponible' | 'en_service' | 'maintenance' | 'hors_service'
           prochaine_maintenance?: string | null
+          next_maintenance_hours?: number | null
           localisation?: string | null
           tarif_horaire?: number | null
           usage_hours?: number | null

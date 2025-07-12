@@ -18,6 +18,7 @@ const toMateriel = (row: MaterielRow): Materiel => ({
   valeur: row.valeur,
   statut: row.statut,
   prochaineMaintenance: row.prochaine_maintenance || undefined,
+  nextMaintenanceHours: row.next_maintenance_hours || undefined,
   localisation: row.localisation || undefined,
   tarifHoraire: row.tarif_horaire || undefined,
   usageHours: row.usage_hours || 0,
@@ -36,6 +37,7 @@ const toMaterielInsert = (materiel: Omit<Materiel, 'id'>): MaterielInsert => ({
   valeur: materiel.valeur,
   statut: materiel.statut,
   prochaine_maintenance: materiel.prochaineMaintenance || null,
+  next_maintenance_hours: materiel.nextMaintenanceHours || null,
   localisation: materiel.localisation || null,
   tarif_horaire: materiel.tarifHoraire || null,
   machine_hours: materiel.machineHours || 0
@@ -53,6 +55,7 @@ const toMaterielUpdate = (materiel: Partial<Omit<Materiel, 'id'>>): MaterielUpda
   if (materiel.valeur !== undefined) update.valeur = materiel.valeur;
   if (materiel.statut !== undefined) update.statut = materiel.statut;
   if (materiel.prochaineMaintenance !== undefined) update.prochaine_maintenance = materiel.prochaineMaintenance || null;
+  if (materiel.nextMaintenanceHours !== undefined) update.next_maintenance_hours = materiel.nextMaintenanceHours || null;
   if (materiel.localisation !== undefined) update.localisation = materiel.localisation || null;
   if (materiel.tarifHoraire !== undefined) update.tarif_horaire = materiel.tarifHoraire || null;
   if (materiel.machineHours !== undefined) update.machine_hours = materiel.machineHours || 0;

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Edit, Trash2, Wrench, Calendar, Download, Filter, Search, Clock, CheckCircle, AlertTriangle, PenTool as Tool, FileText, User, Settings, BarChart3, Gauge, ArrowRight, Cog, Clipboard, Eye } from 'lucide-react';
+import { Plus, Edit, Trash2, Wrench, Calendar, Download, Filter, Search, Clock, CheckCircle, AlertTriangle, PenTool as Tool, FileText, User, Settings, BarChart3, Gauge, ArrowRight, Cog, Clipboard, Eye, SkipForward } from 'lucide-react';
 import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
 import { maintenanceService } from '../../services/maintenanceService';
 import { materielService } from '../../services/materielService';
@@ -249,7 +249,12 @@ export const MaintenanceSection: React.FC = () => {
       <div className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Matériel</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Matériel
+              <span className="text-xs text-gray-500 ml-2">
+                (Heures machine actuelles)
+              </span>
+            </label>
             <select
               name="materielId"
               required
@@ -259,7 +264,7 @@ export const MaintenanceSection: React.FC = () => {
               <option value="">Sélectionner un matériel</option>
               {materiel?.map(item => (
                 <option key={item.id} value={item.id}>
-                  {item.nom} - {item.marque} {item.modele} ({item.machineHours || 0}h machine)
+                  {item.nom} - {item.marque} {item.modele} ({item.machineHours || 0}h / {item.nextMaintenanceHours || '?'}h)
                 </option>
               ))}
             </select>
@@ -284,6 +289,25 @@ export const MaintenanceSection: React.FC = () => {
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Heures machine début</label>
+            <input
+              name="heuresMachineDebut"
+              type="number"
+              step="0.1"
+              min="0"
+              defaultValue={editingMaintenance?.heuresMachineDebut || (() => {
+                const selectedMateriel = materiel?.find(m => m.id === editingMaintenance?.materielId);
+                return selectedMateriel?.machineHours || 0;
+              })()}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              readOnly
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Heures machine au début de la maintenance
+            </p>
+          </div>
+          
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Date planifiée</label>
             <input
@@ -321,22 +345,7 @@ export const MaintenanceSection: React.FC = () => {
           </div>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Heures machine fin</label>
-            <input
-              name="heuresMachineFin"
-              type="number"
-              step="0.1"
-              min="0"
-              defaultValue={editingMaintenance?.heuresMachineFin || ''}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Heures machine après maintenance
-            </p>
-          </div>
-          
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">          
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Durée (heures)</label>
             <input
@@ -347,6 +356,24 @@ export const MaintenanceSection: React.FC = () => {
               defaultValue={editingMaintenance?.dureeHeures || ''}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Heures machine fin</label>
+            <input
+              name="heuresMachineFin"
+              type="number"
+              step="0.1"
+              min="0"
+              defaultValue={editingMaintenance?.heuresMachineFin || (() => {
+                const selectedMateriel = materiel?.find(m => m.id === editingMaintenance?.materielId);
+                return selectedMateriel?.machineHours || 0;
+              })()}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Heures machine après maintenance
+            </p>
           </div>
           
           <div>
@@ -359,6 +386,67 @@ export const MaintenanceSection: React.FC = () => {
               defaultValue={editingMaintenance?.cout || 0}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+          </div>
+        </div>
+        
+        {/* Prochaine maintenance */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <h4 className="text-sm font-medium text-blue-800 mb-2 flex items-center">
+            <SkipForward className="w-4 h-4 mr-2" />
+            Prochaine maintenance
+          </h4>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-blue-700 mb-1">
+                Prochaine maintenance (heures machine)
+              </label>
+              <div className="relative">
+                <input
+                  name="nextMaintenanceHours"
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  defaultValue={(() => {
+                    const selectedMateriel = materiel?.find(m => m.id === editingMaintenance?.materielId);
+                    const selectedType = maintenanceTypes?.find(t => t.id === editingMaintenance?.typeId);
+                    if (selectedMateriel && selectedMateriel.machineHours && selectedType && selectedType.intervalleHeures) {
+                      return selectedMateriel.machineHours + selectedType.intervalleHeures;
+                    }
+                    return '';
+                  })()}
+                  className="w-full px-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <Gauge className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-blue-500" />
+              </div>
+              <p className="text-xs text-blue-600 mt-1">
+                Heures machine pour la prochaine maintenance
+              </p>
+            </div>
+            
+            <div className="flex items-end">
+              <button
+                type="button"
+                className="px-3 py-2 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors text-sm flex items-center"
+                onClick={() => {
+                  const materielId = (document.querySelector('select[name="materielId"]') as HTMLSelectElement)?.value;
+                  const typeId = (document.querySelector('select[name="typeId"]') as HTMLSelectElement)?.value;
+                  
+                  if (materielId && typeId) {
+                    const selectedMateriel = materiel?.find(m => m.id === materielId);
+                    const selectedType = maintenanceTypes?.find(t => t.id === typeId);
+                    
+                    if (selectedMateriel && selectedMateriel.machineHours && selectedType && selectedType.intervalleHeures) {
+                      const nextHours = selectedMateriel.machineHours + selectedType.intervalleHeures;
+                      (document.querySelector('input[name="nextMaintenanceHours"]') as HTMLInputElement).value = nextHours.toString();
+                    }
+                  }
+                }}
+              >
+                <Calculator className="w-4 h-4 mr-2" />
+                Calculer automatiquement
+              </button>
+            </div>
           </div>
         </div>
         
@@ -888,14 +976,20 @@ export const MaintenanceSection: React.FC = () => {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">
                           {maintenance.heuresMachineDebut !== undefined && (
-                            <div>Début: {maintenance.heuresMachineDebut}h</div>
+                            <div className="flex items-center">
+                              <Clock className="w-4 h-4 mr-1 text-gray-400" />
+                              <span>Début: {maintenance.heuresMachineDebut}h</span>
+                            </div>
                           )}
                           {maintenance.heuresMachineFin !== undefined && (
-                            <div>Fin: {maintenance.heuresMachineFin}h</div>
+                            <div className="flex items-center mt-1">
+                              <Gauge className="w-4 h-4 mr-1 text-blue-500" />
+                              <span>Fin: {maintenance.heuresMachineFin}h</span>
+                            </div>
                           )}
                           {maintenance.heuresMachineDebut !== undefined && 
                            maintenance.heuresMachineFin !== undefined && (
-                            <div className="text-xs text-blue-600 mt-1">
+                            <div className="text-xs text-green-600 mt-1 font-medium">
                               Diff: {(maintenance.heuresMachineFin - maintenance.heuresMachineDebut).toFixed(1)}h
                             </div>
                           )}

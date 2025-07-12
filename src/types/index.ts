@@ -58,6 +58,7 @@ export interface Materiel {
   valeur: number;
   statut: 'disponible' | 'en_service' | 'maintenance' | 'hors_service';
   prochaineMaintenance?: string;
+  nextMaintenanceHours?: number;
   localisation?: string;
   tarifHoraire?: number;
   usageHours?: number;

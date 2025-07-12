@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Edit, Trash2, Wrench, Calendar, Download, Euro, Clock, TrendingUp, Calculator, PenTool as Tool, Search, Filter, Eye, AlertTriangle, CheckCircle, Truck, MapPin, BarChart3, Percent } from 'lucide-react';
+import { Plus, Edit, Trash2, Wrench, Calendar, Download, Euro, Clock, TrendingUp, Calculator, PenTool as Tool, Search, Filter, Eye, AlertTriangle, CheckCircle, Truck, MapPin, BarChart3, Percent, Gauge } from 'lucide-react';
 import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
 import { materielService } from '../../services/materielService';
 import { chantierService } from '../../services/chantierService';
@@ -231,16 +231,58 @@ export const MaterielSection: React.FC = () => {
           </div>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Prochaine maintenance</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Heures machine actuelles</label>
+            <div className="relative">
+              <input
+                name="machineHours"
+                type="number"
+                min="0"
+                step="0.1"
+                defaultValue={editingMateriel?.machineHours || 0}
+                className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <Clock className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Compteur d'heures du fabricant
+            </p>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Prochaine maintenance (heures)</label>
+            <div className="relative">
+              <input
+                name="nextMaintenanceHours"
+                type="number"
+                min="0"
+                step="0.1"
+                defaultValue={editingMateriel?.nextMaintenanceHours || ''}
+                className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <Gauge className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Heures machine pour la prochaine maintenance
+            </p>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Prochaine maintenance (date)</label>
             <input
               name="prochaineMaintenance"
               type="date"
               defaultValue={editingMateriel?.prochaineMaintenance || ''}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            <p className="text-xs text-gray-500 mt-1">
+              Date alternative pour la maintenance
+            </p>
           </div>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Localisation
@@ -507,8 +549,25 @@ export const MaterielSection: React.FC = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {item.prochaineMaintenance ? (
                             <div className="flex items-center">
-                              <Calendar className="w-4 h-4 mr-1 text-gray-400" />
-                              {new Date(item.prochaineMaintenance).toLocaleDateString()}
+                              <div className="space-y-1">
+                                {item.nextMaintenanceHours && (
+                                  <div className="flex items-center">
+                                    <Gauge className="w-4 h-4 mr-1 text-blue-500" />
+                                    <span className={item.machineHours && item.machineHours >= (item.nextMaintenanceHours || 0) ? 'text-red-600 font-medium' : ''}>
+                                      {item.nextMaintenanceHours}h machine
+                                    </span>
+                                    {item.machineHours && item.machineHours >= (item.nextMaintenanceHours || 0) && (
+                                      <AlertTriangle className="w-3 h-3 ml-1 text-red-500" />
+                                    )}
+                                  </div>
+                                )}
+                                {item.prochaineMaintenance && (
+                                  <div className="flex items-center">
+                                    <Calendar className="w-4 h-4 mr-1 text-gray-400" />
+                                    {new Date(item.prochaineMaintenance).toLocaleDateString()}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           ) : (
                             <span className="text-gray-400">Non programmée</span>

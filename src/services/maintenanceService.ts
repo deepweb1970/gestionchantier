@@ -357,15 +357,16 @@ export const maintenanceService = {
   // Specialized queries
   getUpcomingMaintenances: async (days: number = 30): Promise<Maintenance[]> => {
     try {
+      // Get maintenances by date
       const today = new Date();
       const futureDate = new Date();
       futureDate.setDate(today.getDate() + days);
       
-      const { data, error } = await supabase
+      const { data: dateData, error: dateError } = await supabase
         .from('maintenances')
         .select(`
           *,
-          materiel(nom),
+          materiel(nom, machine_hours, next_maintenance_hours),
           maintenance_types(nom),
           ouvriers(nom, prenom)
         `)
@@ -374,18 +375,57 @@ export const maintenanceService = {
         .gte('date_planifiee', today.toISOString().split('T')[0])
         .order('date_planifiee');
       
-      if (error) {
-        console.error('Erreur lors de la récupération des maintenances à venir:', error);
-        throw error;
+      if (dateError) {
+        console.error('Erreur lors de la récupération des maintenances à venir par date:', dateError);
+        throw dateError;
       }
       
-      return (data || []).map(item => {
+      // Get maintenances by machine hours
+      const { data: hoursData, error: hoursError } = await supabase
+        .from('materiel')
+        .select(`
+          id,
+          nom,
+          machine_hours,
+          next_maintenance_hours
+        `)
+        .not('next_maintenance_hours', 'is', null)
+        .lt('next_maintenance_hours', 'machine_hours', { ascending: true });
+      
+      if (hoursError) {
+        console.error('Erreur lors de la récupération des matériels nécessitant une maintenance:', hoursError);
+        throw hoursError;
+      }
+      
+      // Create maintenance entries for equipment needing maintenance based on hours
+      const hourBasedMaintenances: Maintenance[] = [];
+      
+      for (const item of (hoursData || [])) {
+        if (item.machine_hours && item.next_maintenance_hours && item.machine_hours >= item.next_maintenance_hours) {
+          hourBasedMaintenances.push({
+            id: `hour-based-${item.id}`,
+            materielId: item.id,
+            typeId: '', // We don't know the type
+            datePlanifiee: today.toISOString().split('T')[0],
+            heuresMachineDebut: item.machine_hours,
+            cout: 0,
+            statut: 'planifiee',
+            description: `Maintenance requise - ${item.machine_hours}h atteintes (seuil: ${item.next_maintenance_hours}h)`,
+            materielNom: item.nom
+          });
+        }
+      }
+      
+      // Combine both types of maintenances
+      const dateBasedMaintenances = (dateData || []).map(item => {
         const materielNom = item.materiel?.nom || '';
         const typeNom = item.maintenance_types?.nom || '';
         const executantNom = item.ouvriers ? `${item.ouvriers.prenom} ${item.ouvriers.nom}` : '';
         
         return toMaintenance(item, materielNom, typeNom, executantNom);
       });
+      
+      return [...dateBasedMaintenances, ...hourBasedMaintenances];
     } catch (error) {
       console.error('Erreur dans maintenanceService.getUpcomingMaintenances:', error);
       throw error;
