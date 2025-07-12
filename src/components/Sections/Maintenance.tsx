@@ -10,12 +10,24 @@ import { Button } from '../Common/Button';
 import { StatusBadge } from '../Common/StatusBadge';
 
 export const MaintenanceSection: React.FC = () => {
-  const [maintenances, setMaintenances] = useState<Maintenance[]>([]);
-  const [maintenanceTypes, setMaintenanceTypes] = useState<MaintenanceType[]>([]);
-  const [materiels, setMateriels] = useState<Materiel[]>([]);
+  const { data: maintenances = [], loading: maintenancesLoading, error: maintenancesError, refresh: refreshMaintenances } = useRealtimeSupabase<Maintenance>({
+    table: 'maintenances',
+    fetchFunction: maintenanceService.getAllMaintenances
+  });
+  
+  const { data: maintenanceTypes = [], loading: typesLoading, error: typesError, refresh: refreshTypes } = useRealtimeSupabase<MaintenanceType>({
+    table: 'maintenance_types',
+    fetchFunction: maintenanceService.getAllMaintenanceTypes
+  });
+  
+  const { data: materiels = [], loading: materielsLoading, error: materielsError, refresh: refreshMateriels } = useRealtimeSupabase<Materiel>({
+    table: 'materiel',
+    fetchFunction: materielService.getAll
+  });
+  
   const [ouvriers, setOuvriers] = useState<Ouvrier[]>([]);
   const [maintenancesAPrevoir, setMaintenancesAPrevoir] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [showTypeModal, setShowTypeModal] = useState(false);
@@ -59,17 +71,8 @@ export const MaintenanceSection: React.FC = () => {
     temps_estime_heures: ''
   });
 
-  useRealtimeSupabase('maintenances', () => {
-    loadMaintenances();
-  });
-
-  useRealtimeSupabase('maintenance_types', () => {
-    loadMaintenanceTypes();
-  });
-
-  useRealtimeSupabase('materiel', () => {
-    loadMateriels();
-  });
+  const combinedLoading = maintenancesLoading || typesLoading || materielsLoading || loading;
+  const combinedError = maintenancesError || typesError || materielsError || error;
 
   useEffect(() => {
     loadData();
@@ -79,9 +82,6 @@ export const MaintenanceSection: React.FC = () => {
     try {
       setLoading(true);
       await Promise.all([
-        loadMaintenances(),
-        loadMaintenanceTypes(),
-        loadMateriels(),
         loadOuvriers(),
         loadMaintenancesAPrevoir()
       ]);
@@ -91,21 +91,6 @@ export const MaintenanceSection: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const loadMaintenances = async () => {
-    const data = await maintenanceService.getAllMaintenances();
-    setMaintenances(data);
-  };
-
-  const loadMaintenanceTypes = async () => {
-    const data = await maintenanceService.getAllMaintenanceTypes();
-    setMaintenanceTypes(data);
-  };
-
-  const loadMateriels = async () => {
-    const data = await materielService.getAll();
-    setMateriels(data);
   };
 
   const loadOuvriers = async () => {
@@ -136,7 +121,7 @@ export const MaintenanceSection: React.FC = () => {
         await maintenanceService.create(maintenanceData);
       }
 
-      await loadMaintenances();
+      refreshMaintenances();
       await loadMaintenancesAPrevoir();
       setShowModal(false);
       resetForm();
@@ -162,7 +147,7 @@ export const MaintenanceSection: React.FC = () => {
         await maintenanceService.createType(typeData);
       }
 
-      await loadMaintenanceTypes();
+      refreshTypes();
       setShowTypeModal(false);
       resetTypeForm();
     } catch (err) {
@@ -175,7 +160,7 @@ export const MaintenanceSection: React.FC = () => {
     if (window.confirm('Êtes-vous sûr de vouloir supprimer cette maintenance ?')) {
       try {
         await maintenanceService.delete(id);
-        await loadMaintenances();
+        refreshMaintenances();
         await loadMaintenancesAPrevoir();
       } catch (err) {
         setError('Erreur lors de la suppression');
@@ -188,7 +173,7 @@ export const MaintenanceSection: React.FC = () => {
     if (window.confirm('Êtes-vous sûr de vouloir supprimer ce type de maintenance ?')) {
       try {
         await maintenanceService.deleteType(id);
-        await loadMaintenanceTypes();
+        refreshTypes();
       } catch (err) {
         setError('Erreur lors de la suppression du type');
         console.error(err);
@@ -337,7 +322,7 @@ export const MaintenanceSection: React.FC = () => {
     }
   };
 
-  if (loading) {
+  if (combinedLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-600"></div>
@@ -372,9 +357,9 @@ export const MaintenanceSection: React.FC = () => {
         </div>
       </div>
 
-      {error && (
+      {combinedError && (
         <div className="bg-red-50 border border-red-200 rounded-md p-4">
-          <p className="text-red-800">{error}</p>
+          <p className="text-red-800">{combinedError}</p>
         </div>
       )}
 
@@ -552,7 +537,7 @@ export const MaintenanceSection: React.FC = () => {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <StatusBadge
                             status={maintenance.statut}
-                            className={getStatusColor(maintenance.statut)}
+                            type="maintenance_status"
                           />
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -735,7 +720,7 @@ export const MaintenanceSection: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <StatusBadge
                         status={type.priorite}
-                        className={getPriorityColor(type.priorite)}
+                        type="maintenance_priority"
                       />
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
