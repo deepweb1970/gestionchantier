@@ -195,7 +195,7 @@ export const Clients: React.FC = () => {
 
   const getClientProjects = (clientId: string): Chantier[] => {
     if (!chantiers) return [];
-    return chantiers.filter(chantier => chantier.client_id === clientId);
+    return chantiers.filter(chantier => chantier.client_id === clientId || chantier.clientId === clientId);
   };
 
   const getClientInvoices = (clientId: string): Facture[] => {
@@ -858,7 +858,7 @@ export const Clients: React.FC = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           <div className="flex items-center">
-                            <span className="font-medium">{projects.length}</span>
+                            <span className="font-medium">{client.projets?.length || projects.length}</span>
                             <span className="text-gray-500 ml-1">projet(s)</span>
                           </div>
                         </td>
