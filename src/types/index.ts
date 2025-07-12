@@ -82,10 +82,12 @@ export interface Client {
 export interface MaintenanceType {
   id: string;
   nom: string;
-  description?: string;
-  intervalleHeures?: number;
-  intervalleJours?: number;
+  description: string;
+  intervalleHeures: number;
+  intervalleJours: number;
   priorite: 'basse' | 'moyenne' | 'haute' | 'critique';
+  coutEstime?: number;
+  tempsEstimeHeures?: number;
 }
 
 export interface Maintenance {
@@ -102,6 +104,8 @@ export interface Maintenance {
   description: string;
   notes?: string;
   executantId?: string;
+  observations?: string;
+  piecesUtilisees?: string[];
   materielNom?: string;
   typeNom?: string;
   executantNom?: string;

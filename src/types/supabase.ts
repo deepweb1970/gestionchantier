@@ -628,6 +628,10 @@ export interface MaintenanceTypes {
           intervalle_heures: number | null
           intervalle_jours: number | null
           priorite: 'basse' | 'moyenne' | 'haute' | 'critique'
+          seuil_alerte_pourcentage: number | null
+          pieces_necessaires: string[] | null
+          cout_estime: number | null
+          temps_estime_heures: number | null
           created_at: string | null
           updated_at: string | null
         }
@@ -638,6 +642,10 @@ export interface MaintenanceTypes {
           intervalle_heures?: number | null
           intervalle_jours?: number | null
           priorite: 'basse' | 'moyenne' | 'haute' | 'critique'
+          seuil_alerte_pourcentage?: number | null
+          pieces_necessaires?: string[] | null
+          cout_estime?: number | null
+          temps_estime_heures?: number | null
           created_at?: string | null
           updated_at?: string | null
         }
@@ -648,6 +656,10 @@ export interface MaintenanceTypes {
           intervalle_heures?: number | null
           intervalle_jours?: number | null
           priorite?: 'basse' | 'moyenne' | 'haute' | 'critique'
+          seuil_alerte_pourcentage?: number | null
+          pieces_necessaires?: string[] | null
+          cout_estime?: number | null
+          temps_estime_heures?: number | null
           created_at?: string | null
           updated_at?: string | null
         }
@@ -667,6 +679,10 @@ export interface MaintenanceTypes {
           description: string
           notes: string | null
           executant_id: string | null
+          observations: string | null
+          pieces_utilisees: string[] | null
+          temps_reel_heures: number | null
+          kilometrage: number | null
           created_at: string | null
           updated_at: string | null
         }
@@ -684,6 +700,10 @@ export interface MaintenanceTypes {
           description: string
           notes?: string | null
           executant_id?: string | null
+          observations?: string | null
+          pieces_utilisees?: string[] | null
+          temps_reel_heures?: number | null
+          kilometrage?: number | null
           created_at?: string | null
           updated_at?: string | null
         }
@@ -701,6 +721,10 @@ export interface MaintenanceTypes {
           description?: string
           notes?: string | null
           executant_id?: string | null
+          observations?: string | null
+          pieces_utilisees?: string[] | null
+          temps_reel_heures?: number | null
+          kilometrage?: number | null
           created_at?: string | null
           updated_at?: string | null
         }

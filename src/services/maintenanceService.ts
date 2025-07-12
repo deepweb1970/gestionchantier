@@ -25,6 +25,8 @@ const toMaintenance = (row: MaintenanceRow, materielNom?: string, typeNom?: stri
   description: row.description,
   notes: row.notes || undefined,
   executantId: row.executant_id || undefined,
+  observations: row.observations || undefined,
+  piecesUtilisees: row.pieces_utilisees || undefined,
   materielNom,
   typeNom,
   executantNom
@@ -43,7 +45,9 @@ const toMaintenanceInsert = (maintenance: Omit<Maintenance, 'id' | 'materielNom'
   statut: maintenance.statut,
   description: maintenance.description,
   notes: maintenance.notes || null,
-  executant_id: maintenance.executantId || null
+  executant_id: maintenance.executantId || null,
+  observations: maintenance.observations || null,
+  pieces_utilisees: maintenance.piecesUtilisees || null
 });
 
 // Convert application format to database format for update
@@ -62,6 +66,8 @@ const toMaintenanceUpdate = (maintenance: Partial<Omit<Maintenance, 'id' | 'mate
   if (maintenance.description !== undefined) update.description = maintenance.description;
   if (maintenance.notes !== undefined) update.notes = maintenance.notes || null;
   if (maintenance.executantId !== undefined) update.executant_id = maintenance.executantId || null;
+  if (maintenance.observations !== undefined) update.observations = maintenance.observations || null;
+  if (maintenance.piecesUtilisees !== undefined) update.pieces_utilisees = maintenance.piecesUtilisees || null;
   
   return update;
 };
@@ -70,19 +76,23 @@ const toMaintenanceUpdate = (maintenance: Partial<Omit<Maintenance, 'id' | 'mate
 const toMaintenanceType = (row: MaintenanceTypeRow): MaintenanceType => ({
   id: row.id,
   nom: row.nom,
-  description: row.description || undefined,
-  intervalleHeures: row.intervalle_heures || undefined,
-  intervalleJours: row.intervalle_jours || undefined,
-  priorite: row.priorite
+  description: row.description || '',
+  intervalleHeures: row.intervalle_heures || 0,
+  intervalleJours: row.intervalle_jours || 0,
+  priorite: row.priorite,
+  coutEstime: row.cout_estime || undefined,
+  tempsEstimeHeures: row.temps_estime_heures || undefined
 });
 
 // Convert application format to database format for maintenance types insert
 const toMaintenanceTypeInsert = (type: Omit<MaintenanceType, 'id'>): MaintenanceTypeInsert => ({
   nom: type.nom,
-  description: type.description || null,
-  intervalle_heures: type.intervalleHeures || null,
-  intervalle_jours: type.intervalleJours || null,
-  priorite: type.priorite
+  description: type.description || '',
+  intervalle_heures: type.intervalleHeures || 0,
+  intervalle_jours: type.intervalleJours || 0,
+  priorite: type.priorite,
+  cout_estime: type.coutEstime || null,
+  temps_estime_heures: type.tempsEstimeHeures || null
 });
 
 // Convert application format to database format for maintenance types update
@@ -94,6 +104,8 @@ const toMaintenanceTypeUpdate = (type: Partial<Omit<MaintenanceType, 'id'>>): Ma
   if (type.intervalleHeures !== undefined) update.intervalle_heures = type.intervalleHeures || null;
   if (type.intervalleJours !== undefined) update.intervalle_jours = type.intervalleJours || null;
   if (type.priorite !== undefined) update.priorite = type.priorite;
+  if (type.coutEstime !== undefined) update.cout_estime = type.coutEstime || null;
+  if (type.tempsEstimeHeures !== undefined) update.temps_estime_heures = type.tempsEstimeHeures || null;
   
   return update;
 };
@@ -367,7 +379,7 @@ export const maintenanceService = {
         .select(`
           *,
           materiel(nom, machine_hours, next_maintenance_hours),
-          maintenance_types(nom),
+          maintenance_types(nom, intervalle_heures, seuil_alerte_pourcentage),
           ouvriers(nom, prenom)
         `)
         .eq('statut', 'planifiee')
@@ -462,6 +474,43 @@ export const maintenanceService = {
     } catch (error) {
       console.error(`Erreur dans maintenanceService.getMaintenanceHistory(${materielId}):`, error);
       throw error;
+    }
+  },
+  
+  // Méthode pour obtenir les maintenances à prévoir basées sur le pourcentage d'utilisation
+  getMaintenancesAPrevoir: async (): Promise<any[]> => {
+    try {
+      const { data, error } = await supabase
+        .from('maintenances_a_prevoir')
+        .select('*')
+        .order('pourcentage_utilisation', { ascending: false });
+      
+      if (error) {
+        console.error('Erreur lors de la récupération des maintenances à prévoir:', error);
+        throw error;
+      }
+      
+      return data || [];
+    } catch (error) {
+      console.error('Erreur dans maintenanceService.getMaintenancesAPrevoir:', error);
+      throw error;
+    }
+  },
+  
+  // Méthode pour vérifier si une maintenance est nécessaire
+  isMaintenanceNeeded: async (materielId: string, typeId?: string): Promise<boolean> => {
+    try {
+      const { data, error } = await supabase
+        .rpc('is_maintenance_needed', {
+          materiel_id: materielId,
+          type_id: typeId || null
+        });
+      
+      if (error) throw error;
+      return data || false;
+    } catch (error) {
+      console.error('Erreur dans maintenanceService.isMaintenanceNeeded:', error);
+      return false;
     }
   },
   

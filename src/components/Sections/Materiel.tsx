@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, Edit, Trash2, Wrench, Calendar, Download, Euro, Clock, TrendingUp, Calculator, PenTool as Tool, Search, Filter, Eye, AlertTriangle, CheckCircle, Truck, MapPin, BarChart3, Percent, Gauge } from 'lucide-react';
-import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
+  Plus, Edit, Trash2, Wrench, Calendar, Download, Euro, Clock, TrendingUp, Calculator, PenTool as Tool, Search, Filter, Eye, AlertTriangle, CheckCircle, Truck, MapPin, BarChart3, Percent, Gauge 
 import { materielService } from '../../services/materielService';
 import { chantierService } from '../../services/chantierService';
 import { saisieHeureService } from '../../services/saisieHeureService';
@@ -8,6 +8,7 @@ import { Materiel } from '../../types';
 import { Modal } from '../Common/Modal';
 import { Button } from '../Common/Button';
 import { StatusBadge } from '../Common/StatusBadge';
+import { maintenanceService } from '../../services/maintenanceService';
 
 export const MaterielSection: React.FC = () => {
   const { data: materiel, loading, error, refresh } = useRealtimeSupabase<Materiel>({
@@ -27,6 +28,7 @@ export const MaterielSection: React.FC = () => {
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMateriel, setEditingMateriel] = useState<Materiel | null>(null);
+  const [isMaintenanceModalOpen, setIsMaintenanceModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredMateriel = (materiel || []).filter(item =>
@@ -34,6 +36,11 @@ export const MaterielSection: React.FC = () => {
     item.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.marque.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // État pour stocker le matériel sélectionné pour la maintenance
+  const [selectedMaterielForMaintenance, setSelectedMaterielForMaintenance] = useState<Materiel | null>(null);
+  
+  const [maintenanceTypes, setMaintenanceTypes] = useState<any[]>([]);
 
   // Fonction pour calculer les heures d'utilisation d'un matériel
   const getMaterielUsageHours = (materielId: string) => {
@@ -58,6 +65,19 @@ export const MaterielSection: React.FC = () => {
     setIsModalOpen(true);
   };
 
+  // Fonction pour planifier une maintenance
+  const handlePlanMaintenance = (item: Materiel) => {
+    setSelectedMaterielForMaintenance(item);
+    
+    // Charger les types de maintenance
+    maintenanceService.getAllMaintenanceTypes()
+      .then(types => {
+        setMaintenanceTypes(types);
+        setIsMaintenanceModalOpen(true);
+      })
+      .catch(err => console.error('Erreur lors du chargement des types de maintenance:', err));
+  };
+
   const handleDelete = async (id: string) => {
     if (confirm('Êtes-vous sûr de vouloir supprimer ce matériel ?')) {
       try {
@@ -70,6 +90,31 @@ export const MaterielSection: React.FC = () => {
         alert('Erreur lors de la suppression du matériel');
       }
     }
+  };
+
+  // Fonction pour créer une maintenance
+  const handleCreateMaintenance = (formData: FormData) => {
+    if (!selectedMaterielForMaintenance) return;
+    
+    const maintenanceData = {
+      materielId: selectedMaterielForMaintenance.id,
+      typeId: formData.get('typeId') as string,
+      datePlanifiee: formData.get('datePlanifiee') as string,
+      heuresMachineDebut: selectedMaterielForMaintenance.machineHours || 0,
+      statut: 'planifiee' as const,
+      description: formData.get('description') as string,
+      cout: parseFloat(formData.get('cout') as string) || 0
+    };
+
+    maintenanceService.createMaintenance(maintenanceData)
+      .then(() => {
+        setIsMaintenanceModalOpen(false);
+        setSelectedMaterielForMaintenance(null);
+        alert('Maintenance planifiée avec succès');
+      })
+      .catch(error => {
+        console.error('Erreur lors de la planification de la maintenance:', error);
+      });
   };
 
   const handleSave = async (formData: FormData) => {
@@ -85,7 +130,7 @@ export const MaterielSection: React.FC = () => {
       prochaineMaintenance: formData.get('prochaineMaintenance') as string || undefined,
       localisation: formData.get('localisation') as string || undefined,
       tarifHoraire: parseFloat(formData.get('tarifHoraire') as string) || undefined,
-      machineHours: parseFloat(formData.get('machineHours') as string) || 0,
+      machineHours: parseFloat(formData.get('machineHours') as string),
       nextMaintenanceHours: parseFloat(formData.get('nextMaintenanceHours') as string) || undefined,
     };
 
@@ -108,6 +153,89 @@ export const MaterielSection: React.FC = () => {
       console.error('Erreur lors de l\'enregistrement:', error);
       alert('Erreur lors de l\'enregistrement du matériel');
     }
+  };
+
+  // Formulaire de planification de maintenance
+  const MaintenanceForm = () => {
+    if (!selectedMaterielForMaintenance) return null;
+    
+    return (
+      <form onSubmit={(e) => {
+        e.preventDefault();
+        handleCreateMaintenance(new FormData(e.currentTarget));
+      }}>
+        <div className="space-y-4">
+          <div className="bg-blue-50 p-4 rounded-lg">
+            <h3 className="font-medium text-blue-800 mb-2">Matériel: {selectedMaterielForMaintenance.nom}</h3>
+            <p className="text-sm text-blue-700">{selectedMaterielForMaintenance.marque} {selectedMaterielForMaintenance.modele}</p>
+            <div className="mt-2 flex items-center">
+              <Gauge className="w-4 h-4 mr-1 text-blue-600" />
+              <span className="text-sm font-medium">
+                Heures machine actuelles: {selectedMaterielForMaintenance.machineHours || 0}h
+              </span>
+            </div>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Type de maintenance</label>
+            <select
+              name="typeId"
+              required
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {maintenanceTypes.map(type => (
+                <option key={type.id} value={type.id}>
+                  {type.nom} - {type.intervalleHeures}h / {type.intervalleJours}j
+                </option>
+              ))}
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Date planifiée</label>
+            <input
+              name="datePlanifiee"
+              type="date"
+              required
+              defaultValue={new Date().toISOString().split('T')[0]}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <textarea
+              name="description"
+              rows={3}
+              required
+              defaultValue={`Maintenance préventive pour ${selectedMaterielForMaintenance.nom}`}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Coût estimé (€)</label>
+            <input
+              name="cout"
+              type="number"
+              min="0"
+              step="0.01"
+              defaultValue="0"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        </div>
+        
+        <div className="flex justify-end space-x-3 mt-6">
+          <Button variant="secondary" onClick={() => setIsMaintenanceModalOpen(false)}>
+            Annuler
+          </Button>
+          <Button type="submit">
+            Planifier la maintenance
+          </Button>
+        </div>
+      </form>
+    );
   };
 
   const MaterielForm = () => (
@@ -266,7 +394,7 @@ export const MaterielSection: React.FC = () => {
               <Gauge className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
             </div>
             <p className="text-xs text-gray-500 mt-1">
-              Heures machine pour la prochaine maintenance
+              Seuil d'heures pour la prochaine maintenance
             </p>
           </div>
           
@@ -334,7 +462,7 @@ export const MaterielSection: React.FC = () => {
           </div>
         )}
 
-        {/* Aperçu de la localisation sélectionnée */}
+        {/* Aperçu de la maintenance */}
         <div className="bg-gray-50 p-4 rounded-lg">
           <h4 className="text-sm font-medium text-gray-700 mb-2">Informations de localisation</h4>
           <div id="localisation-preview" className="text-sm text-gray-600">
@@ -342,6 +470,20 @@ export const MaterielSection: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Aperçu de la maintenance */}
+      {editingMateriel?.machineHours !== undefined && editingMateriel?.nextMaintenanceHours !== undefined && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-4">
+          <h4 className="text-sm font-medium text-yellow-800 mb-2 flex items-center">
+            <Gauge className="w-4 h-4 mr-2" />
+            Statut de maintenance
+          </h4>
+          <div className="text-sm">
+            <p className="text-yellow-700">Heures actuelles: <span className="font-medium">{editingMateriel.machineHours}h</span> / Prochaine maintenance: <span className="font-medium">{editingMateriel.nextMaintenanceHours}h</span></p>
+            <p className="text-yellow-700 mt-1">Pourcentage d'utilisation: <span className="font-medium">{editingMateriel.machineHours && editingMateriel.nextMaintenanceHours ? Math.round((editingMateriel.machineHours / editingMateriel.nextMaintenanceHours) * 100) : 0}%</span></p>
+          </div>
+        </div>
+      )}
       
       <div className="flex justify-end space-x-3 mt-6">
         <Button variant="secondary" onClick={() => setIsModalOpen(false)}>
@@ -486,7 +628,7 @@ export const MaterielSection: React.FC = () => {
                     const usageHours = getMaterielUsageHours(item.id);
                     const revenue = getMaterielRevenue(item);
                     const utilizationRate = getMaterielUtilizationRate(item.id);
-                    
+                    const maintenancePercentage = item.machineHours && item.nextMaintenanceHours ? Math.round((item.machineHours / item.nextMaintenanceHours) * 100) : 0;
                     return (
                       <tr key={item.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -549,7 +691,7 @@ export const MaterielSection: React.FC = () => {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {item.prochaineMaintenance ? (
+                          {item.prochaineMaintenance || item.nextMaintenanceHours ? (
                             <div className="flex items-center">
                               <div className="space-y-1">
                                 {item.nextMaintenanceHours && (
@@ -557,7 +699,7 @@ export const MaterielSection: React.FC = () => {
                                     <Gauge className="w-4 h-4 mr-1 text-blue-500" />
                                     <span className={item.machineHours && item.machineHours >= (item.nextMaintenanceHours || 0) ? 'text-red-600 font-medium' : ''}>
                                       {item.nextMaintenanceHours}h machine
-                                    </span>
+                                    </span> ({maintenancePercentage}%)
                                     {item.machineHours && item.machineHours >= (item.nextMaintenanceHours || 0) && (
                                       <AlertTriangle className="w-3 h-3 ml-1 text-red-500" />
                                     )}
@@ -583,6 +725,13 @@ export const MaterielSection: React.FC = () => {
                               title="Modifier"
                             >
                               <Edit className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handlePlanMaintenance(item)}
+                              className="text-orange-600 hover:text-orange-900"
+                              title="Planifier maintenance"
+                            >
+                              <Tool className="w-4 h-4" />
                             </button>
                             <button
                               onClick={() => handleDelete(item.id)}
@@ -622,6 +771,19 @@ export const MaterielSection: React.FC = () => {
         size="lg"
       >
         {!loading && <MaterielForm />}
+      </Modal>
+
+      {/* Modal de planification de maintenance */}
+      <Modal
+        isOpen={isMaintenanceModalOpen}
+        onClose={() => {
+          setIsMaintenanceModalOpen(false);
+          setSelectedMaterielForMaintenance(null);
+        }}
+        title="Planifier une maintenance"
+        size="lg"
+      >
+        <MaintenanceForm />
       </Modal>
     </div>
   );
