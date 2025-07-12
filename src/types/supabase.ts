@@ -175,6 +175,7 @@ export interface Database {
           tarif_horaire: number | null
           usage_hours: number | null
           utilization_rate: number | null
+          machine_hours: number | null
           created_at: string | null
           updated_at: string | null
         }
@@ -193,6 +194,7 @@ export interface Database {
           tarif_horaire?: number | null
           usage_hours?: number | null
           utilization_rate?: number | null
+          machine_hours?: number | null
           created_at?: string | null
           updated_at?: string | null
         }
@@ -211,6 +213,7 @@ export interface Database {
           tarif_horaire?: number | null
           usage_hours?: number | null
           utilization_rate?: number | null
+          machine_hours?: number | null
           created_at?: string | null
           updated_at?: string | null
         }
@@ -607,6 +610,98 @@ export interface Database {
     }
     CompositeTypes: {
       [_ in never]: never
+    }
+  }
+}
+
+export interface MaintenanceTypes {
+  public: {
+    Tables: {
+      maintenance_types: {
+        Row: {
+          id: string
+          nom: string
+          description: string | null
+          intervalle_heures: number | null
+          intervalle_jours: number | null
+          priorite: 'basse' | 'moyenne' | 'haute' | 'critique'
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          nom: string
+          description?: string | null
+          intervalle_heures?: number | null
+          intervalle_jours?: number | null
+          priorite: 'basse' | 'moyenne' | 'haute' | 'critique'
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          nom?: string
+          description?: string | null
+          intervalle_heures?: number | null
+          intervalle_jours?: number | null
+          priorite?: 'basse' | 'moyenne' | 'haute' | 'critique'
+          created_at?: string | null
+          updated_at?: string | null
+        }
+      }
+      maintenances: {
+        Row: {
+          id: string
+          materiel_id: string
+          type_id: string | null
+          date_planifiee: string
+          date_execution: string | null
+          heures_machine_debut: number | null
+          heures_machine_fin: number | null
+          duree_heures: number | null
+          cout: number
+          statut: 'planifiee' | 'en_cours' | 'terminee' | 'annulee'
+          description: string
+          notes: string | null
+          executant_id: string | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          materiel_id: string
+          type_id?: string | null
+          date_planifiee: string
+          date_execution?: string | null
+          heures_machine_debut?: number | null
+          heures_machine_fin?: number | null
+          duree_heures?: number | null
+          cout?: number
+          statut?: 'planifiee' | 'en_cours' | 'terminee' | 'annulee'
+          description: string
+          notes?: string | null
+          executant_id?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          materiel_id?: string
+          type_id?: string | null
+          date_planifiee?: string
+          date_execution?: string | null
+          heures_machine_debut?: number | null
+          heures_machine_fin?: number | null
+          duree_heures?: number | null
+          cout?: number
+          statut?: 'planifiee' | 'en_cours' | 'terminee' | 'annulee'
+          description?: string
+          notes?: string | null
+          executant_id?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+      }
     }
   }
 }

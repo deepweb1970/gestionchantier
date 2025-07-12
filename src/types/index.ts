@@ -62,6 +62,7 @@ export interface Materiel {
   tarifHoraire?: number;
   usageHours?: number;
   utilizationRate?: number;
+  machineHours?: number;
 }
 
 export interface Client {
@@ -75,6 +76,34 @@ export interface Client {
   contactPrincipal: string;
   notes: string;
   projets: string[];
+}
+
+export interface MaintenanceType {
+  id: string;
+  nom: string;
+  description?: string;
+  intervalleHeures?: number;
+  intervalleJours?: number;
+  priorite: 'basse' | 'moyenne' | 'haute' | 'critique';
+}
+
+export interface Maintenance {
+  id: string;
+  materielId: string;
+  typeId: string;
+  datePlanifiee: string;
+  dateExecution?: string;
+  heuresMachineDebut?: number;
+  heuresMachineFin?: number;
+  dureeHeures?: number;
+  cout: number;
+  statut: 'planifiee' | 'en_cours' | 'terminee' | 'annulee';
+  description: string;
+  notes?: string;
+  executantId?: string;
+  materielNom?: string;
+  typeNom?: string;
+  executantNom?: string;
 }
 
 export interface Facture {

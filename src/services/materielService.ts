@@ -21,7 +21,8 @@ const toMateriel = (row: MaterielRow): Materiel => ({
   localisation: row.localisation || undefined,
   tarifHoraire: row.tarif_horaire || undefined,
   usageHours: row.usage_hours || 0,
-  utilizationRate: row.utilization_rate || 0
+  utilizationRate: row.utilization_rate || 0,
+  machineHours: row.machine_hours || 0
 });
 
 // Convertir le format de l'application vers le format de la base de données
@@ -36,7 +37,8 @@ const toMaterielInsert = (materiel: Omit<Materiel, 'id'>): MaterielInsert => ({
   statut: materiel.statut,
   prochaine_maintenance: materiel.prochaineMaintenance || null,
   localisation: materiel.localisation || null,
-  tarif_horaire: materiel.tarifHoraire || null
+  tarif_horaire: materiel.tarifHoraire || null,
+  machine_hours: materiel.machineHours || 0
 });
 
 const toMaterielUpdate = (materiel: Partial<Omit<Materiel, 'id'>>): MaterielUpdate => {
@@ -53,6 +55,7 @@ const toMaterielUpdate = (materiel: Partial<Omit<Materiel, 'id'>>): MaterielUpda
   if (materiel.prochaineMaintenance !== undefined) update.prochaine_maintenance = materiel.prochaineMaintenance || null;
   if (materiel.localisation !== undefined) update.localisation = materiel.localisation || null;
   if (materiel.tarifHoraire !== undefined) update.tarif_horaire = materiel.tarifHoraire || null;
+  if (materiel.machineHours !== undefined) update.machine_hours = materiel.machineHours || 0;
   
   return update;
 };
