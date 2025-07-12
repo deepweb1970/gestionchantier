@@ -1,4 +1,3 @@
-import React, { useState } from 'react';
 import { Plus, Edit, Trash2, Wrench, Calendar, Download, Filter, Search, Clock, CheckCircle, AlertTriangle, PenTool as Tool, FileText, User, Settings, BarChart3, Gauge, ArrowRight, Cog, Clipboard, Eye, SkipForward, Calculator } from 'lucide-react';
 import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
 import { maintenanceService } from '../../services/maintenanceService';
