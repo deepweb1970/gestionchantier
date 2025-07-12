@@ -94,12 +94,12 @@ export const MaintenanceSection: React.FC = () => {
   };
 
   const loadMaintenances = async () => {
-    const data = await maintenanceService.getAll();
+    const data = await maintenanceService.getAllMaintenances();
     setMaintenances(data);
   };
 
   const loadMaintenanceTypes = async () => {
-    const data = await maintenanceService.getTypes();
+    const data = await maintenanceService.getAllMaintenanceTypes();
     setMaintenanceTypes(data);
   };
 
