@@ -58,7 +58,8 @@ const toMaterielUpdate = (materiel: Partial<Omit<Materiel, 'id'>>): MaterielUpda
   if (materiel.nextMaintenanceHours !== undefined) update.next_maintenance_hours = materiel.nextMaintenanceHours || null;
   if (materiel.localisation !== undefined) update.localisation = materiel.localisation || null;
   if (materiel.tarifHoraire !== undefined) update.tarif_horaire = materiel.tarifHoraire || null;
-  if (materiel.machineHours !== undefined) update.machine_hours = materiel.machineHours || 0;
+  if (materiel.machineHours !== undefined) update.machine_hours = materiel.machineHours;
+  if (materiel.nextMaintenanceHours !== undefined) update.next_maintenance_hours = materiel.nextMaintenanceHours;
   
   return update;
 };
