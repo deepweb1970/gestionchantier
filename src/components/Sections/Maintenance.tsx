@@ -1192,6 +1192,8 @@ export const MaintenanceSection: React.FC = () => {
       </Modal>
     </div>
   );
-};
+};_s(MaintenanceSection, "sXjrbIlnYv4wLygzp3f+GJ5IVTo=", false, function () {return [useRealtimeSupabase, useRealtimeSupabase, useRealtimeSupabase, useRealtimeSupabase];});_c = MaintenanceSection;
 
-export { MaintenanceSection }
+var _c;$RefreshReg$(_c, "MaintenanceSection");
+if (import.meta.hot && !inWebWorker) {
+  window.$RefreshReg$ = prevRefreshReg;
