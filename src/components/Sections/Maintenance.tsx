@@ -1193,3 +1193,5 @@ export const MaintenanceSection: React.FC = () => {
     </div>
   );
 };
+
+export { MaintenanceSection }
