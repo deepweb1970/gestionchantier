@@ -85,6 +85,8 @@ export const MaterielSection: React.FC = () => {
       prochaineMaintenance: formData.get('prochaineMaintenance') as string || undefined,
       localisation: formData.get('localisation') as string || undefined,
       tarifHoraire: parseFloat(formData.get('tarifHoraire') as string) || undefined,
+      machineHours: parseFloat(formData.get('machineHours') as string) || 0,
+      nextMaintenanceHours: parseFloat(formData.get('nextMaintenanceHours') as string) || undefined,
     };
 
     try {
@@ -240,7 +242,7 @@ export const MaterielSection: React.FC = () => {
                 type="number"
                 min="0"
                 step="0.1"
-                defaultValue={editingMateriel?.machineHours || 0}
+                defaultValue={editingMateriel?.machineHours ?? 0}
                 className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <Clock className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -258,7 +260,7 @@ export const MaterielSection: React.FC = () => {
                 type="number"
                 min="0"
                 step="0.1"
-                defaultValue={editingMateriel?.nextMaintenanceHours || ''}
+                defaultValue={editingMateriel?.nextMaintenanceHours ?? ''}
                 className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <Gauge className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
