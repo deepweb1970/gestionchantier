@@ -24,40 +24,54 @@ import {
   AlertCircle, 
   CheckCircle 
 } from 'lucide-react';
-import { mockChantiers, mockOuvriers, mockMateriel, mockSaisiesHeures, mockFactures, mockClients } from '../../data/mockData';
+import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
+import { rapportService } from '../../services/rapportService';
+import { clientService } from '../../services/clientService';
+import { chantierService } from '../../services/chantierService';
+import { ouvrierService } from '../../services/ouvrierService';
+import { materielService } from '../../services/materielService';
+import { saisieHeureService } from '../../services/saisieHeureService';
+import { factureService } from '../../services/factureService';
 import { Rapport, RapportType } from '../../types';
 import { Modal } from '../Common/Modal';
 import { Button } from '../Common/Button';
 
 export const Rapports: React.FC = () => {
-  const [rapports, setRapports] = useState<Rapport[]>([
-    {
-      id: '1',
-      nom: 'Rapport Mensuel Janvier 2024',
-      type: 'performance',
-      dateDebut: '2024-01-01',
-      dateFin: '2024-01-31',
-      parametres: {
-        chantiers: ['1', '2'],
-        ouvriers: ['1', '2'],
-        materiel: ['1']
-      },
-      dateCreation: '2024-02-01',
-      creePar: 'Admin'
-    },
-    {
-      id: '2',
-      nom: 'Analyse Coûts Q1 2024',
-      type: 'couts',
-      dateDebut: '2024-01-01',
-      dateFin: '2024-03-31',
-      parametres: {
-        chantiers: ['1', '2', '3']
-      },
-      dateCreation: '2024-04-01',
-      creePar: 'Manager'
-    }
-  ]);
+  // Récupération des données en temps réel
+  const { data: rapports, loading: rapportsLoading, error: rapportsError, refresh: refreshRapports } = useRealtimeSupabase<Rapport>({
+    table: 'rapports',
+    fetchFunction: rapportService.getAll
+  });
+  
+  const { data: chantiers } = useRealtimeSupabase({
+    table: 'chantiers',
+    fetchFunction: chantierService.getAll
+  });
+  
+  const { data: ouvriers } = useRealtimeSupabase({
+    table: 'ouvriers',
+    fetchFunction: ouvrierService.getAll
+  });
+  
+  const { data: materiel } = useRealtimeSupabase({
+    table: 'materiel',
+    fetchFunction: materielService.getAll
+  });
+  
+  const { data: saisiesHeures } = useRealtimeSupabase({
+    table: 'saisies_heures',
+    fetchFunction: saisieHeureService.getAll
+  });
+  
+  const { data: factures } = useRealtimeSupabase({
+    table: 'factures',
+    fetchFunction: factureService.getAll
+  });
+  
+  const { data: clients } = useRealtimeSupabase({
+    table: 'clients',
+    fetchFunction: clientService.getAll
+  });
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -71,8 +85,29 @@ export const Rapports: React.FC = () => {
   const [selectedChantiers, setSelectedChantiers] = useState<string[]>([]);
   const [selectedOuvriers, setSelectedOuvriers] = useState<string[]>([]);
   const [selectedMateriel, setSelectedMateriel] = useState<string[]>([]);
+  const [globalStats, setGlobalStats] = useState<any>(null);
+  const [performanceIndicators, setPerformanceIndicators] = useState<any>(null);
+  const [analysisData, setAnalysisData] = useState<any>(null);
 
-  const filteredRapports = rapports.filter(rapport => {
+  // Charger les statistiques globales
+  React.useEffect(() => {
+    const loadStats = async () => {
+      try {
+        const [stats, indicators] = await Promise.all([
+          rapportService.getGlobalStats(),
+          rapportService.getPerformanceIndicators()
+        ]);
+        setGlobalStats(stats);
+        setPerformanceIndicators(indicators);
+      } catch (error) {
+        console.error('Erreur lors du chargement des statistiques:', error);
+      }
+    };
+    
+    loadStats();
+  }, []);
+
+  const filteredRapports = (rapports || []).filter(rapport => {
     const matchesSearch = rapport.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          rapport.creePar.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = typeFilter === 'all' || rapport.type === typeFilter;
@@ -94,13 +129,19 @@ export const Rapports: React.FC = () => {
     setIsDetailModalOpen(true);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Êtes-vous sûr de vouloir supprimer ce rapport ?')) {
-      setRapports(rapports.filter(r => r.id !== id));
+      try {
+        await rapportService.delete(id);
+        refreshRapports();
+      } catch (error) {
+        console.error('Erreur lors de la suppression:', error);
+        alert('Erreur lors de la suppression du rapport');
+      }
     }
   };
 
-  const handleSave = (formData: FormData) => {
+  const handleSave = async (formData: FormData) => {
     const rapportData: Rapport = {
       id: editingRapport?.id || Date.now().toString(),
       nom: formData.get('nom') as string,
@@ -116,15 +157,21 @@ export const Rapports: React.FC = () => {
       creePar: editingRapport?.creePar || 'Admin'
     };
 
-    if (editingRapport) {
-      setRapports(rapports.map(r => r.id === editingRapport.id ? rapportData : r));
-    } else {
-      setRapports([...rapports, rapportData]);
+    try {
+      if (editingRapport) {
+        await rapportService.update(editingRapport.id, rapportData);
+      } else {
+        await rapportService.create(rapportData);
+      }
+      
+      refreshRapports();
+      setIsModalOpen(false);
+      setEditingRapport(null);
+      resetForm();
+    } catch (error) {
+      console.error('Erreur lors de l\'enregistrement:', error);
+      alert('Erreur lors de l\'enregistrement du rapport');
     }
-    
-    setIsModalOpen(false);
-    setEditingRapport(null);
-    resetForm();
   };
 
   const resetForm = () => {
@@ -135,95 +182,21 @@ export const Rapports: React.FC = () => {
     setSelectedMateriel([]);
   };
 
-  const generateRapport = () => {
+  const generateRapport = async () => {
     if (!dateDebut || !dateFin) {
       alert('Veuillez sélectionner une période');
       return;
     }
 
-    const data = analyzeData(dateDebut, dateFin, selectedChantiers, selectedOuvriers, selectedMateriel);
-    console.log('Données du rapport:', data);
-    // Ici on pourrait générer un PDF ou Excel
-  };
-
-  const analyzeData = (debut: string, fin: string, chantiers: string[], ouvriers: string[], materiel: string[]) => {
-    // Filtrer les données selon les critères
-    const saisiesFiltrees = mockSaisiesHeures.filter(saisie => {
-      const dateOk = saisie.date >= debut && saisie.date <= fin;
-      const chantierOk = chantiers.length === 0 || chantiers.includes(saisie.chantierId);
-      const ouvrierOk = ouvriers.length === 0 || ouvriers.includes(saisie.ouvrierId);
-      const materielOk = materiel.length === 0 || !saisie.materielId || materiel.includes(saisie.materielId);
-      return dateOk && chantierOk && ouvrierOk && materielOk;
-    });
-
-    const facturesFiltrees = mockFactures.filter(facture => {
-      const dateOk = facture.dateEmission >= debut && facture.dateEmission <= fin;
-      const chantierOk = chantiers.length === 0 || chantiers.includes(facture.chantierId);
-      return dateOk && chantierOk;
-    });
-
-    // Calculs
-    const totalHeures = saisiesFiltrees.reduce((sum, s) => sum + s.heuresNormales + s.heuresSupplementaires, 0);
-    const heuresValidees = saisiesFiltrees.filter(s => s.valide).reduce((sum, s) => sum + s.heuresNormales + s.heuresSupplementaires, 0);
-    const chiffreAffaires = facturesFiltrees.reduce((sum, f) => sum + f.montantTTC, 0);
-    const facturespayees = facturesFiltrees.filter(f => f.statut === 'payee').reduce((sum, f) => sum + f.montantTTC, 0);
-
-    // Coûts de main d'œuvre
-    const coutMainOeuvre = saisiesFiltrees.reduce((sum, saisie) => {
-      const ouvrier = mockOuvriers.find(o => o.id === saisie.ouvrierId);
-      if (!ouvrier) return sum;
-      return sum + (saisie.heuresNormales * ouvrier.tauxHoraire) + 
-                   (saisie.heuresSupplementaires * ouvrier.tauxHoraire * 1.25);
-    }, 0);
-
-    return {
-      periode: { debut, fin },
-      heures: { total: totalHeures, validees: heuresValidees },
-      finances: { chiffreAffaires, facturespayees, coutMainOeuvre },
-      rentabilite: chiffreAffaires > 0 ? ((chiffreAffaires - coutMainOeuvre) / chiffreAffaires * 100) : 0,
-      saisies: saisiesFiltrees,
-      factures: facturesFiltrees
-    };
-  };
-
-  const getGlobalStats = () => {
-    const totalChantiers = mockChantiers.length;
-    const chantiersActifs = mockChantiers.filter(c => c.statut === 'actif').length;
-    const totalOuvriers = mockOuvriers.length;
-    const ouvriersActifs = mockOuvriers.filter(o => o.statut === 'actif').length;
-    const totalMateriel = mockMateriel.length;
-    const materielDisponible = mockMateriel.filter(m => m.statut === 'disponible').length;
-    
-    const chiffreAffairesTotal = mockFactures.reduce((sum, f) => sum + f.montantTTC, 0);
-    const facturesPayees = mockFactures.filter(f => f.statut === 'payee').reduce((sum, f) => sum + f.montantTTC, 0);
-    const facturesEnAttente = mockFactures.filter(f => f.statut === 'envoyee').reduce((sum, f) => sum + f.montantTTC, 0);
-    
-    const totalHeures = mockSaisiesHeures.reduce((sum, s) => sum + s.heuresNormales + s.heuresSupplementaires, 0);
-    const heuresValidees = mockSaisiesHeures.filter(s => s.valide).reduce((sum, s) => sum + s.heuresNormales + s.heuresSupplementaires, 0);
-
-    return {
-      chantiers: { total: totalChantiers, actifs: chantiersActifs },
-      ouvriers: { total: totalOuvriers, actifs: ouvriersActifs },
-      materiel: { total: totalMateriel, disponible: materielDisponible },
-      finances: { total: chiffreAffairesTotal, payees: facturesPayees, enAttente: facturesEnAttente },
-      heures: { total: totalHeures, validees: heuresValidees }
-    };
-  };
-
-  const getPerformanceIndicators = () => {
-    const stats = getGlobalStats();
-    
-    const tauxOccupationOuvriers = (stats.ouvriers.actifs / stats.ouvriers.total) * 100;
-    const tauxValidationHeures = stats.heures.total > 0 ? (stats.heures.validees / stats.heures.total) * 100 : 0;
-    const tauxPaiementFactures = stats.finances.total > 0 ? (stats.finances.payees / stats.finances.total) * 100 : 0;
-    const tauxUtilisationMateriel = 0; // Placeholder for material utilization rate
-
-    return {
-      tauxOccupationOuvriers,
-      tauxValidationHeures,
-      tauxPaiementFactures,
-      tauxUtilisationMateriel
-    };
+    try {
+      const data = await rapportService.analyzeData(dateDebut, dateFin, selectedChantiers, selectedOuvriers, selectedMateriel);
+      setAnalysisData(data);
+      console.log('Données du rapport:', data);
+      // Ici on pourrait générer un PDF ou Excel
+    } catch (error) {
+      console.error('Erreur lors de la génération du rapport:', error);
+      alert('Erreur lors de la génération du rapport');
+    }
   };
 
   const RapportForm = () => (
@@ -298,7 +271,7 @@ export const Rapports: React.FC = () => {
               />
               <span className="text-sm">Tous les chantiers</span>
             </label>
-            {mockChantiers.map(chantier => (
+            {(chantiers || []).map(chantier => (
               <label key={chantier.id} className="flex items-center">
                 <input
                   type="checkbox"
@@ -334,7 +307,7 @@ export const Rapports: React.FC = () => {
               />
               <span className="text-sm">Tous les ouvriers</span>
             </label>
-            {mockOuvriers.map(ouvrier => (
+            {(ouvriers || []).map(ouvrier => (
               <label key={ouvrier.id} className="flex items-center">
                 <input
                   type="checkbox"
@@ -370,21 +343,21 @@ export const Rapports: React.FC = () => {
               />
               <span className="text-sm">Tout le matériel</span>
             </label>
-            {mockMateriel.map(materiel => (
-              <label key={materiel.id} className="flex items-center">
+            {(materiel || []).map(item => (
+              <label key={item.id} className="flex items-center">
                 <input
                   type="checkbox"
-                  checked={selectedMateriel.includes(materiel.id)}
+                  checked={selectedMateriel.includes(item.id)}
                   onChange={(e) => {
                     if (e.target.checked) {
-                      setSelectedMateriel([...selectedMateriel, materiel.id]);
+                      setSelectedMateriel([...selectedMateriel, item.id]);
                     } else {
-                      setSelectedMateriel(selectedMateriel.filter(id => id !== materiel.id));
+                      setSelectedMateriel(selectedMateriel.filter(id => id !== item.id));
                     }
                   }}
                   className="mr-2"
                 />
-                <span className="text-sm">{materiel.nom}</span>
+                <span className="text-sm">{item.nom}</span>
               </label>
             ))}
           </div>
@@ -409,13 +382,15 @@ export const Rapports: React.FC = () => {
   const RapportDetailModal = () => {
     if (!selectedRapport) return null;
 
-    const data = analyzeData(
-      selectedRapport.dateDebut,
-      selectedRapport.dateFin,
-      selectedRapport.parametres.chantiers || [],
-      selectedRapport.parametres.ouvriers || [],
-      selectedRapport.parametres.materiel || []
-    );
+    // Utiliser les données d'analyse si disponibles, sinon afficher un message
+    const data = analysisData || {
+      periode: { debut: selectedRapport.dateDebut, fin: selectedRapport.dateFin },
+      heures: { total: 0, validees: 0 },
+      finances: { chiffreAffaires: 0, facturesPayees: 0, coutMainOeuvre: 0 },
+      rentabilite: 0,
+      saisies: [],
+      factures: []
+    };
 
     return (
       <div className="space-y-6">
@@ -497,19 +472,22 @@ export const Rapports: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {mockChantiers
+                {(chantiers || [])
                   .filter(c => selectedRapport.parametres.chantiers?.length === 0 || selectedRapport.parametres.chantiers?.includes(c.id))
                   .map(chantier => {
-                    const saisiesChantier = data.saisies.filter(s => s.chantierId === chantier.id);
-                    const heuresChantier = saisiesChantier.reduce((sum, s) => sum + s.heuresNormales + s.heuresSupplementaires, 0);
-                    const coutChantier = saisiesChantier.reduce((sum, saisie) => {
-                      const ouvrier = mockOuvriers.find(o => o.id === saisie.ouvrierId);
-                      if (!ouvrier) return sum;
-                      return sum + (saisie.heuresNormales * ouvrier.tauxHoraire) + 
-                                   (saisie.heuresSupplementaires * ouvrier.tauxHoraire * 1.25);
+                    const saisiesChantier = data.saisies.filter((s: any) => s.chantier_id === chantier.id);
+                    const heuresChantier = saisiesChantier.reduce((sum: number, s: any) => {
+                      const heuresTotal = s.heures_total || (s.heures_normales + s.heures_supplementaires + (s.heures_exceptionnelles || 0));
+                      return sum + heuresTotal;
                     }, 0);
-                    const facturesChantier = data.factures.filter(f => f.chantierId === chantier.id);
-                    const facturationChantier = facturesChantier.reduce((sum, f) => sum + f.montantTTC, 0);
+                    const coutChantier = saisiesChantier.reduce((sum, saisie) => {
+                      const ouvrier = saisie.ouvriers as any;
+                      if (!ouvrier) return sum;
+                      const heuresTotal = saisie.heures_total || (saisie.heures_normales + saisie.heures_supplementaires + (saisie.heures_exceptionnelles || 0));
+                      return sum + (heuresTotal * ouvrier.taux_horaire);
+                    }, 0);
+                    const facturesChantier = data.factures.filter((f: any) => f.chantier_id === chantier.id);
+                    const facturationChantier = facturesChantier.reduce((sum: number, f: any) => sum + f.montant_ttc, 0);
 
                     return (
                       <tr key={chantier.id}>
@@ -539,12 +517,12 @@ export const Rapports: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {mockOuvriers
+                {(ouvriers || [])
                   .filter(o => selectedRapport.parametres.ouvriers?.length === 0 || selectedRapport.parametres.ouvriers?.includes(o.id))
                   .map(ouvrier => {
-                    const saisiesOuvrier = data.saisies.filter(s => s.ouvrierId === ouvrier.id);
-                    const heuresNormales = saisiesOuvrier.reduce((sum, s) => sum + s.heuresNormales, 0);
-                    const heuresSupplementaires = saisiesOuvrier.reduce((sum, s) => sum + s.heuresSupplementaires, 0);
+                    const saisiesOuvrier = data.saisies.filter((s: any) => s.ouvrier_id === ouvrier.id);
+                    const heuresNormales = saisiesOuvrier.reduce((sum: number, s: any) => sum + s.heures_normales, 0);
+                    const heuresSupplementaires = saisiesOuvrier.reduce((sum: number, s: any) => sum + s.heures_supplementaires, 0);
                     const coutTotal = (heuresNormales * ouvrier.tauxHoraire) + (heuresSupplementaires * ouvrier.tauxHoraire * 1.25);
 
                     return (
@@ -576,8 +554,14 @@ export const Rapports: React.FC = () => {
   };
 
   const DashboardPersonnalisable = () => {
-    const stats = getGlobalStats();
-    const indicators = getPerformanceIndicators();
+    if (!globalStats || !performanceIndicators) {
+      return (
+        <div className="text-center py-8">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Chargement des statistiques...</p>
+        </div>
+      );
+    }
 
     return (
       <div className="space-y-6">
@@ -595,8 +579,8 @@ export const Rapports: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-blue-100">Chantiers Actifs</p>
-                <p className="text-3xl font-bold">{stats.chantiers.actifs}</p>
-                <p className="text-sm text-blue-100">sur {stats.chantiers.total} total</p>
+                <p className="text-3xl font-bold">{globalStats.chantiers.actifs}</p>
+                <p className="text-sm text-blue-100">sur {globalStats.chantiers.total} total</p>
               </div>
               <Building2 className="w-12 h-12 text-blue-200" />
             </div>
@@ -606,8 +590,8 @@ export const Rapports: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-green-100">Ouvriers Actifs</p>
-                <p className="text-3xl font-bold">{stats.ouvriers.actifs}</p>
-                <p className="text-sm text-green-100">{indicators.tauxOccupationOuvriers.toFixed(1)}% occupation</p>
+                <p className="text-3xl font-bold">{globalStats.ouvriers.actifs}</p>
+                <p className="text-sm text-green-100">{performanceIndicators.tauxOccupationOuvriers.toFixed(1)}% occupation</p>
               </div>
               <Users className="w-12 h-12 text-green-200" />
             </div>
@@ -617,8 +601,8 @@ export const Rapports: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-purple-100">CA Total</p>
-                <p className="text-3xl font-bold">{(stats.finances.total / 1000).toFixed(0)}k€</p>
-                <p className="text-sm text-purple-100">{indicators.tauxPaiementFactures.toFixed(1)}% payé</p>
+                <p className="text-3xl font-bold">{(globalStats.finances.total / 1000).toFixed(0)}k€</p>
+                <p className="text-sm text-purple-100">{performanceIndicators.tauxPaiementFactures.toFixed(1)}% payé</p>
               </div>
               <DollarSign className="w-12 h-12 text-purple-200" />
             </div>
@@ -628,8 +612,8 @@ export const Rapports: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-orange-100">Matériel</p>
-                <p className="text-3xl font-bold">{stats.materiel.total}</p>
-                <p className="text-sm text-orange-100">{indicators.tauxUtilisationMateriel.toFixed(1)}% utilisé</p>
+                <p className="text-3xl font-bold">{globalStats.materiel.total}</p>
+                <p className="text-sm text-orange-100">{performanceIndicators.tauxUtilisationMateriel.toFixed(1)}% utilisé</p>
               </div>
               <Wrench className="w-12 h-12 text-orange-200" />
             </div>
@@ -644,12 +628,12 @@ export const Rapports: React.FC = () => {
               <div>
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-sm text-gray-600">Validation des heures</span>
-                  <span className="text-sm font-medium">{indicators.tauxValidationHeures.toFixed(1)}%</span>
+                  <span className="text-sm font-medium">{performanceIndicators.tauxValidationHeures.toFixed(1)}%</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div 
                     className="bg-blue-600 h-2 rounded-full" 
-                    style={{ width: `${indicators.tauxValidationHeures}%` }}
+                    style={{ width: `${performanceIndicators.tauxValidationHeures}%` }}
                   />
                 </div>
               </div>
@@ -657,12 +641,12 @@ export const Rapports: React.FC = () => {
               <div>
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-sm text-gray-600">Paiement des factures</span>
-                  <span className="text-sm font-medium">{indicators.tauxPaiementFactures.toFixed(1)}%</span>
+                  <span className="text-sm font-medium">{performanceIndicators.tauxPaiementFactures.toFixed(1)}%</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div 
                     className="bg-green-600 h-2 rounded-full" 
-                    style={{ width: `${indicators.tauxPaiementFactures}%` }}
+                    style={{ width: `${performanceIndicators.tauxPaiementFactures}%` }}
                   />
                 </div>
               </div>
@@ -670,12 +654,12 @@ export const Rapports: React.FC = () => {
               <div>
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-sm text-gray-600">Utilisation matériel</span>
-                  <span className="text-sm font-medium">{indicators.tauxUtilisationMateriel.toFixed(1)}%</span>
+                  <span className="text-sm font-medium">{performanceIndicators.tauxUtilisationMateriel.toFixed(1)}%</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div 
                     className="bg-orange-600 h-2 rounded-full" 
-                    style={{ width: `${indicators.tauxUtilisationMateriel}%` }}
+                    style={{ width: `${performanceIndicators.tauxUtilisationMateriel}%` }}
                   />
                 </div>
               </div>
@@ -683,12 +667,12 @@ export const Rapports: React.FC = () => {
               <div>
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-sm text-gray-600">Occupation ouvriers</span>
-                  <span className="text-sm font-medium">{indicators.tauxOccupationOuvriers.toFixed(1)}%</span>
+                  <span className="text-sm font-medium">{performanceIndicators.tauxOccupationOuvriers.toFixed(1)}%</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div 
                     className="bg-purple-600 h-2 rounded-full" 
-                    style={{ width: `${indicators.tauxOccupationOuvriers}%` }}
+                    style={{ width: `${performanceIndicators.tauxOccupationOuvriers}%` }}
                   />
                 </div>
               </div>
@@ -786,198 +770,225 @@ export const Rapports: React.FC = () => {
 
       {/* Aperçu des indicateurs clés */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {(() => {
-          const stats = getGlobalStats();
-          const indicators = getPerformanceIndicators();
-          
-          return (
-            <>
-              <div className="bg-white rounded-lg shadow-sm border p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Performance Globale</p>
-                    <p className="text-2xl font-bold text-blue-600">{indicators.tauxValidationHeures.toFixed(1)}%</p>
-                    <p className="text-sm text-gray-500">Validation heures</p>
-                  </div>
-                  <div className="p-3 rounded-full bg-blue-500">
-                    <Activity className="w-6 h-6 text-white" />
-                  </div>
+        {rapportsLoading ? (
+          <div className="col-span-4 text-center py-8">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Chargement des données...</p>
+          </div>
+        ) : performanceIndicators ? (
+          <>
+            <div className="bg-white rounded-lg shadow-sm border p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Performance Globale</p>
+                  <p className="text-2xl font-bold text-blue-600">{performanceIndicators.tauxValidationHeures.toFixed(1)}%</p>
+                  <p className="text-sm text-gray-500">Validation heures</p>
+                </div>
+                <div className="p-3 rounded-full bg-blue-500">
+                  <Activity className="w-6 h-6 text-white" />
                 </div>
               </div>
+            </div>
 
-              <div className="bg-white rounded-lg shadow-sm border p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Rentabilité</p>
-                    <p className="text-2xl font-bold text-green-600">{indicators.tauxPaiementFactures.toFixed(1)}%</p>
-                    <p className="text-sm text-gray-500">Factures payées</p>
-                  </div>
-                  <div className="p-3 rounded-full bg-green-500">
-                    <TrendingUp className="w-6 h-6 text-white" />
-                  </div>
+            <div className="bg-white rounded-lg shadow-sm border p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Rentabilité</p>
+                  <p className="text-2xl font-bold text-green-600">{performanceIndicators.tauxPaiementFactures.toFixed(1)}%</p>
+                  <p className="text-sm text-gray-500">Factures payées</p>
+                </div>
+                <div className="p-3 rounded-full bg-green-500">
+                  <TrendingUp className="w-6 h-6 text-white" />
                 </div>
               </div>
+            </div>
 
-              <div className="bg-white rounded-lg shadow-sm border p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Utilisation Ressources</p>
-                    <p className="text-2xl font-bold text-orange-600">{indicators.tauxUtilisationMateriel.toFixed(1)}%</p>
-                    <p className="text-sm text-gray-500">Matériel utilisé</p>
-                  </div>
-                  <div className="p-3 rounded-full bg-orange-500">
-                    <Target className="w-6 h-6 text-white" />
-                  </div>
+            <div className="bg-white rounded-lg shadow-sm border p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Utilisation Ressources</p>
+                  <p className="text-2xl font-bold text-orange-600">{performanceIndicators.tauxUtilisationMateriel.toFixed(1)}%</p>
+                  <p className="text-sm text-gray-500">Matériel utilisé</p>
+                </div>
+                <div className="p-3 rounded-full bg-orange-500">
+                  <Target className="w-6 h-6 text-white" />
                 </div>
               </div>
+            </div>
 
-              <div className="bg-white rounded-lg shadow-sm border p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Productivité</p>
-                    <p className="text-2xl font-bold text-purple-600">{indicators.tauxOccupationOuvriers.toFixed(1)}%</p>
-                    <p className="text-sm text-gray-500">Ouvriers actifs</p>
-                  </div>
-                  <div className="p-3 rounded-full bg-purple-500">
-                    <Users className="w-6 h-6 text-white" />
-                  </div>
+            <div className="bg-white rounded-lg shadow-sm border p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Productivité</p>
+                  <p className="text-2xl font-bold text-purple-600">{performanceIndicators.tauxOccupationOuvriers.toFixed(1)}%</p>
+                  <p className="text-sm text-gray-500">Ouvriers actifs</p>
+                </div>
+                <div className="p-3 rounded-full bg-purple-500">
+                  <Users className="w-6 h-6 text-white" />
                 </div>
               </div>
-            </>
-          );
-        })()}
+            </div>
+          </>
+        ) : (
+          <div className="col-span-4 text-center py-8 text-gray-500">
+            <p>Erreur lors du chargement des indicateurs</p>
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-lg shadow-sm border">
-        <div className="p-4 border-b">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <input
-                type="text"
-                placeholder="Rechercher un rapport..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div className="flex items-center space-x-2">
-              <Filter className="w-4 h-4 text-gray-500" />
-              <select
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="all">Tous les types</option>
-                <option value="performance">Performance</option>
-                <option value="couts">Analyse des coûts</option>
-                <option value="activite">Rapport d'activité</option>
-                <option value="financier">Rapport financier</option>
-                <option value="ressources">Utilisation des ressources</option>
-              </select>
-            </div>
+        {rapportsLoading ? (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Chargement des rapports...</p>
           </div>
-        </div>
+        ) : rapportsError ? (
+          <div className="text-center py-8 text-red-500">
+            <p>Erreur lors du chargement des rapports</p>
+            <p className="text-sm">{rapportsError.message}</p>
+          </div>
+        ) : (
+          <>
+            <div className="p-4 border-b">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <input
+                    type="text"
+                    placeholder="Rechercher un rapport..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Filter className="w-4 h-4 text-gray-500" />
+                  <select
+                    value={typeFilter}
+                    onChange={(e) => setTypeFilter(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="all">Tous les types</option>
+                    <option value="performance">Performance</option>
+                    <option value="couts">Analyse des coûts</option>
+                    <option value="activite">Rapport d'activité</option>
+                    <option value="financier">Rapport financier</option>
+                    <option value="ressources">Utilisation des ressources</option>
+                  </select>
+                </div>
+              </div>
+            </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Rapport
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Type
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Période
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Créé par
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Date création
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredRapports.map((rapport) => (
-                <tr key={rapport.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0 h-10 w-10">
-                        <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center">
-                          <BarChart3 className="h-5 w-5 text-white" />
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Rapport
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Type
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Période
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Créé par
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Date création
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredRapports.map((rapport) => (
+                    <tr key={rapport.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0 h-10 w-10">
+                            <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center">
+                              <BarChart3 className="h-5 w-5 text-white" />
+                            </div>
+                          </div>
+                          <div className="ml-4">
+                            <div className="text-sm font-medium text-gray-900">{rapport.nom}</div>
+                          </div>
                         </div>
-                      </div>
-                      <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">{rapport.nom}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      rapport.type === 'performance' ? 'bg-blue-100 text-blue-800' :
-                      rapport.type === 'couts' ? 'bg-orange-100 text-orange-800' :
-                      rapport.type === 'activite' ? 'bg-green-100 text-green-800' :
-                      rapport.type === 'financier' ? 'bg-purple-100 text-purple-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {rapport.type === 'performance' ? 'Performance' :
-                       rapport.type === 'couts' ? 'Coûts' :
-                       rapport.type === 'activite' ? 'Activité' :
-                       rapport.type === 'financier' ? 'Financier' :
-                       'Ressources'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <div className="flex items-center">
-                      <Calendar className="w-4 h-4 mr-1 text-gray-400" />
-                      {new Date(rapport.dateDebut).toLocaleDateString()} - {new Date(rapport.dateFin).toLocaleDateString()}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {rapport.creePar}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {new Date(rapport.dateCreation).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => handleViewDetails(rapport)}
-                        className="text-green-600 hover:text-green-900"
-                        title="Voir détails"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleEdit(rapport)}
-                        className="text-blue-600 hover:text-blue-900"
-                        title="Modifier"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button className="text-purple-600 hover:text-purple-900" title="Télécharger">
-                        <Download className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(rapport.id)}
-                        className="text-red-600 hover:text-red-900"
-                        title="Supprimer"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          rapport.type === 'performance' ? 'bg-blue-100 text-blue-800' :
+                          rapport.type === 'couts' ? 'bg-orange-100 text-orange-800' :
+                          rapport.type === 'activite' ? 'bg-green-100 text-green-800' :
+                          rapport.type === 'financier' ? 'bg-purple-100 text-purple-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {rapport.type === 'performance' ? 'Performance' :
+                           rapport.type === 'couts' ? 'Coûts' :
+                           rapport.type === 'activite' ? 'Activité' :
+                           rapport.type === 'financier' ? 'Financier' :
+                           'Ressources'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <div className="flex items-center">
+                          <Calendar className="w-4 h-4 mr-1 text-gray-400" />
+                          {new Date(rapport.dateDebut).toLocaleDateString()} - {new Date(rapport.dateFin).toLocaleDateString()}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {rapport.creePar}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {new Date(rapport.dateCreation).toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => handleViewDetails(rapport)}
+                            className="text-green-600 hover:text-green-900"
+                            title="Voir détails"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleEdit(rapport)}
+                            className="text-blue-600 hover:text-blue-900"
+                            title="Modifier"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button className="text-purple-600 hover:text-purple-900" title="Télécharger">
+                            <Download className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(rapport.id)}
+                            className="text-red-600 hover:text-red-900"
+                            title="Supprimer"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                {filteredRapports.length === 0 && (
+                  <tfoot>
+                    <tr>
+                      <td colSpan={6} className="px-6 py-10 text-center text-gray-500 bg-gray-50">
+                        Aucun rapport trouvé
+                      </td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Modal de création/modification */}
