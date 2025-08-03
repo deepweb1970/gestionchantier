@@ -21,8 +21,7 @@ import {
   ArrowRight,
   FileText,
   Table,
-  Printer,
-  BarChart3
+  Printer
 } from 'lucide-react';
 import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
 import { PlanningEvent, Chantier, Ouvrier, Materiel } from '../../types';
@@ -79,9 +78,7 @@ export const Planning: React.FC = () => {
   const [exportChantierFilter, setExportChantierFilter] = useState('all');
   const [exportOuvrierFilter, setExportOuvrierFilter] = useState('all');
   const [exportMaterielFilter, setExportMaterielFilter] = useState('all');
-  const [exportFormat, setExportFormat] = useState<'pdf' | 'csv' | 'excel'>('pdf');
-  const [exportType, setExportType] = useState<'table' | 'chart'>('table');
-  const [chartType, setChartType] = useState<'gantt' | 'timeline' | 'calendar'>('gantt');
+  const [exportFormat, setExportFormat] = useState<'pdf' | 'excel' | 'csv'>('pdf');
 
   // Helper functions
   const getChantier = (chantierId?: string): Chantier | undefined => {
@@ -152,407 +149,6 @@ export const Planning: React.FC = () => {
     });
   };
 
-  const exportToCSV = (data: any[], filename: string) => {
-    if (!data.length) return;
-    
-    const headers = Object.keys(data[0]);
-    const csvContent = [
-      headers.join(','),
-      ...data.map(row => 
-        headers.map(header => {
-          const value = row[header];
-          if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
-            return `"${value.replace(/"/g, '""')}"`;
-          }
-          return value;
-        }).join(',')
-      )
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${filename}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
-  const exportToExcel = (data: any[], filename: string) => {
-    // Simulation Excel export
-    const csvContent = data.map(row => 
-      Object.values(row).map(value => 
-        typeof value === 'string' && value.includes(',') ? `"${value}"` : value
-      ).join(',')
-    ).join('\n');
-    
-    const blob = new Blob([csvContent], { type: 'application/vnd.ms-excel' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${filename}.xlsx`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
-  const exportToChart = (data: any[], filename: string) => {
-    // Créer un canvas pour le graphique
-    const canvas = document.createElement('canvas');
-    canvas.width = 1200;
-    canvas.height = 800;
-    const ctx = canvas.getContext('2d');
-    
-    if (!ctx) return;
-    
-    // Configuration du graphique
-    const margin = { top: 60, right: 40, bottom: 80, left: 200 };
-    const chartWidth = canvas.width - margin.left - margin.right;
-    const chartHeight = canvas.height - margin.top - margin.bottom;
-    
-    // Fond blanc
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    if (chartType === 'gantt') {
-      drawGanttChart(ctx, data, margin, chartWidth, chartHeight, filename);
-    } else if (chartType === 'timeline') {
-      drawTimelineChart(ctx, data, margin, chartWidth, chartHeight, filename);
-    } else if (chartType === 'calendar') {
-      drawCalendarChart(ctx, data, margin, chartWidth, chartHeight, filename);
-    }
-    
-    // Télécharger l'image
-    canvas.toBlob((blob) => {
-      if (blob) {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${filename}-${chartType}.png`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      }
-    });
-  };
-  
-  const drawGanttChart = (ctx: CanvasRenderingContext2D, data: any[], margin: any, chartWidth: number, chartHeight: number, filename: string) => {
-    // Titre
-    ctx.fillStyle = '#1f2937';
-    ctx.font = 'bold 24px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText(`Planning Gantt - ${filename}`, canvas.width / 2, 30);
-    
-    // Sous-titre avec période
-    ctx.font = '14px Arial';
-    ctx.fillStyle = '#6b7280';
-    const periode = exportDateStart && exportDateEnd ? 
-      `${new Date(exportDateStart).toLocaleDateString('fr-FR')} - ${new Date(exportDateEnd).toLocaleDateString('fr-FR')}` :
-      'Tous les événements';
-    ctx.fillText(periode, canvas.width / 2, 50);
-    
-    if (data.length === 0) {
-      ctx.fillStyle = '#9ca3af';
-      ctx.font = '16px Arial';
-      ctx.fillText('Aucun événement à afficher', canvas.width / 2, canvas.height / 2);
-      return;
-    }
-    
-    // Calculer la plage de dates
-    const dates = data.map(event => new Date(event['Date début']));
-    const minDate = new Date(Math.min(...dates.map(d => d.getTime())));
-    const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
-    const totalDays = Math.ceil((maxDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-    
-    // Grouper par ressource (ouvrier ou matériel)
-    const resources = [...new Set(data.map(event => event.Ouvrier || event.Matériel || 'Non assigné'))];
-    const rowHeight = Math.min(40, chartHeight / resources.length);
-    
-    // Dessiner l'axe des dates (en haut)
-    ctx.fillStyle = '#374151';
-    ctx.font = '12px Arial';
-    ctx.textAlign = 'center';
-    
-    for (let i = 0; i <= totalDays; i += Math.max(1, Math.floor(totalDays / 10))) {
-      const date = new Date(minDate.getTime() + i * 24 * 60 * 60 * 1000);
-      const x = margin.left + (i / totalDays) * chartWidth;
-      
-      // Ligne verticale
-      ctx.strokeStyle = '#e5e7eb';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(x, margin.top);
-      ctx.lineTo(x, margin.top + chartHeight);
-      ctx.stroke();
-      
-      // Date
-      ctx.fillText(date.toLocaleDateString('fr-FR'), x, margin.top - 10);
-    }
-    
-    // Dessiner les ressources et leurs événements
-    ctx.textAlign = 'left';
-    resources.forEach((resource, index) => {
-      const y = margin.top + index * rowHeight;
-      
-      // Nom de la ressource
-      ctx.fillStyle = '#374151';
-      ctx.font = 'bold 12px Arial';
-      ctx.fillText(resource, 10, y + rowHeight / 2 + 4);
-      
-      // Ligne horizontale
-      ctx.strokeStyle = '#e5e7eb';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(margin.left, y + rowHeight);
-      ctx.lineTo(margin.left + chartWidth, y + rowHeight);
-      ctx.stroke();
-      
-      // Événements pour cette ressource
-      const resourceEvents = data.filter(event => 
-        (event.Ouvrier === resource) || (event.Matériel === resource) || 
-        (!event.Ouvrier && !event.Matériel && resource === 'Non assigné')
-      );
-      
-      resourceEvents.forEach((event, eventIndex) => {
-        const startDate = new Date(event['Date début']);
-        const endDate = new Date(event['Date fin']);
-        
-        const startX = margin.left + ((startDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24)) / totalDays * chartWidth;
-        const endX = margin.left + ((endDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24)) / totalDays * chartWidth;
-        const barWidth = Math.max(2, endX - startX);
-        
-        // Couleur selon le type
-        const colors = {
-          'chantier': '#3b82f6',
-          'maintenance': '#f59e0b',
-          'conge': '#10b981',
-          'formation': '#8b5cf6'
-        };
-        ctx.fillStyle = colors[event.Type as keyof typeof colors] || '#6b7280';
-        
-        // Barre de l'événement
-        const barY = y + 5 + (eventIndex % 3) * 10;
-        ctx.fillRect(startX, barY, barWidth, 8);
-        
-        // Texte de l'événement (si assez de place)
-        if (barWidth > 50) {
-          ctx.fillStyle = '#ffffff';
-          ctx.font = '10px Arial';
-          ctx.textAlign = 'left';
-          const text = event.Titre.length > 15 ? event.Titre.substring(0, 15) + '...' : event.Titre;
-          ctx.fillText(text, startX + 2, barY + 6);
-        }
-      });
-    });
-    
-    // Légende
-    const legendY = margin.top + chartHeight + 20;
-    const legendItems = [
-      { type: 'chantier', color: '#3b82f6', label: 'Chantier' },
-      { type: 'maintenance', color: '#f59e0b', label: 'Maintenance' },
-      { type: 'conge', color: '#10b981', label: 'Congé' },
-      { type: 'formation', color: '#8b5cf6', label: 'Formation' }
-    ];
-    
-    legendItems.forEach((item, index) => {
-      const x = margin.left + index * 120;
-      
-      // Rectangle coloré
-      ctx.fillStyle = item.color;
-      ctx.fillRect(x, legendY, 15, 10);
-      
-      // Texte
-      ctx.fillStyle = '#374151';
-      ctx.font = '12px Arial';
-      ctx.textAlign = 'left';
-      ctx.fillText(item.label, x + 20, legendY + 8);
-    });
-  };
-  
-  const drawTimelineChart = (ctx: CanvasRenderingContext2D, data: any[], margin: any, chartWidth: number, chartHeight: number, filename: string) => {
-    // Titre
-    ctx.fillStyle = '#1f2937';
-    ctx.font = 'bold 24px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText(`Timeline - ${filename}`, canvas.width / 2, 30);
-    
-    if (data.length === 0) {
-      ctx.fillStyle = '#9ca3af';
-      ctx.font = '16px Arial';
-      ctx.fillText('Aucun événement à afficher', canvas.width / 2, canvas.height / 2);
-      return;
-    }
-    
-    // Trier les événements par date
-    const sortedData = [...data].sort((a, b) => 
-      new Date(a['Date début']).getTime() - new Date(b['Date début']).getTime()
-    );
-    
-    // Ligne de temps centrale
-    const timelineY = margin.top + chartHeight / 2;
-    ctx.strokeStyle = '#374151';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(margin.left, timelineY);
-    ctx.lineTo(margin.left + chartWidth, timelineY);
-    ctx.stroke();
-    
-    // Événements sur la timeline
-    sortedData.forEach((event, index) => {
-      const x = margin.left + (index / (sortedData.length - 1)) * chartWidth;
-      const isEven = index % 2 === 0;
-      const eventY = isEven ? timelineY - 80 : timelineY + 80;
-      
-      // Ligne vers l'événement
-      ctx.strokeStyle = '#6b7280';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(x, timelineY);
-      ctx.lineTo(x, eventY);
-      ctx.stroke();
-      
-      // Point sur la timeline
-      ctx.fillStyle = '#3b82f6';
-      ctx.beginPath();
-      ctx.arc(x, timelineY, 6, 0, 2 * Math.PI);
-      ctx.fill();
-      
-      // Boîte d'événement
-      const boxWidth = 150;
-      const boxHeight = 60;
-      const boxX = x - boxWidth / 2;
-      const boxY = eventY - (isEven ? boxHeight : 0);
-      
-      // Fond de la boîte
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
-      
-      // Bordure de la boîte
-      ctx.strokeStyle = '#d1d5db';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(boxX, boxY, boxWidth, boxHeight);
-      
-      // Texte de l'événement
-      ctx.fillStyle = '#1f2937';
-      ctx.font = 'bold 11px Arial';
-      ctx.textAlign = 'center';
-      const title = event.Titre.length > 20 ? event.Titre.substring(0, 20) + '...' : event.Titre;
-      ctx.fillText(title, x, boxY + 15);
-      
-      ctx.font = '9px Arial';
-      ctx.fillStyle = '#6b7280';
-      ctx.fillText(event['Date début'], x, boxY + 30);
-      ctx.fillText(`${event['Heure début']} - ${event['Heure fin']}`, x, boxY + 42);
-      ctx.fillText(event.Type, x, boxY + 54);
-    });
-  };
-  
-  const drawCalendarChart = (ctx: CanvasRenderingContext2D, data: any[], margin: any, chartWidth: number, chartHeight: number, filename: string) => {
-    // Titre
-    ctx.fillStyle = '#1f2937';
-    ctx.font = 'bold 24px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText(`Calendrier - ${filename}`, canvas.width / 2, 30);
-    
-    if (data.length === 0) {
-      ctx.fillStyle = '#9ca3af';
-      ctx.font = '16px Arial';
-      ctx.fillText('Aucun événement à afficher', canvas.width / 2, canvas.height / 2);
-      return;
-    }
-    
-    // Calculer la plage de dates pour le calendrier
-    const dates = data.map(event => new Date(event['Date début']));
-    const minDate = new Date(Math.min(...dates.map(d => d.getTime())));
-    const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
-    
-    // Ajuster au début et fin de mois
-    const startMonth = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
-    const endMonth = new Date(maxDate.getFullYear(), maxDate.getMonth() + 1, 0);
-    
-    // Calculer le nombre de semaines nécessaires
-    const totalDays = Math.ceil((endMonth.getTime() - startMonth.getTime()) / (1000 * 60 * 60 * 24));
-    const weeks = Math.ceil(totalDays / 7);
-    
-    const cellWidth = chartWidth / 7;
-    const cellHeight = chartHeight / weeks;
-    
-    // Jours de la semaine
-    const dayNames = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
-    ctx.fillStyle = '#374151';
-    ctx.font = 'bold 12px Arial';
-    ctx.textAlign = 'center';
-    
-    dayNames.forEach((day, index) => {
-      const x = margin.left + index * cellWidth + cellWidth / 2;
-      ctx.fillText(day, x, margin.top - 10);
-    });
-    
-    // Grille du calendrier
-    for (let week = 0; week < weeks; week++) {
-      for (let day = 0; day < 7; day++) {
-        const currentDate = new Date(startMonth);
-        currentDate.setDate(startMonth.getDate() + week * 7 + day);
-        
-        const x = margin.left + day * cellWidth;
-        const y = margin.top + week * cellHeight;
-        
-        // Bordure de la cellule
-        ctx.strokeStyle = '#e5e7eb';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(x, y, cellWidth, cellHeight);
-        
-        // Numéro du jour
-        ctx.fillStyle = currentDate.getMonth() === minDate.getMonth() || currentDate.getMonth() === maxDate.getMonth() ? 
-          '#1f2937' : '#9ca3af';
-        ctx.font = '12px Arial';
-        ctx.textAlign = 'left';
-        ctx.fillText(currentDate.getDate().toString(), x + 5, y + 15);
-        
-        // Événements de ce jour
-        const dayEvents = data.filter(event => {
-          const eventDate = new Date(event['Date début']);
-          return eventDate.toDateString() === currentDate.toDateString();
-        });
-        
-        dayEvents.slice(0, 3).forEach((event, eventIndex) => {
-          const eventY = y + 20 + eventIndex * 12;
-          
-          // Couleur selon le type
-          const colors = {
-            'chantier': '#3b82f6',
-            'maintenance': '#f59e0b',
-            'conge': '#10b981',
-            'formation': '#8b5cf6'
-          };
-          ctx.fillStyle = colors[event.Type as keyof typeof colors] || '#6b7280';
-          
-          // Rectangle de l'événement
-          ctx.fillRect(x + 2, eventY, cellWidth - 4, 10);
-          
-          // Texte de l'événement
-          ctx.fillStyle = '#ffffff';
-          ctx.font = '8px Arial';
-          ctx.textAlign = 'left';
-          const text = event.Titre.length > 12 ? event.Titre.substring(0, 12) + '...' : event.Titre;
-          ctx.fillText(text, x + 4, eventY + 7);
-        });
-        
-        // Indicateur s'il y a plus d'événements
-        if (dayEvents.length > 3) {
-          ctx.fillStyle = '#6b7280';
-          ctx.font = '8px Arial';
-          ctx.textAlign = 'center';
-          ctx.fillText(`+${dayEvents.length - 3}`, x + cellWidth / 2, y + cellHeight - 5);
-        }
-      }
-    }
-  };
-
   const handleExport = () => {
     const filteredEvents = getFilteredEventsForExport();
     
@@ -591,55 +187,88 @@ export const Planning: React.FC = () => {
       ? `du ${new Date(exportDateStart).toLocaleDateString()} au ${new Date(exportDateEnd).toLocaleDateString()}`
       : 'toutes périodes';
     
-    const filename = `planning-${new Date().toISOString().split('T')[0]}`;
-    
-    try {
-      if (exportType === 'table') {
-        if (exportFormat === 'pdf') {
-          const columns = [
-            { header: 'Titre', dataKey: 'Titre', width: 40 },
-            { header: 'Type', dataKey: 'Type', width: 20 },
-            { header: 'Date début', dataKey: 'Date début', width: 22 },
-            { header: 'Heure début', dataKey: 'Heure début', width: 18 },
-            { header: 'Date fin', dataKey: 'Date fin', width: 22 },
-            { header: 'Heure fin', dataKey: 'Heure fin', width: 18 },
-            { header: 'Durée (h)', dataKey: 'Durée (h)', width: 15 },
-            { header: 'Chantier', dataKey: 'Chantier', width: 30 },
-            { header: 'Ouvrier', dataKey: 'Ouvrier', width: 25 }
-          ];
-          
-          const stats = {
-            'Nombre d\'événements': filteredEvents.length,
-            'Période': periodText,
-            'Total heures': exportData.reduce((sum, event) => sum + parseFloat(event['Durée (h)']), 0).toFixed(1) + 'h',
-            'Événements chantier': filteredEvents.filter(e => e.type === 'chantier').length,
-            'Événements maintenance': filteredEvents.filter(e => e.type === 'maintenance').length,
-            'Congés': filteredEvents.filter(e => e.type === 'conge').length
-          };
-          
-          exportToPDF({
-            title: 'Planning des Événements',
-            subtitle: `Période: ${periodText}`,
-            data: exportData,
-            columns,
-            filename,
-            includeStats: true,
-            stats
-          });
-        } else if (exportFormat === 'csv') {
-          exportToCSV(exportData, filename);
-        } else if (exportFormat === 'excel') {
-          exportToExcel(exportData, filename);
-        }
-      } else if (exportType === 'chart') {
-        exportToChart(exportData, filename);
-      }
+    if (exportFormat === 'pdf') {
+      const columns = [
+        { header: 'Titre', dataKey: 'Titre', width: 40 },
+        { header: 'Type', dataKey: 'Type', width: 20 },
+        { header: 'Date début', dataKey: 'Date début', width: 22 },
+        { header: 'Heure début', dataKey: 'Heure début', width: 18 },
+        { header: 'Date fin', dataKey: 'Date fin', width: 22 },
+        { header: 'Heure fin', dataKey: 'Heure fin', width: 18 },
+        { header: 'Durée (h)', dataKey: 'Durée (h)', width: 15 },
+        { header: 'Chantier', dataKey: 'Chantier', width: 30 },
+        { header: 'Ouvrier', dataKey: 'Ouvrier', width: 25 }
+      ];
       
-      setIsExportModalOpen(false);
-    } catch (error) {
-      console.error('Erreur lors de l\'export:', error);
-      alert('Erreur lors de l\'export');
+      const stats = {
+        'Nombre d\'événements': filteredEvents.length,
+        'Période': periodText,
+        'Total heures': exportData.reduce((sum, event) => sum + parseFloat(event['Durée (h)']), 0).toFixed(1) + 'h',
+        'Événements chantier': filteredEvents.filter(e => e.type === 'chantier').length,
+        'Événements maintenance': filteredEvents.filter(e => e.type === 'maintenance').length,
+        'Congés': filteredEvents.filter(e => e.type === 'conge').length
+      };
+      
+      exportToPDF({
+        title: 'Planning des Événements',
+        subtitle: `Période: ${periodText}`,
+        data: exportData,
+        columns,
+        filename: `planning-${new Date().toISOString().split('T')[0]}`,
+        includeStats: true,
+        stats
+      });
+    } else if (exportFormat === 'csv') {
+      exportToCSV(exportData, `planning-${new Date().toISOString().split('T')[0]}`);
+    } else if (exportFormat === 'excel') {
+      exportToExcel(exportData, `planning-${new Date().toISOString().split('T')[0]}`);
     }
+    
+    setIsExportModalOpen(false);
+  };
+
+  const exportToCSV = (data: any[], filename: string) => {
+    if (!data.length) return;
+    
+    const headers = Object.keys(data[0]);
+    const csvContent = [
+      headers.join(','),
+      ...data.map(row => 
+        headers.map(header => {
+          const value = row[header];
+          if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
+            return `"${value.replace(/"/g, '""')}"`;
+          }
+          return value;
+        }).join(',')
+      )
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${filename}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const exportToExcel = (data: any[], filename: string) => {
+    // Simulation d'export Excel - en production, utiliser une bibliothèque comme SheetJS
+    const jsonContent = JSON.stringify(data, null, 2);
+    const blob = new Blob([jsonContent], { 
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${filename}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   // Check for conflicts
@@ -905,126 +534,47 @@ export const Planning: React.FC = () => {
       </div>
 
       <div className="space-y-4">
-        {/* Type d'export */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-3">Type d'export</label>
+          <h4 className="text-sm font-medium text-gray-700 mb-3">Format d'export</h4>
           <div className="space-y-2">
             <label className="flex items-center">
               <input
                 type="radio"
-                name="exportType"
-                value="table"
-                checked={exportType === 'table'}
-                onChange={(e) => setExportType(e.target.value as 'table' | 'chart')}
+                name="format"
+                value="pdf"
+                checked={exportFormat === 'pdf'}
+                onChange={(e) => setExportFormat(e.target.value as 'pdf')}
                 className="mr-3"
               />
-              <FileText className="w-5 h-5 mr-2 text-blue-500" />
-              <span>Tableau de données</span>
+              <FileText className="w-5 h-5 mr-2 text-red-500" />
+              <span>PDF - Document formaté avec statistiques</span>
             </label>
             <label className="flex items-center">
               <input
                 type="radio"
-                name="exportType"
-                value="chart"
-                checked={exportType === 'chart'}
-                onChange={(e) => setExportType(e.target.value as 'table' | 'chart')}
+                name="format"
+                value="csv"
+                checked={exportFormat === 'csv'}
+                onChange={(e) => setExportFormat(e.target.value as 'csv')}
                 className="mr-3"
               />
-              <BarChart3 className="w-5 h-5 mr-2 text-green-500" />
-              <span>Graphique visuel</span>
+              <Table className="w-5 h-5 mr-2 text-green-500" />
+              <span>CSV - Données tabulaires</span>
+            </label>
+            <label className="flex items-center">
+              <input
+                type="radio"
+                name="format"
+                value="excel"
+                checked={exportFormat === 'excel'}
+                onChange={(e) => setExportFormat(e.target.value as 'excel')}
+                className="mr-3"
+              />
+              <Table className="w-5 h-5 mr-2 text-blue-500" />
+              <span>Excel - Feuille de calcul</span>
             </label>
           </div>
         </div>
-
-        {/* Format d'export pour tableau */}
-        {exportType === 'table' && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">Format de fichier</label>
-            <div className="space-y-2">
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  name="format"
-                  value="pdf"
-                  checked={exportFormat === 'pdf'}
-                  onChange={(e) => setExportFormat(e.target.value as 'pdf')}
-                  className="mr-3"
-                />
-                <FileText className="w-5 h-5 mr-2 text-red-500" />
-                <span>PDF - Document formaté</span>
-              </label>
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  name="format"
-                  value="csv"
-                  checked={exportFormat === 'csv'}
-                  onChange={(e) => setExportFormat(e.target.value as 'csv')}
-                  className="mr-3"
-                />
-                <FileText className="w-5 h-5 mr-2 text-green-500" />
-                <span>CSV - Données tabulaires</span>
-              </label>
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  name="format"
-                  value="excel"
-                  checked={exportFormat === 'excel'}
-                  onChange={(e) => setExportFormat(e.target.value as 'excel')}
-                  className="mr-3"
-                />
-                <FileText className="w-5 h-5 mr-2 text-blue-500" />
-                <span>Excel - Feuille de calcul</span>
-              </label>
-            </div>
-          </div>
-        )}
-
-        {/* Type de graphique */}
-        {exportType === 'chart' && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">Type de graphique</label>
-            <div className="space-y-2">
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  name="chartType"
-                  value="gantt"
-                  checked={chartType === 'gantt'}
-                  onChange={(e) => setChartType(e.target.value as 'gantt' | 'timeline' | 'calendar')}
-                  className="mr-3"
-                />
-                <BarChart3 className="w-5 h-5 mr-2 text-blue-500" />
-                <span>Diagramme de Gantt</span>
-              </label>
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  name="chartType"
-                  value="timeline"
-                  checked={chartType === 'timeline'}
-                  onChange={(e) => setChartType(e.target.value as 'gantt' | 'timeline' | 'calendar')}
-                  className="mr-3"
-                />
-                <Clock className="w-5 h-5 mr-2 text-purple-500" />
-                <span>Timeline chronologique</span>
-              </label>
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  name="chartType"
-                  value="calendar"
-                  checked={chartType === 'calendar'}
-                  onChange={(e) => setChartType(e.target.value as 'gantt' | 'timeline' | 'calendar')}
-                  className="mr-3"
-                />
-                <Calendar className="w-5 h-5 mr-2 text-green-500" />
-                <span>Vue calendrier</span>
-              </label>
-            </div>
-          </div>
-        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
@@ -1099,13 +649,8 @@ export const Planning: React.FC = () => {
           <h4 className="text-sm font-medium text-gray-700 mb-2">Aperçu de l'export</h4>
           <div className="text-sm text-gray-600">
             <p>• {getFilteredEventsForExport().length} événement(s) à exporter</p>
-            <p>• Type: {exportType === 'table' ? 'Tableau' : 'Graphique'}</p>
-            {exportType === 'table' && <p>• Format: {exportFormat.toUpperCase()}</p>}
-            {exportType === 'chart' && <p>• Graphique: {
-              chartType === 'gantt' ? 'Diagramme de Gantt' :
-              chartType === 'timeline' ? 'Timeline' :
-              'Calendrier'
-            }</p>}
+            <p>• Format: {exportFormat.toUpperCase()}</p>
+            <p>• Colonnes: Titre, Type, Date début, Heure début, Date fin, Heure fin, Durée, Chantier, Ouvrier, Matériel, Description</p>
             {exportDateStart && exportDateEnd && (
               <p>• Période: {new Date(exportDateStart).toLocaleDateString()} - {new Date(exportDateEnd).toLocaleDateString()}</p>
             )}
@@ -1118,16 +663,6 @@ export const Planning: React.FC = () => {
             {exportMaterielFilter !== 'all' && (
               <p>• Matériel: {materiel?.find(m => m.id === exportMaterielFilter)?.nom}</p>
             )}
-            <p>• Colonnes: Titre, Type, Date début, Heure début, Date fin, Heure fin, Durée, Chantier, Ouvrier, Matériel, Description</p>
-            {exportType === 'chart' && (
-              <div className="mt-2 p-2 bg-blue-50 rounded">
-                <p className="text-blue-700 text-xs">
-                  {chartType === 'gantt' && '📊 Diagramme de Gantt : Vue chronologique avec barres par ressource'}
-                  {chartType === 'timeline' && '⏱️ Timeline : Vue chronologique linéaire des événements'}
-                  {chartType === 'calendar' && '📅 Calendrier : Vue mensuelle avec événements par jour'}
-                </p>
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -1138,7 +673,7 @@ export const Planning: React.FC = () => {
         </Button>
         <Button onClick={handleExport} disabled={getFilteredEventsForExport().length === 0}>
           <Download className="w-4 h-4 mr-2" />
-          Exporter {exportType === 'table' ? exportFormat.toUpperCase() : 'Graphique'}
+          Exporter
         </Button>
       </div>
     </div>
