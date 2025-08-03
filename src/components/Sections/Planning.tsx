@@ -415,10 +415,10 @@ export const Planning: React.FC = () => {
               name="heureDebut"
               type="time"
               required
-              defaultValue={editingEvent?.dateDebut ? 
-                editingEvent.dateDebut.includes('T') ? 
-                  editingEvent.dateDebut.split('T')[1].substring(0, 5) : 
-                  '08:00'}
+              defaultValue={editingEvent ? 
+                (editingEvent.dateDebut.includes('T') ?
+                  editingEvent.dateDebut.split('T')[1].substring(0, 5) :
+                  '08:00') : '08:00'}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -441,10 +441,10 @@ export const Planning: React.FC = () => {
               name="heureFin"
               type="time"
               required
-              defaultValue={editingEvent?.dateFin ? 
-                editingEvent.dateFin.includes('T') ? 
-                  editingEvent.dateFin.split('T')[1].substring(0, 5) : 
-                  '17:00'}
+              defaultValue={editingEvent ? 
+                (editingEvent.dateFin.includes('T') ?
+                  editingEvent.dateFin.split('T')[1].substring(0, 5) :
+                  '17:00') : '17:00'}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
