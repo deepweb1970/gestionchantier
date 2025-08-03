@@ -179,8 +179,9 @@ export const exportRapportToPDF = (rapport: any, analysisData: any) => {
     chantier: saisie.chantiers ? saisie.chantiers.nom : '-',
     heures: saisie.heures_total || (saisie.heures_normales + saisie.heures_supplementaires + (saisie.heures_exceptionnelles || 0)),
     description: saisie.description,
-    statut: saisie.valide ? 'Validée' : 'En attente'
-  }));
+    statut: saisie.valide ? 'Validée' : 'En attente',
+    dateSort: new Date(saisie.date) // Ajouter une date pour le tri
+  })).sort((a, b) => a.dateSort.getTime() - b.dateSort.getTime()); // Trier par date croissante
   
   exportToPDF({
     title: rapport.nom,
