@@ -21,7 +21,10 @@ import {
   ArrowRight,
   FileText,
   Table,
-  Printer
+  Printer,
+  BarChart3,
+  PieChart,
+  TrendingUp
 } from 'lucide-react';
 import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
 import { PlanningEvent, Chantier, Ouvrier, Materiel } from '../../types';
@@ -63,6 +66,7 @@ export const Planning: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isChartExportModalOpen, setIsChartExportModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<PlanningEvent | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<PlanningEvent | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -79,6 +83,15 @@ export const Planning: React.FC = () => {
   const [exportOuvrierFilter, setExportOuvrierFilter] = useState('all');
   const [exportMaterielFilter, setExportMaterielFilter] = useState('all');
   const [exportFormat, setExportFormat] = useState<'pdf' | 'excel' | 'csv'>('pdf');
+  
+  // Chart export states
+  const [chartType, setChartType] = useState<'bar' | 'pie' | 'timeline'>('bar');
+  const [chartDateStart, setChartDateStart] = useState('');
+  const [chartDateEnd, setChartDateEnd] = useState('');
+  const [chartGroupBy, setChartGroupBy] = useState<'day' | 'week' | 'month' | 'type' | 'resource'>('day');
+  const [chartChantier, setChartChantier] = useState('all');
+  const [chartOuvrier, setChartOuvrier] = useState('all');
+  const [chartMateriel, setChartMateriel] = useState('all');
 
   // Helper functions
   const getChantier = (chantierId?: string): Chantier | undefined => {
@@ -225,6 +238,367 @@ export const Planning: React.FC = () => {
     }
     
     setIsExportModalOpen(false);
+  };
+
+  const handleChartExport = () => {
+    const filteredEvents = getFilteredEventsForChart();
+    
+    if (filteredEvents.length === 0) {
+      alert('Aucun événement trouvé pour les critères sélectionnés');
+      return;
+    }
+    
+    generateChart(filteredEvents);
+  };
+
+  const getFilteredEventsForChart = () => {
+    return (events || []).filter(event => {
+      const eventDate = new Date(event.dateDebut);
+      
+      // Filtre par date
+      if (chartDateStart && eventDate < new Date(chartDateStart)) return false;
+      if (chartDateEnd && eventDate > new Date(chartDateEnd + 'T23:59:59')) return false;
+      
+      // Filtre par chantier
+      if (chartChantier !== 'all' && event.chantierId !== chartChantier) return false;
+      
+      // Filtre par ouvrier
+      if (chartOuvrier !== 'all' && event.ouvrierId !== chartOuvrier) return false;
+      
+      // Filtre par matériel
+      if (chartMateriel !== 'all' && event.materielId !== chartMateriel) return false;
+      
+      return true;
+    });
+  };
+
+  const generateChart = (filteredEvents: PlanningEvent[]) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 800;
+    canvas.height = 600;
+    const ctx = canvas.getContext('2d');
+    
+    if (!ctx) return;
+    
+    // Configuration du graphique
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Titre
+    ctx.fillStyle = '#1f2937';
+    ctx.font = 'bold 24px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(`Planning - ${getChartTitle()}`, canvas.width / 2, 40);
+    
+    // Sous-titre avec période
+    ctx.font = '14px Arial';
+    ctx.fillStyle = '#6b7280';
+    const periode = chartDateStart && chartDateEnd 
+      ? `${new Date(chartDateStart).toLocaleDateString()} - ${new Date(chartDateEnd).toLocaleDateString()}`
+      : 'Toutes les dates';
+    ctx.fillText(`Période: ${periode}`, canvas.width / 2, 65);
+    
+    // Générer le graphique selon le type
+    switch (chartType) {
+      case 'bar':
+        generateBarChart(ctx, filteredEvents, canvas.width, canvas.height);
+        break;
+      case 'pie':
+        generatePieChart(ctx, filteredEvents, canvas.width, canvas.height);
+        break;
+      case 'timeline':
+        generateTimelineChart(ctx, filteredEvents, canvas.width, canvas.height);
+        break;
+    }
+    
+    // Télécharger l'image
+    canvas.toBlob((blob) => {
+      if (blob) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `planning-${chartType}-${new Date().toISOString().split('T')[0]}.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+    });
+    
+    setIsChartExportModalOpen(false);
+  };
+
+  const getChartTitle = () => {
+    switch (chartType) {
+      case 'bar': return 'Répartition des événements';
+      case 'pie': return 'Distribution par type';
+      case 'timeline': return 'Timeline des événements';
+      default: return 'Graphique du planning';
+    }
+  };
+
+  const generateBarChart = (ctx: CanvasRenderingContext2D, events: PlanningEvent[], width: number, height: number) => {
+    const chartArea = { x: 80, y: 100, width: width - 160, height: height - 200 };
+    const data = getChartData(events);
+    
+    if (data.length === 0) return;
+    
+    const maxValue = Math.max(...data.map(d => d.value));
+    const barWidth = chartArea.width / data.length * 0.8;
+    const barSpacing = chartArea.width / data.length * 0.2;
+    
+    // Couleurs pour les barres
+    const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
+    
+    data.forEach((item, index) => {
+      const barHeight = (item.value / maxValue) * chartArea.height;
+      const x = chartArea.x + (index * (barWidth + barSpacing));
+      const y = chartArea.y + chartArea.height - barHeight;
+      
+      // Dessiner la barre
+      ctx.fillStyle = colors[index % colors.length];
+      ctx.fillRect(x, y, barWidth, barHeight);
+      
+      // Valeur au-dessus de la barre
+      ctx.fillStyle = '#1f2937';
+      ctx.font = '12px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(item.value.toString(), x + barWidth / 2, y - 5);
+      
+      // Label en bas
+      ctx.save();
+      ctx.translate(x + barWidth / 2, chartArea.y + chartArea.height + 15);
+      ctx.rotate(-Math.PI / 4);
+      ctx.textAlign = 'right';
+      ctx.fillText(item.label, 0, 0);
+      ctx.restore();
+    });
+    
+    // Axes
+    ctx.strokeStyle = '#6b7280';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(chartArea.x, chartArea.y);
+    ctx.lineTo(chartArea.x, chartArea.y + chartArea.height);
+    ctx.lineTo(chartArea.x + chartArea.width, chartArea.y + chartArea.height);
+    ctx.stroke();
+  };
+
+  const generatePieChart = (ctx: CanvasRenderingContext2D, events: PlanningEvent[], width: number, height: number) => {
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const radius = Math.min(width, height) / 4;
+    
+    const data = getChartData(events);
+    const total = data.reduce((sum, item) => sum + item.value, 0);
+    
+    if (total === 0) return;
+    
+    const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
+    let currentAngle = -Math.PI / 2;
+    
+    data.forEach((item, index) => {
+      const sliceAngle = (item.value / total) * 2 * Math.PI;
+      
+      // Dessiner la tranche
+      ctx.beginPath();
+      ctx.moveTo(centerX, centerY);
+      ctx.arc(centerX, centerY, radius, currentAngle, currentAngle + sliceAngle);
+      ctx.closePath();
+      ctx.fillStyle = colors[index % colors.length];
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      // Label et pourcentage
+      const labelAngle = currentAngle + sliceAngle / 2;
+      const labelX = centerX + Math.cos(labelAngle) * (radius + 30);
+      const labelY = centerY + Math.sin(labelAngle) * (radius + 30);
+      
+      ctx.fillStyle = '#1f2937';
+      ctx.font = '12px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(item.label, labelX, labelY);
+      ctx.fillText(`${((item.value / total) * 100).toFixed(1)}%`, labelX, labelY + 15);
+      
+      currentAngle += sliceAngle;
+    });
+  };
+
+  const generateTimelineChart = (ctx: CanvasRenderingContext2D, events: PlanningEvent[], width: number, height: number) => {
+    const chartArea = { x: 80, y: 100, width: width - 160, height: height - 200 };
+    
+    if (events.length === 0) return;
+    
+    // Trier les événements par date
+    const sortedEvents = [...events].sort((a, b) => 
+      new Date(a.dateDebut).getTime() - new Date(b.dateDebut).getTime()
+    );
+    
+    const startDate = new Date(sortedEvents[0].dateDebut);
+    const endDate = new Date(sortedEvents[sortedEvents.length - 1].dateFin);
+    const totalDuration = endDate.getTime() - startDate.getTime();
+    
+    const colors = {
+      'chantier': '#3b82f6',
+      'maintenance': '#f59e0b',
+      'conge': '#10b981',
+      'formation': '#8b5cf6'
+    };
+    
+    // Dessiner la ligne de temps
+    ctx.strokeStyle = '#6b7280';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(chartArea.x, chartArea.y + chartArea.height / 2);
+    ctx.lineTo(chartArea.x + chartArea.width, chartArea.y + chartArea.height / 2);
+    ctx.stroke();
+    
+    // Dessiner les événements
+    sortedEvents.forEach((event, index) => {
+      const eventStart = new Date(event.dateDebut);
+      const eventEnd = new Date(event.dateFin);
+      
+      const startX = chartArea.x + ((eventStart.getTime() - startDate.getTime()) / totalDuration) * chartArea.width;
+      const endX = chartArea.x + ((eventEnd.getTime() - startDate.getTime()) / totalDuration) * chartArea.width;
+      const y = chartArea.y + chartArea.height / 2 + (index % 2 === 0 ? -30 : 30);
+      
+      // Barre d'événement
+      ctx.fillStyle = colors[event.type] || '#6b7280';
+      ctx.fillRect(startX, y - 5, Math.max(endX - startX, 3), 10);
+      
+      // Ligne de connexion
+      ctx.strokeStyle = colors[event.type] || '#6b7280';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(startX + (endX - startX) / 2, y);
+      ctx.lineTo(startX + (endX - startX) / 2, chartArea.y + chartArea.height / 2);
+      ctx.stroke();
+      
+      // Label de l'événement
+      ctx.fillStyle = '#1f2937';
+      ctx.font = '10px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(
+        event.titre.length > 20 ? event.titre.substring(0, 20) + '...' : event.titre,
+        startX + (endX - startX) / 2,
+        y + (index % 2 === 0 ? -10 : 25)
+      );
+    });
+    
+    // Dates de début et fin
+    ctx.fillStyle = '#6b7280';
+    ctx.font = '12px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText(startDate.toLocaleDateString(), chartArea.x, chartArea.y + chartArea.height + 30);
+    ctx.textAlign = 'right';
+    ctx.fillText(endDate.toLocaleDateString(), chartArea.x + chartArea.width, chartArea.y + chartArea.height + 30);
+  };
+
+  const getChartData = (events: PlanningEvent[]) => {
+    switch (chartGroupBy) {
+      case 'type':
+        return getDataByType(events);
+      case 'resource':
+        return getDataByResource(events);
+      case 'day':
+        return getDataByDay(events);
+      case 'week':
+        return getDataByWeek(events);
+      case 'month':
+        return getDataByMonth(events);
+      default:
+        return getDataByType(events);
+    }
+  };
+
+  const getDataByType = (events: PlanningEvent[]) => {
+    const typeCount = events.reduce((acc, event) => {
+      const type = event.type;
+      acc[type] = (acc[type] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    return Object.entries(typeCount).map(([type, count]) => ({
+      label: type === 'chantier' ? 'Chantier' :
+             type === 'maintenance' ? 'Maintenance' :
+             type === 'conge' ? 'Congé' :
+             type === 'formation' ? 'Formation' : type,
+      value: count
+    }));
+  };
+
+  const getDataByResource = (events: PlanningEvent[]) => {
+    const resourceCount = events.reduce((acc, event) => {
+      let resource = 'Non assigné';
+      
+      if (event.ouvrierId) {
+        const ouvrier = ouvriers?.find(o => o.id === event.ouvrierId);
+        resource = ouvrier ? `${ouvrier.prenom} ${ouvrier.nom}` : 'Ouvrier inconnu';
+      } else if (event.materielId) {
+        const mat = materiel?.find(m => m.id === event.materielId);
+        resource = mat ? mat.nom : 'Matériel inconnu';
+      } else if (event.chantierId) {
+        const chantier = chantiers?.find(c => c.id === event.chantierId);
+        resource = chantier ? chantier.nom : 'Chantier inconnu';
+      }
+      
+      acc[resource] = (acc[resource] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    return Object.entries(resourceCount).map(([resource, count]) => ({
+      label: resource.length > 15 ? resource.substring(0, 15) + '...' : resource,
+      value: count
+    }));
+  };
+
+  const getDataByDay = (events: PlanningEvent[]) => {
+    const dayCount = events.reduce((acc, event) => {
+      const day = new Date(event.dateDebut).toLocaleDateString();
+      acc[day] = (acc[day] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    return Object.entries(dayCount)
+      .sort(([a], [b]) => new Date(a).getTime() - new Date(b).getTime())
+      .map(([day, count]) => ({
+        label: day,
+        value: count
+      }));
+  };
+
+  const getDataByWeek = (events: PlanningEvent[]) => {
+    const weekCount = events.reduce((acc, event) => {
+      const date = new Date(event.dateDebut);
+      const weekStart = new Date(date);
+      weekStart.setDate(date.getDate() - date.getDay());
+      const weekLabel = `Semaine du ${weekStart.toLocaleDateString()}`;
+      
+      acc[weekLabel] = (acc[weekLabel] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    return Object.entries(weekCount).map(([week, count]) => ({
+      label: week,
+      value: count
+    }));
+  };
+
+  const getDataByMonth = (events: PlanningEvent[]) => {
+    const monthCount = events.reduce((acc, event) => {
+      const date = new Date(event.dateDebut);
+      const monthLabel = date.toLocaleDateString('fr-FR', { year: 'numeric', month: 'long' });
+      
+      acc[monthLabel] = (acc[monthLabel] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    return Object.entries(monthCount).map(([month, count]) => ({
+      label: month,
+      value: count
+    }));
   };
 
   const exportToCSV = (data: any[], filename: string) => {
@@ -678,6 +1052,167 @@ export const Planning: React.FC = () => {
       </div>
     </div>
   );
+
+  const ChartExportModal = () => {
+    const filteredEvents = getFilteredEventsForChart();
+    
+    return (
+      <div className="space-y-6">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center">
+            <BarChart3 className="w-5 h-5 text-blue-600 mr-2" />
+            <p className="text-sm text-blue-800">
+              Exportez le planning sous forme de graphique avec les filtres de votre choix
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Type de graphique</label>
+            <select
+              value={chartType}
+              onChange={(e) => setChartType(e.target.value as 'bar' | 'pie' | 'timeline')}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="bar">Graphique en barres</option>
+              <option value="pie">Graphique en secteurs</option>
+              <option value="timeline">Timeline</option>
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Grouper par</label>
+            <select
+              value={chartGroupBy}
+              onChange={(e) => setChartGroupBy(e.target.value as any)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="type">Type d'événement</option>
+              <option value="resource">Ressource</option>
+              <option value="day">Par jour</option>
+              <option value="week">Par semaine</option>
+              <option value="month">Par mois</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Date de début</label>
+            <input
+              type="date"
+              value={chartDateStart}
+              onChange={(e) => setChartDateStart(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Date de fin</label>
+            <input
+              type="date"
+              value={chartDateEnd}
+              onChange={(e) => setChartDateEnd(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Chantier</label>
+            <select
+              value={chartChantier}
+              onChange={(e) => setChartChantier(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">Tous les chantiers</option>
+              {chantiers?.filter(c => c.statut === 'actif' || c.statut === 'planifie').map(chantier => (
+                <option key={chantier.id} value={chantier.id}>{chantier.nom}</option>
+              ))}
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Ouvrier</label>
+            <select
+              value={chartOuvrier}
+              onChange={(e) => setChartOuvrier(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">Tous les ouvriers</option>
+              {ouvriers?.filter(o => o.statut === 'actif').map(ouvrier => (
+                <option key={ouvrier.id} value={ouvrier.id}>
+                  {ouvrier.prenom} {ouvrier.nom}
+                </option>
+              ))}
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Matériel</label>
+            <select
+              value={chartMateriel}
+              onChange={(e) => setChartMateriel(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">Tout le matériel</option>
+              {materiel?.filter(m => m.statut === 'disponible' || m.statut === 'en_service').map(item => (
+                <option key={item.id} value={item.id}>{item.nom}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <h4 className="font-medium text-gray-900 mb-2">Aperçu</h4>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div>
+              <span className="text-gray-600">Type:</span>
+              <span className="ml-2 font-medium">
+                {chartType === 'bar' ? 'Barres' : 
+                 chartType === 'pie' ? 'Secteurs' : 'Timeline'}
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-600">Groupement:</span>
+              <span className="ml-2 font-medium">
+                {chartGroupBy === 'type' ? 'Type' :
+                 chartGroupBy === 'resource' ? 'Ressource' :
+                 chartGroupBy === 'day' ? 'Jour' :
+                 chartGroupBy === 'week' ? 'Semaine' : 'Mois'}
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-600">Période:</span>
+              <span className="ml-2 font-medium">
+                {chartDateStart && chartDateEnd 
+                  ? `${new Date(chartDateStart).toLocaleDateString()} - ${new Date(chartDateEnd).toLocaleDateString()}`
+                  : 'Toutes'}
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-600">Événements:</span>
+              <span className="ml-2 font-medium text-blue-600">{filteredEvents.length}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end space-x-3">
+          <Button variant="secondary" onClick={() => setIsChartExportModalOpen(false)}>
+            Annuler
+          </Button>
+          <Button 
+            onClick={handleChartExport}
+            disabled={filteredEvents.length === 0}
+          >
+            <BarChart3 className="w-4 h-4 mr-2" />
+            Générer le graphique
+          </Button>
+        </div>
+      </div>
+    );
+  };
 
   // Form component
   const EventForm = () => (
@@ -1391,6 +1926,10 @@ export const Planning: React.FC = () => {
             <Download className="w-4 h-4 mr-2" />
             Exporter
           </Button>
+          <Button variant="secondary" onClick={() => setIsChartExportModalOpen(true)}>
+            <BarChart3 className="w-4 h-4 mr-2" />
+            Exporter Graphique
+          </Button>
         </div>
       </div>
 
@@ -1636,6 +2175,16 @@ export const Planning: React.FC = () => {
         size="lg"
       >
         <ExportModalComponent />
+      </Modal>
+
+      {/* Modal d'export graphique */}
+      <Modal
+        isOpen={isChartExportModalOpen}
+        onClose={() => setIsChartExportModalOpen(false)}
+        title="Export Graphique du Planning"
+        size="lg"
+      >
+        <ChartExportModal />
       </Modal>
     </div>
   );
