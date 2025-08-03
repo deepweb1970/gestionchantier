@@ -35,6 +35,7 @@ import { factureService } from '../../services/factureService';
 import { Rapport, RapportType } from '../../types';
 import { Modal } from '../Common/Modal';
 import { Button } from '../Common/Button';
+import { exportRapportToPDF, exportStatsToPDF } from '../../utils/pdfExport';
 
 export const Rapports: React.FC = () => {
   // Récupération des données en temps réel
@@ -141,6 +142,32 @@ export const Rapports: React.FC = () => {
     }
   };
 
+  const handleExportPDF = async (rapport: Rapport) => {
+    try {
+      // Générer les données d'analyse pour le rapport
+      const data = await rapportService.analyzeData(
+        rapport.dateDebut, 
+        rapport.dateFin, 
+        rapport.parametres.chantiers || [], 
+        rapport.parametres.ouvriers || [], 
+        rapport.parametres.materiel || []
+      );
+      
+      // Exporter en PDF
+      exportRapportToPDF(rapport, data);
+    } catch (error) {
+      console.error('Erreur lors de l\'export PDF:', error);
+      alert('Erreur lors de l\'export PDF du rapport');
+    }
+  };
+
+  const handleExportGlobalStatsPDF = () => {
+    if (globalStats && performanceIndicators) {
+      exportStatsToPDF(globalStats, performanceIndicators);
+    } else {
+      alert('Les statistiques ne sont pas encore chargées');
+    }
+  };
   const handleSave = async (formData: FormData) => {
     const rapportData: Rapport = {
       id: editingRapport?.id || Date.now().toString(),
@@ -541,12 +568,12 @@ export const Rapports: React.FC = () => {
 
         <div className="flex justify-end space-x-3">
           <Button variant="secondary">
-            <Download className="w-4 h-4 mr-2" />
-            Export PDF
-          </Button>
-          <Button variant="secondary">
             <FileText className="w-4 h-4 mr-2" />
             Export Excel
+          </Button>
+          <Button variant="secondary">
+            <Download className="w-4 h-4 mr-2" />
+            Export PDF
           </Button>
         </div>
       </div>
@@ -570,6 +597,14 @@ export const Rapports: React.FC = () => {
           <Button size="sm">
             <Settings className="w-4 h-4 mr-2" />
             Personnaliser
+          </Button>
+          <Button 
+            size="sm" 
+            variant="secondary"
+            onClick={handleExportGlobalStatsPDF}
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Export PDF
           </Button>
         </div>
 
@@ -960,7 +995,9 @@ export const Rapports: React.FC = () => {
                             title="Modifier"
                           >
                             <Edit className="w-4 h-4" />
-                          </button>
+                            onClick={() => handleExportPDF(rapport)}
+                            className="text-purple-600 hover:text-purple-900" 
+                            title="Export PDF"
                           <button className="text-purple-600 hover:text-purple-900" title="Télécharger">
                             <Download className="w-4 h-4" />
                           </button>
