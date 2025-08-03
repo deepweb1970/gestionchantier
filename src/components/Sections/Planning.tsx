@@ -18,7 +18,10 @@ import {
   CalendarDays, 
   CalendarRange, 
   ArrowLeft, 
-  ArrowRight 
+  ArrowRight,
+  FileText,
+  Table,
+  Printer
 } from 'lucide-react';
 import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
 import { PlanningEvent, Chantier, Ouvrier, Materiel } from '../../types';
@@ -26,6 +29,7 @@ import { Modal } from '../Common/Modal';
 import { Button } from '../Common/Button';
 import { StatusBadge } from '../Common/StatusBadge';
 import { ExportModal } from '../Common/ExportModal';
+import { exportToPDF } from '../../utils/pdfExport';
 
 // Services
 import { chantierService } from '../../services/chantierService';
@@ -67,6 +71,14 @@ export const Planning: React.FC = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'month' | 'week' | 'day'>('week');
   const [conflicts, setConflicts] = useState<{[key: string]: string[]}>({});
+  
+  // Export filters
+  const [exportDateStart, setExportDateStart] = useState('');
+  const [exportDateEnd, setExportDateEnd] = useState('');
+  const [exportChantierFilter, setExportChantierFilter] = useState('all');
+  const [exportOuvrierFilter, setExportOuvrierFilter] = useState('all');
+  const [exportMaterielFilter, setExportMaterielFilter] = useState('all');
+  const [exportFormat, setExportFormat] = useState<'pdf' | 'excel' | 'csv'>('pdf');
 
   // Helper functions
   const getChantier = (chantierId?: string): Chantier | undefined => {
@@ -101,6 +113,162 @@ export const Planning: React.FC = () => {
     
     return matchesSearch && matchesType && matchesResource;
   });
+
+  const getFilteredEventsForExport = () => {
+    return (events || []).filter(event => {
+      // Filtre par date
+      if (exportDateStart && exportDateEnd) {
+        const eventStart = new Date(event.dateDebut);
+        const eventEnd = new Date(event.dateFin);
+        const filterStart = new Date(exportDateStart);
+        const filterEnd = new Date(exportDateEnd);
+        filterEnd.setHours(23, 59, 59, 999); // Inclure toute la journée de fin
+        
+        // L'événement doit chevaucher avec la période de filtre
+        if (eventEnd < filterStart || eventStart > filterEnd) {
+          return false;
+        }
+      }
+      
+      // Filtre par chantier
+      if (exportChantierFilter !== 'all' && event.chantierId !== exportChantierFilter) {
+        return false;
+      }
+      
+      // Filtre par ouvrier
+      if (exportOuvrierFilter !== 'all' && event.ouvrierId !== exportOuvrierFilter) {
+        return false;
+      }
+      
+      // Filtre par matériel
+      if (exportMaterielFilter !== 'all' && event.materielId !== exportMaterielFilter) {
+        return false;
+      }
+      
+      return true;
+    });
+  };
+
+  const handleExport = () => {
+    const filteredEvents = getFilteredEventsForExport();
+    
+    if (filteredEvents.length === 0) {
+      alert('Aucun événement trouvé avec les filtres sélectionnés');
+      return;
+    }
+    
+    // Préparer les données pour l'export
+    const exportData = filteredEvents.map(event => {
+      const chantier = chantiers?.find(c => c.id === event.chantierId);
+      const ouvrier = ouvriers?.find(o => o.id === event.ouvrierId);
+      const materielItem = materiel?.find(m => m.id === event.materielId);
+      
+      const startDate = new Date(event.dateDebut);
+      const endDate = new Date(event.dateFin);
+      
+      return {
+        'Titre': event.titre,
+        'Type': event.type === 'chantier' ? 'Chantier' :
+                event.type === 'maintenance' ? 'Maintenance' :
+                event.type === 'conge' ? 'Congé' : 'Formation',
+        'Date début': startDate.toLocaleDateString(),
+        'Heure début': startDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+        'Date fin': endDate.toLocaleDateString(),
+        'Heure fin': endDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+        'Durée (h)': ((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60)).toFixed(1),
+        'Chantier': chantier?.nom || '-',
+        'Ouvrier': ouvrier ? `${ouvrier.prenom} ${ouvrier.nom}` : '-',
+        'Matériel': materielItem?.nom || '-',
+        'Description': event.description || '-'
+      };
+    }).sort((a, b) => new Date(a['Date début']).getTime() - new Date(b['Date début']).getTime());
+    
+    const periodText = exportDateStart && exportDateEnd 
+      ? `du ${new Date(exportDateStart).toLocaleDateString()} au ${new Date(exportDateEnd).toLocaleDateString()}`
+      : 'toutes périodes';
+    
+    if (exportFormat === 'pdf') {
+      const columns = [
+        { header: 'Titre', dataKey: 'Titre', width: 40 },
+        { header: 'Type', dataKey: 'Type', width: 20 },
+        { header: 'Date', dataKey: 'Date début', width: 25 },
+        { header: 'Début', dataKey: 'Heure début', width: 20 },
+        { header: 'Fin', dataKey: 'Heure fin', width: 20 },
+        { header: 'Durée', dataKey: 'Durée (h)', width: 15 },
+        { header: 'Chantier', dataKey: 'Chantier', width: 35 },
+        { header: 'Ouvrier', dataKey: 'Ouvrier', width: 30 }
+      ];
+      
+      const stats = {
+        'Nombre d\'événements': filteredEvents.length,
+        'Période': periodText,
+        'Total heures': exportData.reduce((sum, event) => sum + parseFloat(event['Durée (h)']), 0).toFixed(1) + 'h',
+        'Événements chantier': filteredEvents.filter(e => e.type === 'chantier').length,
+        'Événements maintenance': filteredEvents.filter(e => e.type === 'maintenance').length,
+        'Congés': filteredEvents.filter(e => e.type === 'conge').length
+      };
+      
+      exportToPDF({
+        title: 'Planning des Événements',
+        subtitle: `Période: ${periodText}`,
+        data: exportData,
+        columns,
+        filename: `planning-${new Date().toISOString().split('T')[0]}`,
+        includeStats: true,
+        stats
+      });
+    } else if (exportFormat === 'csv') {
+      exportToCSV(exportData, `planning-${new Date().toISOString().split('T')[0]}`);
+    } else if (exportFormat === 'excel') {
+      exportToExcel(exportData, `planning-${new Date().toISOString().split('T')[0]}`);
+    }
+    
+    setIsExportModalOpen(false);
+  };
+
+  const exportToCSV = (data: any[], filename: string) => {
+    if (!data.length) return;
+    
+    const headers = Object.keys(data[0]);
+    const csvContent = [
+      headers.join(','),
+      ...data.map(row => 
+        headers.map(header => {
+          const value = row[header];
+          if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
+            return `"${value.replace(/"/g, '""')}"`;
+          }
+          return value;
+        }).join(',')
+      )
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${filename}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const exportToExcel = (data: any[], filename: string) => {
+    // Simulation d'export Excel - en production, utiliser une bibliothèque comme SheetJS
+    const jsonContent = JSON.stringify(data, null, 2);
+    const blob = new Blob([jsonContent], { 
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${filename}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   // Check for conflicts
   useEffect(() => {
@@ -354,6 +522,160 @@ export const Planning: React.FC = () => {
       return `${startDate.toLocaleDateString()} ${startTimeStr} - ${endDate.toLocaleDateString()} ${endTimeStr}`;
     }
   };
+
+  const ExportModalComponent = () => (
+    <div className="space-y-6">
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <h3 className="text-lg font-semibold text-blue-800 mb-2">Export du Planning</h3>
+        <p className="text-sm text-blue-700">
+          Exportez les événements du planning selon vos critères de filtrage
+        </p>
+      </div>
+
+      <div className="space-y-4">
+        <div>
+          <h4 className="text-sm font-medium text-gray-700 mb-3">Format d'export</h4>
+          <div className="space-y-2">
+            <label className="flex items-center">
+              <input
+                type="radio"
+                name="format"
+                value="pdf"
+                checked={exportFormat === 'pdf'}
+                onChange={(e) => setExportFormat(e.target.value as 'pdf')}
+                className="mr-3"
+              />
+              <FileText className="w-5 h-5 mr-2 text-red-500" />
+              <span>PDF - Document formaté avec statistiques</span>
+            </label>
+            <label className="flex items-center">
+              <input
+                type="radio"
+                name="format"
+                value="csv"
+                checked={exportFormat === 'csv'}
+                onChange={(e) => setExportFormat(e.target.value as 'csv')}
+                className="mr-3"
+              />
+              <Table className="w-5 h-5 mr-2 text-green-500" />
+              <span>CSV - Données tabulaires</span>
+            </label>
+            <label className="flex items-center">
+              <input
+                type="radio"
+                name="format"
+                value="excel"
+                checked={exportFormat === 'excel'}
+                onChange={(e) => setExportFormat(e.target.value as 'excel')}
+                className="mr-3"
+              />
+              <Table className="w-5 h-5 mr-2 text-blue-500" />
+              <span>Excel - Feuille de calcul</span>
+            </label>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Date de début</label>
+            <input
+              type="date"
+              value={exportDateStart}
+              onChange={(e) => setExportDateStart(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Date de fin</label>
+            <input
+              type="date"
+              value={exportDateEnd}
+              onChange={(e) => setExportDateEnd(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Chantier</label>
+            <select
+              value={exportChantierFilter}
+              onChange={(e) => setExportChantierFilter(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">Tous les chantiers</option>
+              {chantiers?.filter(c => c.statut === 'actif' || c.statut === 'planifie').map(chantier => (
+                <option key={chantier.id} value={chantier.id}>
+                  {chantier.nom}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Ouvrier</label>
+            <select
+              value={exportOuvrierFilter}
+              onChange={(e) => setExportOuvrierFilter(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">Tous les ouvriers</option>
+              {ouvriers?.filter(o => o.statut === 'actif').map(ouvrier => (
+                <option key={ouvrier.id} value={ouvrier.id}>
+                  {ouvrier.prenom} {ouvrier.nom}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Matériel</label>
+            <select
+              value={exportMaterielFilter}
+              onChange={(e) => setExportMaterielFilter(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">Tout le matériel</option>
+              {materiel?.filter(m => m.statut === 'disponible' || m.statut === 'en_service').map(item => (
+                <option key={item.id} value={item.id}>
+                  {item.nom}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <h4 className="text-sm font-medium text-gray-700 mb-2">Aperçu de l'export</h4>
+          <div className="text-sm text-gray-600">
+            <p>• {getFilteredEventsForExport().length} événement(s) à exporter</p>
+            <p>• Format: {exportFormat.toUpperCase()}</p>
+            {exportDateStart && exportDateEnd && (
+              <p>• Période: {new Date(exportDateStart).toLocaleDateString()} - {new Date(exportDateEnd).toLocaleDateString()}</p>
+            )}
+            {exportChantierFilter !== 'all' && (
+              <p>• Chantier: {chantiers?.find(c => c.id === exportChantierFilter)?.nom}</p>
+            )}
+            {exportOuvrierFilter !== 'all' && (
+              <p>• Ouvrier: {ouvriers?.find(o => o.id === exportOuvrierFilter)?.prenom} {ouvriers?.find(o => o.id === exportOuvrierFilter)?.nom}</p>
+            )}
+            {exportMaterielFilter !== 'all' && (
+              <p>• Matériel: {materiel?.find(m => m.id === exportMaterielFilter)?.nom}</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex justify-end space-x-3">
+        <Button variant="secondary" onClick={() => setIsExportModalOpen(false)}>
+          Annuler
+        </Button>
+        <Button onClick={handleExport} disabled={getFilteredEventsForExport().length === 0}>
+          <Download className="w-4 h-4 mr-2" />
+          Exporter
+        </Button>
+      </div>
+    </div>
+  );
 
   // Form component
   const EventForm = () => (
@@ -1304,23 +1626,15 @@ export const Planning: React.FC = () => {
         <EventDetailModal />
       </Modal>
 
-      <ExportModal
+      {/* Modal d'export */}
+      <Modal
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}
-        title="Exporter le planning"
-        data={filteredEvents.map(event => ({
-          Titre: event.titre,
-          Description: event.description || '',
-          Type: event.type,
-          'Date début': new Date(event.dateDebut).toLocaleString(),
-          'Date fin': new Date(event.dateFin).toLocaleString(),
-          Chantier: getChantier(event.chantierId)?.nom || '',
-          Ouvrier: event.ouvrierId ? `${getOuvrier(event.ouvrierId)?.prenom} ${getOuvrier(event.ouvrierId)?.nom}` : '',
-          Matériel: getMateriel(event.materielId)?.nom || '',
-          Conflit: conflicts[event.id] ? 'Oui' : 'Non'
-        }))}
-        filename="planning"
-      />
+        title="Exporter le Planning"
+        size="lg"
+      >
+        <ExportModalComponent />
+      </Modal>
     </div>
   );
 };
