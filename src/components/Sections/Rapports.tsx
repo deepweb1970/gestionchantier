@@ -995,10 +995,12 @@ export const Rapports: React.FC = () => {
                             title="Modifier"
                           >
                             <Edit className="w-4 h-4" />
+                          </button>
+                          <button
                             onClick={() => handleExportPDF(rapport)}
                             className="text-purple-600 hover:text-purple-900" 
                             title="Export PDF"
-                          <button className="text-purple-600 hover:text-purple-900" title="Télécharger">
+                          >
                             <Download className="w-4 h-4" />
                           </button>
                           <button
