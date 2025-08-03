@@ -88,6 +88,13 @@ export const MaintenanceSection: React.FC = () => {
   const [sortBy, setSortBy] = useState<'date' | 'priority' | 'cost' | 'status'>('date');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
+  const [isMaintenanceModalOpen, setIsMaintenanceModalOpen] = useState(false);
+  const [isEditMaintenanceModalOpen, setIsEditMaintenanceModalOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isTypeModalOpen, setIsTypeModalOpen] = useState(false);
+  const [isEditTypeModalOpen, setIsEditTypeModalOpen] = useState(false);
+  const [isQuickPlanModalOpen, setIsQuickPlanModalOpen] = useState(false);
+
   // Form state for maintenance
   const [formData, setFormData] = useState({
     materiel_id: '',
@@ -159,6 +166,66 @@ export const MaintenanceSection: React.FC = () => {
   const loadMaintenancesAPrevoir = async () => {
     const data = await maintenanceService.getMaintenancesAPrevoir();
     setMaintenancesAPrevoir(data);
+  };
+
+  const handleViewMaintenance = (maintenance: Maintenance) => {
+    setSelectedMaintenance(maintenance);
+    setIsDetailModalOpen(true);
+  };
+
+  const handleEditMaintenance = (maintenance: Maintenance) => {
+    setEditingMaintenance(maintenance);
+    setIsEditMaintenanceModalOpen(true);
+  };
+
+  const handleDeleteMaintenance = async (id: string) => {
+    if (confirm('Êtes-vous sûr de vouloir supprimer cette maintenance ?')) {
+      try {
+        await maintenanceService.deleteMaintenance(id);
+        refreshMaintenances();
+        alert('Maintenance supprimée avec succès');
+      } catch (error) {
+        console.error('Erreur lors de la suppression:', error);
+        alert('Erreur lors de la suppression de la maintenance');
+      }
+    }
+  };
+
+  const handleSaveMaintenance = async (formData: FormData) => {
+    const maintenanceData = {
+      materielId: formData.get('materielId') as string,
+      typeId: formData.get('typeId') as string || null,
+      datePlanifiee: formData.get('datePlanifiee') as string,
+      dateExecution: formData.get('dateExecution') as string || null,
+      statut: formData.get('statut') as string,
+      description: formData.get('description') as string,
+      executantId: formData.get('executantId') as string || null,
+      dureeHeures: parseFloat(formData.get('dureeHeures') as string) || null,
+      heuresMachineDebut: parseFloat(formData.get('heuresMachineDebut') as string) || null,
+      heuresMachineFin: parseFloat(formData.get('heuresMachineFin') as string) || null,
+      cout: parseFloat(formData.get('cout') as string) || 0,
+      piecesUtilisees: (formData.get('piecesUtilisees') as string)?.split(',').map(p => p.trim()).filter(p => p) || [],
+      notes: formData.get('notes') as string || null,
+      observations: formData.get('observations') as string || null
+    };
+
+    try {
+      if (editingMaintenance) {
+        const updatedMaintenance = await maintenanceService.updateMaintenance(editingMaintenance.id, maintenanceData);
+        console.log('Maintenance mise à jour:', updatedMaintenance);
+      } else {
+        const newMaintenance = await maintenanceService.createMaintenance(maintenanceData);
+        console.log('Nouvelle maintenance créée:', newMaintenance);
+      }
+      
+      refreshMaintenances();
+      setIsMaintenanceModalOpen(false);
+      setIsEditMaintenanceModalOpen(false);
+      setEditingMaintenance(null);
+    } catch (error) {
+      console.error('Erreur lors de l\'enregistrement:', error);
+      alert('Erreur lors de l\'enregistrement de la maintenance');
+    }
   };
 
   const handleSave = async () => {
@@ -543,6 +610,346 @@ export const MaintenanceSection: React.FC = () => {
   const stats = getMaintenanceStats();
   const typeStats = getTypeStats();
   const materielStatus = getMaterielMaintenanceStatus();
+
+  const MaintenanceForm = () => (
+    <form onSubmit={(e) => {
+      e.preventDefault();
+      handleSaveMaintenance(new FormData(e.currentTarget));
+    }}>
+      <div className="space-y-6">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-5">
+          <h3 className="text-lg font-semibold text-blue-800 mb-4 flex items-center">
+            <Wrench className="w-5 h-5 mr-2" />
+            Informations générales
+          </h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Matériel</label>
+              <select
+                name="materielId"
+                required
+                defaultValue={editingMaintenance?.materielId || ''}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Sélectionner un matériel</option>
+                {materiels?.map(item => (
+                  <option key={item.id} value={item.id}>
+                    {item.nom} - {item.marque} {item.modele}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Type de maintenance</label>
+              <select
+                name="typeId"
+                defaultValue={editingMaintenance?.typeId || ''}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Aucun type spécifique</option>
+                {maintenanceTypes.map(type => (
+                  <option key={type.id} value={type.id}>
+                    {type.nom} - {type.priorite}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <textarea
+              name="description"
+              rows={3}
+              required
+              defaultValue={editingMaintenance?.description || ''}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Description détaillée de la maintenance..."
+            />
+          </div>
+        </div>
+        
+        <div className="bg-green-50 border border-green-200 rounded-lg p-5">
+          <h3 className="text-lg font-semibold text-green-800 mb-4 flex items-center">
+            <Calendar className="w-5 h-5 mr-2" />
+            Planification
+          </h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Date planifiée</label>
+              <input
+                name="datePlanifiee"
+                type="date"
+                required
+                defaultValue={editingMaintenance?.datePlanifiee || new Date().toISOString().split('T')[0]}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Date d'exécution</label>
+              <input
+                name="dateExecution"
+                type="date"
+                defaultValue={editingMaintenance?.dateExecution || ''}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Statut</label>
+              <select
+                name="statut"
+                defaultValue={editingMaintenance?.statut || 'planifiee'}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                <option value="planifiee">Planifiée</option>
+                <option value="en_cours">En cours</option>
+                <option value="terminee">Terminée</option>
+                <option value="annulee">Annulée</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-5">
+          <h3 className="text-lg font-semibold text-purple-800 mb-4 flex items-center">
+            <User className="w-5 h-5 mr-2" />
+            Exécution
+          </h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Exécutant</label>
+              <select
+                name="executantId"
+                defaultValue={editingMaintenance?.executantId || ''}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+              >
+                <option value="">Aucun exécutant assigné</option>
+                {ouvriers?.filter(o => o.statut === 'actif').map(ouvrier => (
+                  <option key={ouvrier.id} value={ouvrier.id}>
+                    {ouvrier.prenom} {ouvrier.nom} - {ouvrier.qualification}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Durée estimée (heures)</label>
+              <input
+                name="dureeHeures"
+                type="number"
+                step="0.5"
+                min="0"
+                defaultValue={editingMaintenance?.dureeHeures || ''}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                placeholder="Ex: 2.5"
+              />
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Heures machine début</label>
+              <input
+                name="heuresMachineDebut"
+                type="number"
+                step="0.1"
+                min="0"
+                defaultValue={editingMaintenance?.heuresMachineDebut || ''}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                placeholder="Compteur avant maintenance"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Heures machine fin</label>
+              <input
+                name="heuresMachineFin"
+                type="number"
+                step="0.1"
+                min="0"
+                defaultValue={editingMaintenance?.heuresMachineFin || ''}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                placeholder="Compteur après maintenance"
+              />
+            </div>
+          </div>
+          
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Coût (€)</label>
+            <input
+              name="cout"
+              type="number"
+              step="0.01"
+              min="0"
+              required
+              defaultValue={editingMaintenance?.cout || 0}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+              placeholder="Coût total de la maintenance"
+            />
+          </div>
+        </div>
+        
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-5">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+            <FileText className="w-5 h-5 mr-2" />
+            Notes et observations
+          </h3>
+          
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Pièces utilisées (séparées par des virgules)</label>
+              <textarea
+                name="piecesUtilisees"
+                rows={2}
+                defaultValue={editingMaintenance?.piecesUtilisees?.join(', ') || ''}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500"
+                placeholder="Ex: Filtre à huile, Joint de culasse, Courroie"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+              <textarea
+                name="notes"
+                rows={2}
+                defaultValue={editingMaintenance?.notes || ''}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500"
+                placeholder="Notes internes sur la maintenance"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Observations</label>
+              <textarea
+                name="observations"
+                rows={3}
+                defaultValue={editingMaintenance?.observations || ''}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500"
+                placeholder="Observations techniques, problèmes rencontrés, recommandations..."
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div className="flex justify-end space-x-3 mt-6">
+        <Button variant="secondary" onClick={() => {
+          setIsMaintenanceModalOpen(false);
+          setIsEditMaintenanceModalOpen(false);
+          setEditingMaintenance(null);
+        }}>
+          Annuler
+        </Button>
+        <Button type="submit">
+          {editingMaintenance ? 'Mettre à jour' : 'Créer la maintenance'}
+        </Button>
+      </div>
+    </form>
+  );
+
+  const MaintenanceDetailModal = () => (
+    <div className="space-y-6">
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <h3 className="font-medium text-gray-900 mb-3">Informations générales</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <p className="text-sm text-gray-600">Matériel</p>
+            <p className="font-medium">
+              {materiels.find(m => m.id === selectedMaintenance?.materielId)?.nom}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">Type</p>
+            <p className="font-medium">
+              {maintenanceTypes.find(t => t.id === selectedMaintenance?.typeId)?.nom}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">Statut</p>
+            <StatusBadge status={selectedMaintenance?.statut} type="maintenance_status" />
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">Coût</p>
+            <p className="font-medium text-green-600">
+              {selectedMaintenance?.cout ? `${selectedMaintenance.cout.toFixed(2)} €` : 'Non estimé'}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-blue-50 p-4 rounded-lg">
+        <h3 className="font-medium text-gray-900 mb-3">Planning</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <p className="text-sm text-gray-600">Date planifiée</p>
+            <p className="font-medium">
+              {selectedMaintenance?.datePlanifiee ? 
+                new Date(selectedMaintenance.datePlanifiee).toLocaleDateString() : 
+                'Non planifiée'}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">Date d'exécution</p>
+            <p className="font-medium">
+              {selectedMaintenance?.dateExecution ? 
+                new Date(selectedMaintenance.dateExecution).toLocaleDateString() : 
+                'Non exécutée'}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">Exécutant</p>
+            <p className="font-medium">
+              {selectedMaintenance?.executantId ? 
+                (() => {
+                  const executant = ouvriers.find(o => o.id === selectedMaintenance.executantId);
+                  return executant ? `${executant.prenom} ${executant.nom}` : 'Inconnu';
+                })() : 
+                'Non assigné'}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">Durée</p>
+            <p className="font-medium">
+              {selectedMaintenance?.dureeHeures ? 
+                `${selectedMaintenance.dureeHeures}h` : 
+                'Non estimée'}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h3 className="font-medium text-gray-900 mb-3">Description</h3>
+        <p className="text-gray-700 bg-gray-50 p-3 rounded">
+          {selectedMaintenance?.description}
+        </p>
+      </div>
+
+      {selectedMaintenance?.notes && (
+        <div>
+          <h3 className="font-medium text-gray-900 mb-3">Notes</h3>
+          <p className="text-gray-700 bg-gray-50 p-3 rounded">
+            {selectedMaintenance.notes}
+          </p>
+        </div>
+      )}
+
+      {selectedMaintenance?.observations && (
+        <div>
+          <h3 className="font-medium text-gray-900 mb-3">Observations</h3>
+          <p className="text-gray-700 bg-gray-50 p-3 rounded">
+            {selectedMaintenance.observations}
+          </p>
+        </div>
+      )}
+    </div>
+  );
 
   if (combinedLoading) {
     return (
@@ -952,33 +1359,29 @@ export const MaintenanceSection: React.FC = () => {
                             </span>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <div className="flex items-center justify-end space-x-2">
-                            <Button
-                              onClick={() => handleViewDetails(maintenance)}
-                              variant="secondary"
-                              size="sm"
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={() => handleViewMaintenance(maintenance)}
+                              className="text-green-600 hover:text-green-900"
                               title="Voir détails"
                             >
                               <Eye className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              onClick={() => handleEdit(maintenance)}
-                              variant="secondary"
-                              size="sm"
+                            </button>
+                            <button
+                              onClick={() => handleEditMaintenance(maintenance)}
+                              className="text-blue-600 hover:text-blue-900"
                               title="Modifier"
                             >
                               <Edit className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              onClick={() => handleDelete(maintenance.id)}
-                              variant="secondary"
-                              size="sm"
-                              className="text-red-600 hover:text-red-700"
+                            </button>
+                            <button
+                              onClick={() => handleDeleteMaintenance(maintenance.id)}
+                              className="text-red-600 hover:text-red-900"
                               title="Supprimer"
                             >
                               <Trash2 className="w-4 h-4" />
-                            </Button>
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -2044,6 +2447,45 @@ export const MaintenanceSection: React.FC = () => {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Modal for Maintenance */}
+      <Modal
+        isOpen={isMaintenanceModalOpen}
+        onClose={() => {
+          setIsMaintenanceModalOpen(false);
+          setEditingMaintenance(null);
+        }}
+        title="Nouvelle maintenance"
+        size="xl"
+      >
+        <MaintenanceForm />
+      </Modal>
+
+      {/* Modal de modification de maintenance */}
+      <Modal
+        isOpen={isEditMaintenanceModalOpen}
+        onClose={() => {
+          setIsEditMaintenanceModalOpen(false);
+          setEditingMaintenance(null);
+        }}
+        title="Modifier la maintenance"
+        size="xl"
+      >
+        <MaintenanceForm />
+      </Modal>
+
+      {/* Modal de détails de maintenance */}
+      <Modal
+        isOpen={isDetailModalOpen}
+        onClose={() => {
+          setIsDetailModalOpen(false);
+          setSelectedMaintenance(null);
+        }}
+        title={`Détails - ${selectedMaintenance?.description}`}
+        size="xl"
+      >
+        {selectedMaintenance && <MaintenanceDetailModal />}
       </Modal>
 
       {/* Modal d'export */}
