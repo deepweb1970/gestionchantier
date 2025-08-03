@@ -171,9 +171,9 @@ export const Planning: React.FC = () => {
         'Type': event.type === 'chantier' ? 'Chantier' :
                 event.type === 'maintenance' ? 'Maintenance' :
                 event.type === 'conge' ? 'Congé' : 'Formation',
-        'Date début': startDate.toLocaleDateString(),
+        'Date début': startDate.toLocaleDateString('fr-FR'),
         'Heure début': startDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
-        'Date fin': endDate.toLocaleDateString(),
+        'Date fin': endDate.toLocaleDateString('fr-FR'),
         'Heure fin': endDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
         'Durée (h)': ((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60)).toFixed(1),
         'Chantier': chantier?.nom || '-',
@@ -191,12 +191,13 @@ export const Planning: React.FC = () => {
       const columns = [
         { header: 'Titre', dataKey: 'Titre', width: 40 },
         { header: 'Type', dataKey: 'Type', width: 20 },
-        { header: 'Date', dataKey: 'Date début', width: 25 },
-        { header: 'Début', dataKey: 'Heure début', width: 20 },
-        { header: 'Fin', dataKey: 'Heure fin', width: 20 },
-        { header: 'Durée', dataKey: 'Durée (h)', width: 15 },
-        { header: 'Chantier', dataKey: 'Chantier', width: 35 },
-        { header: 'Ouvrier', dataKey: 'Ouvrier', width: 30 }
+        { header: 'Date début', dataKey: 'Date début', width: 22 },
+        { header: 'Heure début', dataKey: 'Heure début', width: 18 },
+        { header: 'Date fin', dataKey: 'Date fin', width: 22 },
+        { header: 'Heure fin', dataKey: 'Heure fin', width: 18 },
+        { header: 'Durée (h)', dataKey: 'Durée (h)', width: 15 },
+        { header: 'Chantier', dataKey: 'Chantier', width: 30 },
+        { header: 'Ouvrier', dataKey: 'Ouvrier', width: 25 }
       ];
       
       const stats = {
@@ -649,6 +650,7 @@ export const Planning: React.FC = () => {
           <div className="text-sm text-gray-600">
             <p>• {getFilteredEventsForExport().length} événement(s) à exporter</p>
             <p>• Format: {exportFormat.toUpperCase()}</p>
+            <p>• Colonnes: Titre, Type, Date début, Heure début, Date fin, Heure fin, Durée, Chantier, Ouvrier, Matériel, Description</p>
             {exportDateStart && exportDateEnd && (
               <p>• Période: {new Date(exportDateStart).toLocaleDateString()} - {new Date(exportDateEnd).toLocaleDateString()}</p>
             )}
