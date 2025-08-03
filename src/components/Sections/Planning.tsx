@@ -71,7 +71,7 @@ export const Planning: React.FC = () => {
   // Helper functions
   const getChantier = (chantierId?: string): Chantier | undefined => {
     if (!chantierId) return undefined;
-    return chantiers?.find(c => c.id === chantierId);
+    return chantiers?.find(c => c.id === chantierId || (c as any).client_id === chantierId);
   };
 
   const getOuvrier = (ouvrierId?: string): Ouvrier | undefined => {
@@ -440,7 +440,7 @@ export const Planning: React.FC = () => {
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">Aucun chantier</option>
-            {chantiers?.map(chantier => (
+            {chantiers?.filter(c => c.statut === 'actif' || c.statut === 'planifie').map(chantier => (
               <option key={chantier.id} value={chantier.id}>
                 {chantier.nom} ({chantier.statut})
               </option>
@@ -456,7 +456,7 @@ export const Planning: React.FC = () => {
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">Aucun ouvrier</option>
-            {ouvriers?.map(ouvrier => (
+            {ouvriers?.filter(o => o.statut === 'actif').map(ouvrier => (
               <option key={ouvrier.id} value={ouvrier.id}>
                 {ouvrier.prenom} {ouvrier.nom} - {ouvrier.qualification} ({ouvrier.statut})
               </option>
@@ -472,7 +472,7 @@ export const Planning: React.FC = () => {
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">Aucun matériel</option>
-            {materiel?.map(item => (
+            {materiel?.filter(m => m.statut === 'disponible' || m.statut === 'en_service').map(item => (
               <option key={item.id} value={item.id}>
                 {item.nom} - {item.marque} {item.modele} ({item.statut})
               </option>
@@ -549,7 +549,7 @@ export const Planning: React.FC = () => {
                 Chantier
               </h4>
               <p className="text-sm font-medium text-gray-900">{chantier.nom}</p>
-              <p className="text-xs text-gray-500">{chantier.adresse}</p>
+              <p className="text-xs text-gray-500">{(chantier as any).adresse || chantier.adresse}</p>
               <div className="mt-2">
                 <StatusBadge status={chantier.statut} type="chantier" />
               </div>
@@ -673,7 +673,7 @@ export const Planning: React.FC = () => {
   // Week view
   const renderWeekView = () => {
     const days = getDaysInWeek(currentDate);
-    const hours = Array.from({ length: 13 }, (_, i) => i + 7); // 7:00 to 19:00
+    const hours = Array.from({ length: 24 }, (_, i) => i); // 0:00 to 23:00
     
     return (
       <div className="bg-white rounded-lg shadow-sm border">
@@ -700,7 +700,7 @@ export const Planning: React.FC = () => {
           {hours.map(hour => (
             <div key={hour} className="grid grid-cols-8 border-b last:border-b-0">
               <div className="p-2 text-center text-xs text-gray-500 border-r">
-                {hour}:00
+                {hour.toString().padStart(2, '0')}:00
               </div>
               
               {days.map((day, dayIndex) => {
@@ -724,7 +724,9 @@ export const Planning: React.FC = () => {
                 return (
                   <div 
                     key={dayIndex} 
-                    className={`min-h-[60px] p-1 relative ${dayIndex < 6 ? 'border-r' : ''}`}
+                    className={`min-h-[40px] p-1 relative ${dayIndex < 6 ? 'border-r' : ''} ${
+                      hour >= 22 || hour <= 6 ? 'bg-gray-50' : ''
+                    }`}
                   >
                     <div className="space-y-1">
                       {hourEvents.map(event => (
@@ -759,7 +761,7 @@ export const Planning: React.FC = () => {
 
   // Day view
   const renderDayView = () => {
-    const hours = Array.from({ length: 14 }, (_, i) => i + 7); // 7:00 to 20:00
+    const hours = Array.from({ length: 24 }, (_, i) => i); // 0:00 to 23:00
     
     return (
       <div className="bg-white rounded-lg shadow-sm border">
@@ -790,14 +792,20 @@ export const Planning: React.FC = () => {
             
             return (
               <div key={hour} className="grid grid-cols-12 border-b last:border-b-0">
-                <div className="col-span-1 p-2 text-center text-sm text-gray-500 border-r">
-                  {hour}:00
+                <div className={`col-span-1 p-2 text-center text-sm text-gray-500 border-r ${
+                  hour >= 22 || hour <= 6 ? 'bg-gray-100' : ''
+                }`}>
+                  {hour.toString().padStart(2, '0')}:00
                 </div>
                 
-                <div className="col-span-11 min-h-[80px] p-2">
+                <div className={`col-span-11 min-h-[60px] p-2 ${
+                  hour >= 22 || hour <= 6 ? 'bg-gray-50' : ''
+                }`}>
                   {hourEvents.length === 0 ? (
-                    <div className="h-full flex items-center justify-center text-sm text-gray-400">
-                      Aucun événement
+                    <div className={`h-full flex items-center justify-center text-sm ${
+                      hour >= 22 || hour <= 6 ? 'text-gray-300' : 'text-gray-400'
+                    }`}>
+                      {hour >= 22 || hour <= 6 ? 'Hors horaires' : 'Aucun événement'}
                     </div>
                   ) : (
                     <div className="space-y-2">
