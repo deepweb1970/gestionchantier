@@ -217,9 +217,9 @@ export const Planning: React.FC = () => {
       const heureDebut = formData.get('heureDebut') as string;
       const heureFin = formData.get('heureFin') as string;
       
-      // Construire les dates complètes avec les heures
-      const dateTimeDebut = `${dateDebut}T${heureDebut}:00`;
-      const dateTimeFin = `${dateFin}T${heureFin}:00`;
+      // Construire les dates complètes avec les heures en UTC pour éviter les problèmes de fuseau horaire
+      const dateTimeDebut = `${dateDebut}T${heureDebut}:00.000Z`;
+      const dateTimeFin = `${dateFin}T${heureFin}:00.000Z`;
       
       const eventData = {
         titre: formData.get('titre') as string,
@@ -334,15 +334,24 @@ export const Planning: React.FC = () => {
   };
 
   const formatDateRange = (start: string, end: string) => {
-    const startDate = new Date(start);
-    const endDate = new Date(end);
+    // Extraire directement les parties date et heure pour éviter les conversions de fuseau horaire
+    const startParts = start.split('T');
+    const endParts = end.split('T');
+    
+    const startDateStr = startParts[0];
+    const startTimeStr = startParts[1] ? startParts[1].substring(0, 5) : '00:00';
+    const endDateStr = endParts[0];
+    const endTimeStr = endParts[1] ? endParts[1].substring(0, 5) : '00:00';
+    
+    const startDate = new Date(startDateStr + 'T00:00:00');
+    const endDate = new Date(endDateStr + 'T00:00:00');
     
     const isSameDay = startDate.toDateString() === endDate.toDateString();
     
     if (isSameDay) {
-      return `${startDate.toLocaleDateString()} ${startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+      return `${startDate.toLocaleDateString()} ${startTimeStr} - ${endTimeStr}`;
     } else {
-      return `${startDate.toLocaleDateString()} ${startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${endDate.toLocaleDateString()} ${endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+      return `${startDate.toLocaleDateString()} ${startTimeStr} - ${endDate.toLocaleDateString()} ${endTimeStr}`;
     }
   };
 
@@ -407,10 +416,9 @@ export const Planning: React.FC = () => {
               type="time"
               required
               defaultValue={editingEvent?.dateDebut ? 
-                (() => {
-                  const date = new Date(editingEvent.dateDebut);
-                  return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
-                })() : '08:00'}
+                editingEvent.dateDebut.includes('T') ? 
+                  editingEvent.dateDebut.split('T')[1].substring(0, 5) : 
+                  '08:00'}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -434,10 +442,9 @@ export const Planning: React.FC = () => {
               type="time"
               required
               defaultValue={editingEvent?.dateFin ? 
-                (() => {
-                  const date = new Date(editingEvent.dateFin);
-                  return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
-                })() : '17:00'}
+                editingEvent.dateFin.includes('T') ? 
+                  editingEvent.dateFin.split('T')[1].substring(0, 5) : 
+                  '17:00'}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -721,12 +728,55 @@ export const Planning: React.FC = () => {
                 dayEnd.setHours(hour + 1, 0, 0, 0);
                 
                 const hourEvents = filteredEvents.filter(event => {
-                  const eventStart = new Date(event.dateDebut);
-                  const eventEnd = new Date(event.dateFin);
-                  const hourStartTime = new Date(dayStart);
-                  hourStartTime.setHours(hour, 0, 0, 0);
-                  const hourEndTime = new Date(dayStart);
-                  hourEndTime.setHours(hour, 59, 59, 999);
+                  // Extraire les heures directement depuis les chaînes ISO pour éviter les conversions de fuseau horaire
+                  const eventStartStr = event.dateDebut;
+                  const eventEndStr = event.dateFin;
+                  
+                  // Extraire la date et l'heure de début de l'événement
+                  const eventStartDate = eventStartStr.split('T')[0];
+                  const eventStartTime = eventStartStr.split('T')[1];
+                  const eventStartHour = parseInt(eventStartTime.split(':')[0]);
+                  const eventStartMinute = parseInt(eventStartTime.split(':')[1]);
+                  
+                  // Extraire la date et l'heure de fin de l'événement
+                  const eventEndDate = eventEndStr.split('T')[0];
+                  const eventEndTime = eventEndStr.split('T')[1];
+                  const eventEndHour = parseInt(eventEndTime.split(':')[0]);
+                  const eventEndMinute = parseInt(eventEndTime.split(':')[1]);
+                  
+                  // Date du jour actuel dans la grille
+                  const currentDayStr = day.toISOString().split('T')[0];
+                  
+                  // Vérifier si l'événement se déroule ce jour-là
+                  const isEventOnThisDay = (eventStartDate === currentDayStr) || 
+                                         (eventEndDate === currentDayStr) ||
+                                         (eventStartDate < currentDayStr && eventEndDate > currentDayStr);
+                  
+                  if (!isEventOnThisDay) return false;
+                  
+                  // Vérifier si l'événement se déroule pendant cette heure
+                  if (eventStartDate === currentDayStr && eventEndDate === currentDayStr) {
+                    // Événement sur le même jour
+                    const eventStartTotalMinutes = eventStartHour * 60 + eventStartMinute;
+                    const eventEndTotalMinutes = eventEndHour * 60 + eventEndMinute;
+                    const hourStartMinutes = hour * 60;
+                    const hourEndMinutes = (hour + 1) * 60;
+                    
+                    return eventStartTotalMinutes < hourEndMinutes && eventEndTotalMinutes > hourStartMinutes;
+                  } else if (eventStartDate === currentDayStr) {
+                    // Événement commence ce jour
+                    const eventStartTotalMinutes = eventStartHour * 60 + eventStartMinute;
+                    const hourEndMinutes = (hour + 1) * 60;
+                    return eventStartTotalMinutes < hourEndMinutes;
+                  } else if (eventEndDate === currentDayStr) {
+                    // Événement finit ce jour
+                    const eventEndTotalMinutes = eventEndHour * 60 + eventEndMinute;
+                    const hourStartMinutes = hour * 60;
+                    return eventEndTotalMinutes > hourStartMinutes;
+                  } else {
+                    // Événement s'étend sur plusieurs jours
+                    return true;
+                  }
                   
                   // Vérifier si l'événement se déroule pendant cette heure
                   return eventStart <= hourEndTime && eventEnd >= hourStartTime;
@@ -753,9 +803,9 @@ export const Planning: React.FC = () => {
                             <span className="truncate">{event.titre}</span>
                           </div>
                           <div className="text-xs opacity-75 truncate">
-                            {new Date(event.dateDebut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            {event.dateDebut.includes('T') ? event.dateDebut.split('T')[1].substring(0, 5) : '00:00'}
                             {' - '}
-                            {new Date(event.dateFin).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            {event.dateFin.includes('T') ? event.dateFin.split('T')[1].substring(0, 5) : '00:00'}
                           </div>
                         </div>
                       ))}
@@ -790,15 +840,55 @@ export const Planning: React.FC = () => {
             hourEnd.setHours(hour + 1, 0, 0, 0);
             
             const hourEvents = filteredEvents.filter(event => {
-              const eventStart = new Date(event.dateDebut);
-              const eventEnd = new Date(event.dateFin);
-              const hourStartTime = new Date(currentDate);
-              hourStartTime.setHours(hour, 0, 0, 0);
-              const hourEndTime = new Date(currentDate);
-              hourEndTime.setHours(hour, 59, 59, 999);
+              // Extraire les heures directement depuis les chaînes ISO
+              const eventStartStr = event.dateDebut;
+              const eventEndStr = event.dateFin;
+              
+              // Extraire la date et l'heure de début de l'événement
+              const eventStartDate = eventStartStr.split('T')[0];
+              const eventStartTime = eventStartStr.split('T')[1];
+              const eventStartHour = parseInt(eventStartTime.split(':')[0]);
+              const eventStartMinute = parseInt(eventStartTime.split(':')[1]);
+              
+              // Extraire la date et l'heure de fin de l'événement
+              const eventEndDate = eventEndStr.split('T')[0];
+              const eventEndTime = eventEndStr.split('T')[1];
+              const eventEndHour = parseInt(eventEndTime.split(':')[0]);
+              const eventEndMinute = parseInt(eventEndTime.split(':')[1]);
+              
+              // Date du jour actuel
+              const currentDayStr = currentDate.toISOString().split('T')[0];
+              
+              // Vérifier si l'événement se déroule ce jour-là
+              const isEventOnThisDay = (eventStartDate === currentDayStr) || 
+                                     (eventEndDate === currentDayStr) ||
+                                     (eventStartDate < currentDayStr && eventEndDate > currentDayStr);
+              
+              if (!isEventOnThisDay) return false;
               
               // Vérifier si l'événement se déroule pendant cette heure
-              return eventStart <= hourEndTime && eventEnd >= hourStartTime;
+              if (eventStartDate === currentDayStr && eventEndDate === currentDayStr) {
+                // Événement sur le même jour
+                const eventStartTotalMinutes = eventStartHour * 60 + eventStartMinute;
+                const eventEndTotalMinutes = eventEndHour * 60 + eventEndMinute;
+                const hourStartMinutes = hour * 60;
+                const hourEndMinutes = (hour + 1) * 60;
+                
+                return eventStartTotalMinutes < hourEndMinutes && eventEndTotalMinutes > hourStartMinutes;
+              } else if (eventStartDate === currentDayStr) {
+                // Événement commence ce jour
+                const eventStartTotalMinutes = eventStartHour * 60 + eventStartMinute;
+                const hourEndMinutes = (hour + 1) * 60;
+                return eventStartTotalMinutes < hourEndMinutes;
+              } else if (eventEndDate === currentDayStr) {
+                // Événement finit ce jour
+                const eventEndTotalMinutes = eventEndHour * 60 + eventEndMinute;
+                const hourStartMinutes = hour * 60;
+                return eventEndTotalMinutes > hourStartMinutes;
+              } else {
+                // Événement s'étend sur plusieurs jours
+                return true;
+              }
             });
             
             return (
@@ -834,9 +924,9 @@ export const Planning: React.FC = () => {
                           </div>
                           
                           <div className="mt-1 text-sm">
-                            {new Date(event.dateDebut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            {event.dateDebut.includes('T') ? event.dateDebut.split('T')[1].substring(0, 5) : '00:00'}
                             {' - '}
-                            {new Date(event.dateFin).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            {event.dateFin.includes('T') ? event.dateFin.split('T')[1].substring(0, 5) : '00:00'}
                           </div>
                           
                           <div className="mt-1 text-sm">
