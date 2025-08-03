@@ -212,11 +212,20 @@ export const Planning: React.FC = () => {
 
   const handleSave = async (formData: FormData) => {
     try {
+      const dateDebut = formData.get('dateDebut') as string;
+      const dateFin = formData.get('dateFin') as string;
+      const heureDebut = formData.get('heureDebut') as string;
+      const heureFin = formData.get('heureFin') as string;
+      
+      // Construire les dates complètes avec les heures
+      const dateTimeDebut = `${dateDebut}T${heureDebut}:00`;
+      const dateTimeFin = `${dateFin}T${heureFin}:00`;
+      
       const eventData = {
         titre: formData.get('titre') as string,
         description: formData.get('description') as string || undefined,
-        dateDebut: formData.get('dateDebut') as string + 'T' + formData.get('heureDebut') as string,
-        dateFin: formData.get('dateFin') as string + 'T' + formData.get('heureFin') as string,
+        dateDebut: dateTimeDebut,
+        dateFin: dateTimeFin,
         chantierId: formData.get('chantierId') as string || undefined,
         ouvrierId: formData.get('ouvrierId') as string || undefined,
         materielId: formData.get('materielId') as string || undefined,
@@ -284,19 +293,13 @@ export const Planning: React.FC = () => {
     return filteredEvents.filter(event => {
       const eventStart = new Date(event.dateDebut);
       const eventEnd = new Date(event.dateFin);
+      const dayStart = new Date(day);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(day);
+      dayEnd.setHours(23, 59, 59, 999);
       
-      // Check if the event falls on this day
-      return (
-        eventStart.getDate() === day.getDate() &&
-        eventStart.getMonth() === day.getMonth() &&
-        eventStart.getFullYear() === day.getFullYear()
-      ) || (
-        eventEnd.getDate() === day.getDate() &&
-        eventEnd.getMonth() === day.getMonth() &&
-        eventEnd.getFullYear() === day.getFullYear()
-      ) || (
-        eventStart < day && eventEnd > day
-      );
+      // Vérifier si l'événement se déroule ce jour-là
+      return eventStart <= dayEnd && eventEnd >= dayStart;
     });
   };
 
@@ -403,7 +406,11 @@ export const Planning: React.FC = () => {
               name="heureDebut"
               type="time"
               required
-              defaultValue={editingEvent?.dateDebut ? new Date(editingEvent.dateDebut).toTimeString().slice(0, 5) : '08:00'}
+              defaultValue={editingEvent?.dateDebut ? 
+                (() => {
+                  const date = new Date(editingEvent.dateDebut);
+                  return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+                })() : '08:00'}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -426,7 +433,11 @@ export const Planning: React.FC = () => {
               name="heureFin"
               type="time"
               required
-              defaultValue={editingEvent?.dateFin ? new Date(editingEvent.dateFin).toTimeString().slice(0, 5) : '17:00'}
+              defaultValue={editingEvent?.dateFin ? 
+                (() => {
+                  const date = new Date(editingEvent.dateFin);
+                  return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+                })() : '17:00'}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -712,13 +723,13 @@ export const Planning: React.FC = () => {
                 const hourEvents = filteredEvents.filter(event => {
                   const eventStart = new Date(event.dateDebut);
                   const eventEnd = new Date(event.dateFin);
+                  const hourStartTime = new Date(dayStart);
+                  hourStartTime.setHours(hour, 0, 0, 0);
+                  const hourEndTime = new Date(dayStart);
+                  hourEndTime.setHours(hour, 59, 59, 999);
                   
-                  // Check if the event starts or continues during this hour
-                  return (
-                    (eventStart >= dayStart && eventStart < dayEnd) ||
-                    (eventEnd > dayStart && eventEnd <= dayEnd) ||
-                    (eventStart <= dayStart && eventEnd >= dayEnd)
-                  );
+                  // Vérifier si l'événement se déroule pendant cette heure
+                  return eventStart <= hourEndTime && eventEnd >= hourStartTime;
                 });
                 
                 return (
@@ -781,13 +792,13 @@ export const Planning: React.FC = () => {
             const hourEvents = filteredEvents.filter(event => {
               const eventStart = new Date(event.dateDebut);
               const eventEnd = new Date(event.dateFin);
+              const hourStartTime = new Date(currentDate);
+              hourStartTime.setHours(hour, 0, 0, 0);
+              const hourEndTime = new Date(currentDate);
+              hourEndTime.setHours(hour, 59, 59, 999);
               
-              // Check if the event starts or continues during this hour
-              return (
-                (eventStart >= hourStart && eventStart < hourEnd) ||
-                (eventEnd > hourStart && eventEnd <= hourEnd) ||
-                (eventStart <= hourStart && eventEnd >= hourEnd)
-              );
+              // Vérifier si l'événement se déroule pendant cette heure
+              return eventStart <= hourEndTime && eventEnd >= hourStartTime;
             });
             
             return (
