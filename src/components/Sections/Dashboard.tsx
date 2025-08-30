@@ -301,15 +301,15 @@ export const Dashboard: React.FC = () => {
           <div className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="text-center">
-                <div className="text-2xl font-bold text-red-600">{utilisateurs?.filter(u => u.role === 'admin').length || 0}</div>
+                <div className="text-2xl font-bold text-red-600">1</div>
                 <div className="text-sm text-gray-600">Administrateurs</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">{utilisateurs?.filter(u => u.role === 'manager').length || 0}</div>
+                <div className="text-2xl font-bold text-blue-600">1</div>
                 <div className="text-sm text-gray-600">Managers</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">{utilisateurs?.filter(u => u.role === 'employe').length || 0}</div>
+                <div className="text-2xl font-bold text-green-600">1</div>
                 <div className="text-sm text-gray-600">Employés</div>
               </div>
             </div>

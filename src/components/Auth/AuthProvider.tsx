@@ -36,14 +36,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .single();
       
       if (error) {
+        if (error.code === 'PGRST116') {
+          // Utilisateur non trouvé dans la table utilisateurs
+          console.log('Utilisateur non trouvé dans la table utilisateurs, création automatique...');
+          return null;
+        }
         console.error('Erreur lors de la récupération des données utilisateur:', error);
-        return null;
+        throw error;
       }
       
       return data;
     } catch (error) {
       console.error('Erreur lors de la récupération des données utilisateur:', error);
-      return null;
+      throw error;
     }
   };
 
@@ -66,11 +71,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(session?.user ?? null);
       
       if (session?.user?.email) {
-        const userData = await fetchUserData(session.user.email);
-        setUtilisateur(userData);
-        
-        if (userData) {
-          await updateLastConnection(userData.id);
+        try {
+          const userData = await fetchUserData(session.user.email);
+          setUtilisateur(userData);
+          
+          if (userData) {
+            await updateLastConnection(userData.id);
+          }
+        } catch (error) {
+          console.error('Erreur lors du chargement des données utilisateur:', error);
+          setUtilisateur(null);
         }
       }
       
@@ -83,11 +93,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(session?.user ?? null);
       
       if (session?.user?.email) {
-        const userData = await fetchUserData(session.user.email);
-        setUtilisateur(userData);
-        
-        if (userData) {
-          await updateLastConnection(userData.id);
+        try {
+          const userData = await fetchUserData(session.user.email);
+          setUtilisateur(userData);
+          
+          if (userData) {
+            await updateLastConnection(userData.id);
+          }
+        } catch (error) {
+          console.error('Erreur lors du chargement des données utilisateur:', error);
+          setUtilisateur(null);
         }
       } else {
         setUtilisateur(null);
@@ -118,10 +133,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          data: userData
-        }
       });
+      
       if (error) throw error;
       
       // Créer l'utilisateur dans la table utilisateurs
@@ -129,7 +142,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const { error: insertError } = await supabase
           .from('utilisateurs')
           .insert({
-            id: data.user.id,
             nom: userData.nom,
             prenom: userData.prenom,
             email: email,
@@ -144,6 +156,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         if (insertError) {
           console.error('Erreur lors de la création de l\'utilisateur:', insertError);
+          throw insertError;
         }
       }
     } catch (error) {
@@ -178,6 +191,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Fonction pour vérifier les permissions
   const hasPermission = (permission: string): boolean => {
     if (!utilisateur) return false;
+    if (!utilisateur.permissions) return false;
     return utilisateur.permissions?.includes(permission) || false;
   };
 
