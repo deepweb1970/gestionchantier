@@ -27,11 +27,17 @@ import {
   Copy, 
   RefreshCw 
 } from 'lucide-react';
-import { mockUtilisateurs } from '../../data/mockData';
-import { Utilisateur } from '../../types';
+import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
+import { supabase } from '../../lib/supabase';
+import type { Database } from '../../types/supabase';
 import { Modal } from '../Common/Modal';
 import { Button } from '../Common/Button';
 import { StatusBadge } from '../Common/StatusBadge';
+import { useAuth } from '../Auth/AuthProvider';
+
+type UtilisateurRow = Database['public']['Tables']['utilisateurs']['Row'];
+type UtilisateurInsert = Database['public']['Tables']['utilisateurs']['Insert'];
+type UtilisateurUpdate = Database['public']['Tables']['utilisateurs']['Update'];
 
 interface HistoriqueConnexion {
   id: string;
@@ -52,14 +58,39 @@ interface ParametreSecurite {
 }
 
 export const Utilisateurs: React.FC = () => {
-  const [utilisateurs, setUtilisateurs] = useState<Utilisateur[]>(mockUtilisateurs);
+  const { hasPermission } = useAuth();
+  
+  // Vérifier les permissions
+  if (!hasPermission('manage_users')) {
+    return (
+      <div className="text-center py-12">
+        <Shield className="w-16 h-16 mx-auto text-gray-400 mb-4" />
+        <h2 className="text-xl font-semibold text-gray-600 mb-2">Accès restreint</h2>
+        <p className="text-gray-500">Vous n'avez pas les permissions nécessaires pour gérer les utilisateurs.</p>
+      </div>
+    );
+  }
+
+  const { data: utilisateurs, loading, error, refresh } = useRealtimeSupabase<UtilisateurRow>({
+    table: 'utilisateurs',
+    fetchFunction: async () => {
+      const { data, error } = await supabase
+        .from('utilisateurs')
+        .select('*')
+        .order('nom');
+      
+      if (error) throw error;
+      return data || [];
+    }
+  });
+  
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false);
   const [is2FAModalOpen, setIs2FAModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
-  const [editingUtilisateur, setEditingUtilisateur] = useState<Utilisateur | null>(null);
-  const [selectedUtilisateur, setSelectedUtilisateur] = useState<Utilisateur | null>(null);
+  const [editingUtilisateur, setEditingUtilisateur] = useState<UtilisateurRow | null>(null);
+  const [selectedUtilisateur, setSelectedUtilisateur] = useState<UtilisateurRow | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -135,7 +166,7 @@ export const Utilisateurs: React.FC = () => {
     employe: ['read', 'view_reports']
   };
 
-  const filteredUtilisateurs = utilisateurs.filter(utilisateur => {
+  const filteredUtilisateurs = utilisateurs?.filter(utilisateur => {
     const matchesSearch = utilisateur.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          utilisateur.prenom.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          utilisateur.email.toLowerCase().includes(searchTerm.toLowerCase());
@@ -146,43 +177,66 @@ export const Utilisateurs: React.FC = () => {
     return matchesSearch && matchesRole && matchesStatus;
   });
 
-  const handleEdit = (utilisateur: Utilisateur) => {
+  const handleEdit = (utilisateur: UtilisateurRow) => {
     setEditingUtilisateur(utilisateur);
     setIsModalOpen(true);
   };
 
-  const handleViewDetails = (utilisateur: Utilisateur) => {
+  const handleViewDetails = (utilisateur: UtilisateurRow) => {
     setSelectedUtilisateur(utilisateur);
     setIsDetailModalOpen(true);
   };
 
-  const handleSecurity = (utilisateur: Utilisateur) => {
+  const handleSecurity = (utilisateur: UtilisateurRow) => {
     setSelectedUtilisateur(utilisateur);
     setIsSecurityModalOpen(true);
   };
 
-  const handle2FA = (utilisateur: Utilisateur) => {
+  const handle2FA = (utilisateur: UtilisateurRow) => {
     setSelectedUtilisateur(utilisateur);
     generateQRCode();
     generateBackupCodes();
     setIs2FAModalOpen(true);
   };
 
-  const handleHistory = (utilisateur: Utilisateur) => {
+  const handleHistory = (utilisateur: UtilisateurRow) => {
     setSelectedUtilisateur(utilisateur);
     setIsHistoryModalOpen(true);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Êtes-vous sûr de vouloir supprimer cet utilisateur ?')) {
-      setUtilisateurs(utilisateurs.filter(u => u.id !== id));
+      try {
+        const { error } = await supabase
+          .from('utilisateurs')
+          .delete()
+          .eq('id', id);
+        
+        if (error) throw error;
+        refresh();
+      } catch (error) {
+        console.error('Erreur lors de la suppression:', error);
+        alert('Erreur lors de la suppression de l\'utilisateur');
+      }
     }
   };
 
-  const toggleUserStatus = (id: string) => {
-    setUtilisateurs(utilisateurs.map(u => 
-      u.id === id ? { ...u, actif: !u.actif } : u
-    ));
+  const toggleUserStatus = async (id: string) => {
+    try {
+      const utilisateur = utilisateurs?.find(u => u.id === id);
+      if (!utilisateur) return;
+      
+      const { error } = await supabase
+        .from('utilisateurs')
+        .update({ actif: !utilisateur.actif })
+        .eq('id', id);
+      
+      if (error) throw error;
+      refresh();
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour du statut:', error);
+      alert('Erreur lors de la mise à jour du statut');
+    }
   };
 
   const resetPassword = (id: string) => {
@@ -218,44 +272,57 @@ export const Utilisateurs: React.FC = () => {
     alert('Copié dans le presse-papiers');
   };
 
-  const handleSave = (formData: FormData) => {
+  const handleSave = async (formData: FormData) => {
     const selectedPermissions = permissions
       .filter(p => formData.get(`permission_${p.id}`))
       .map(p => p.id);
 
-    const utilisateurData: Utilisateur = {
-      id: editingUtilisateur?.id || Date.now().toString(),
+    const utilisateurData = {
       nom: formData.get('nom') as string,
       prenom: formData.get('prenom') as string,
       email: formData.get('email') as string,
-      role: formData.get('role') as Utilisateur['role'],
-      dernierConnexion: editingUtilisateur?.dernierConnexion || new Date().toISOString(),
+      role: formData.get('role') as UtilisateurRow['role'],
       actif: formData.get('actif') === 'on',
       permissions: selectedPermissions
     };
 
-    if (editingUtilisateur) {
-      setUtilisateurs(utilisateurs.map(u => u.id === editingUtilisateur.id ? utilisateurData : u));
-    } else {
-      setUtilisateurs([...utilisateurs, utilisateurData]);
+    try {
+      if (editingUtilisateur) {
+        const { error } = await supabase
+          .from('utilisateurs')
+          .update(utilisateurData)
+          .eq('id', editingUtilisateur.id);
+        
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('utilisateurs')
+          .insert(utilisateurData);
+        
+        if (error) throw error;
+      }
+      
+      refresh();
+      setIsModalOpen(false);
+      setEditingUtilisateur(null);
+    } catch (error) {
+      console.error('Erreur lors de l\'enregistrement:', error);
+      alert('Erreur lors de l\'enregistrement de l\'utilisateur');
     }
-    
-    setIsModalOpen(false);
-    setEditingUtilisateur(null);
   };
 
   const getDefaultPermissions = (role: string) => {
     return rolePermissions[role as keyof typeof rolePermissions] || [];
   };
 
-  const getUserConnections = (userId: string) => {
+  const getUserConnections = (userId: string): HistoriqueConnexion[] => {
     return historiqueConnexions.filter(h => h.utilisateurId === userId);
   };
 
   const getSecurityStats = () => {
-    const totalUsers = utilisateurs.length;
-    const activeUsers = utilisateurs.filter(u => u.actif).length;
-    const adminUsers = utilisateurs.filter(u => u.role === 'admin').length;
+    const totalUsers = utilisateurs?.length || 0;
+    const activeUsers = utilisateurs?.filter(u => u.actif).length || 0;
+    const adminUsers = utilisateurs?.filter(u => u.role === 'admin').length || 0;
     const recentConnections = historiqueConnexions.filter(h => {
       const connectionDate = new Date(h.dateConnexion);
       const yesterday = new Date();
@@ -449,7 +516,7 @@ export const Utilisateurs: React.FC = () => {
             <div>
               <p className="text-sm text-gray-600">Dernière connexion</p>
               <p className="font-medium">
-                {new Date(selectedUtilisateur.dernierConnexion).toLocaleString()}
+                {selectedUtilisateur.derniere_connexion ? new Date(selectedUtilisateur.derniere_connexion).toLocaleString() : 'Jamais'}
               </p>
             </div>
             {lastConnection && (
@@ -466,11 +533,11 @@ export const Utilisateurs: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             {permissions.map(permission => (
               <div key={permission.id} className={`flex items-center space-x-2 p-2 rounded ${
-                selectedUtilisateur.permissions.includes(permission.id) 
+                selectedUtilisateur.permissions?.includes(permission.id) 
                   ? 'bg-green-50 text-green-800' 
                   : 'bg-gray-50 text-gray-500'
               }`}>
-                {selectedUtilisateur.permissions.includes(permission.id) ? (
+                {selectedUtilisateur.permissions?.includes(permission.id) ? (
                   <CheckCircle className="w-4 h-4" />
                 ) : (
                   <div className="w-4 h-4 border border-gray-300 rounded" />
@@ -840,180 +907,203 @@ export const Utilisateurs: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-lg shadow-sm border">
-        <div className="p-4 border-b">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <input
-                type="text"
-                placeholder="Rechercher un utilisateur..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div className="flex items-center space-x-2">
-              <Filter className="w-4 h-4 text-gray-500" />
-              <select
-                value={roleFilter}
-                onChange={(e) => setRoleFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="all">Tous les rôles</option>
-                <option value="admin">Administrateur</option>
-                <option value="manager">Manager</option>
-                <option value="employe">Employé</option>
-              </select>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="all">Tous les statuts</option>
-                <option value="actif">Actifs</option>
-                <option value="inactif">Inactifs</option>
-              </select>
-            </div>
+        {loading ? (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Chargement des données...</p>
           </div>
-        </div>
+        ) : error ? (
+          <div className="text-center py-8 text-red-500">
+            <p>Erreur lors du chargement des données</p>
+            <p className="text-sm">{error.message}</p>
+          </div>
+        ) : (
+          <>
+            <div className="p-4 border-b">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <input
+                    type="text"
+                    placeholder="Rechercher un utilisateur..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Filter className="w-4 h-4 text-gray-500" />
+                  <select
+                    value={roleFilter}
+                    onChange={(e) => setRoleFilter(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="all">Tous les rôles</option>
+                    <option value="admin">Administrateur</option>
+                    <option value="manager">Manager</option>
+                    <option value="employe">Employé</option>
+                  </select>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="all">Tous les statuts</option>
+                    <option value="actif">Actifs</option>
+                    <option value="inactif">Inactifs</option>
+                  </select>
+                </div>
+              </div>
+            </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Utilisateur
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Rôle
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Statut
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Dernière connexion
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Permissions
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredUtilisateurs.map((utilisateur) => (
-                <tr key={utilisateur.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0 h-10 w-10">
-                        <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                          utilisateur.role === 'admin' ? 'bg-red-500' :
-                          utilisateur.role === 'manager' ? 'bg-blue-500' :
-                          'bg-green-500'
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Utilisateur
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Rôle
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Statut
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Dernière connexion
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Permissions
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {(filteredUtilisateurs || []).map((utilisateur) => (
+                    <tr key={utilisateur.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0 h-10 w-10">
+                            <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                              utilisateur.role === 'admin' ? 'bg-red-500' :
+                              utilisateur.role === 'manager' ? 'bg-blue-500' :
+                              'bg-green-500'
+                            }`}>
+                              <User className="h-5 w-5 text-white" />
+                            </div>
+                          </div>
+                          <div className="ml-4">
+                            <div className="text-sm font-medium text-gray-900">
+                              {utilisateur.prenom} {utilisateur.nom}
+                            </div>
+                            <div className="text-sm text-gray-500">{utilisateur.email}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          utilisateur.role === 'admin' ? 'bg-red-100 text-red-800' :
+                          utilisateur.role === 'manager' ? 'bg-blue-100 text-blue-800' :
+                          'bg-green-100 text-green-800'
                         }`}>
-                          <User className="h-5 w-5 text-white" />
+                          {utilisateur.role === 'admin' ? 'Administrateur' :
+                           utilisateur.role === 'manager' ? 'Manager' :
+                           'Employé'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {utilisateur.actif ? (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <CheckCircle className="w-3 h-3 mr-1" />
+                            Actif
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                            <UserX className="w-3 h-3 mr-1" />
+                            Inactif
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <div className="flex items-center">
+                          <Clock className="w-4 h-4 mr-1 text-gray-400" />
+                          {utilisateur.derniere_connexion ? new Date(utilisateur.derniere_connexion).toLocaleDateString() : 'Jamais'}
                         </div>
-                      </div>
-                      <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">
-                          {utilisateur.prenom} {utilisateur.nom}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <span className="text-gray-600">{utilisateur.permissions?.length || 0} permission(s)</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => handleViewDetails(utilisateur)}
+                            className="text-green-600 hover:text-green-900"
+                            title="Voir détails"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleHistory(utilisateur)}
+                            className="text-purple-600 hover:text-purple-900"
+                            title="Historique"
+                          >
+                            <Clock className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handle2FA(utilisateur)}
+                            className="text-orange-600 hover:text-orange-900"
+                            title="2FA"
+                          >
+                            <Smartphone className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => toggleUserStatus(utilisateur.id)}
+                            className={utilisateur.actif ? "text-red-600 hover:text-red-900" : "text-green-600 hover:text-green-900"}
+                            title={utilisateur.actif ? "Désactiver" : "Activer"}
+                          >
+                            {utilisateur.actif ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+                          </button>
+                          <button
+                            onClick={() => resetPassword(utilisateur.id)}
+                            className="text-yellow-600 hover:text-yellow-900"
+                            title="Réinitialiser mot de passe"
+                          >
+                            <RefreshCw className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleEdit(utilisateur)}
+                            className="text-blue-600 hover:text-blue-900"
+                            title="Modifier"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(utilisateur.id)}
+                            className="text-red-600 hover:text-red-900"
+                            title="Supprimer"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
-                        <div className="text-sm text-gray-500">{utilisateur.email}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      utilisateur.role === 'admin' ? 'bg-red-100 text-red-800' :
-                      utilisateur.role === 'manager' ? 'bg-blue-100 text-blue-800' :
-                      'bg-green-100 text-green-800'
-                    }`}>
-                      {utilisateur.role === 'admin' ? 'Administrateur' :
-                       utilisateur.role === 'manager' ? 'Manager' :
-                       'Employé'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {utilisateur.actif ? (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        <CheckCircle className="w-3 h-3 mr-1" />
-                        Actif
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                        <UserX className="w-3 h-3 mr-1" />
-                        Inactif
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <div className="flex items-center">
-                      <Clock className="w-4 h-4 mr-1 text-gray-400" />
-                      {new Date(utilisateur.dernierConnexion).toLocaleDateString()}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <span className="text-gray-600">{utilisateur.permissions.length} permission(s)</span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => handleViewDetails(utilisateur)}
-                        className="text-green-600 hover:text-green-900"
-                        title="Voir détails"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleHistory(utilisateur)}
-                        className="text-purple-600 hover:text-purple-900"
-                        title="Historique"
-                      >
-                        <Clock className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handle2FA(utilisateur)}
-                        className="text-orange-600 hover:text-orange-900"
-                        title="2FA"
-                      >
-                        <Smartphone className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => toggleUserStatus(utilisateur.id)}
-                        className={utilisateur.actif ? "text-red-600 hover:text-red-900" : "text-green-600 hover:text-green-900"}
-                        title={utilisateur.actif ? "Désactiver" : "Activer"}
-                      >
-                        {utilisateur.actif ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
-                      </button>
-                      <button
-                        onClick={() => resetPassword(utilisateur.id)}
-                        className="text-yellow-600 hover:text-yellow-900"
-                        title="Réinitialiser mot de passe"
-                      >
-                        <RefreshCw className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleEdit(utilisateur)}
-                        className="text-blue-600 hover:text-blue-900"
-                        title="Modifier"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(utilisateur.id)}
-                        className="text-red-600 hover:text-red-900"
-                        title="Supprimer"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                {(filteredUtilisateurs || []).length === 0 && (
+                  <tfoot>
+                    <tr>
+                      <td colSpan={6} className="px-6 py-10 text-center text-gray-500 bg-gray-50">
+                        Aucun utilisateur trouvé
+                      </td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Modal de création/modification */}

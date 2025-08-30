@@ -18,9 +18,10 @@ import { Planning } from './components/Sections/Planning';
 import { ParametresHeuresSup } from './components/Sections/ParametresHeuresSup';
 import { MaintenanceSection } from './components/Sections/Maintenance';
 import { PetitMaterielSection } from './components/Sections/PetitMateriel';
+import { ProtectedRoute } from './components/Common/ProtectedRoute';
 
 function App() {
-  const { user, loading } = useAuth();
+  const { user, utilisateur, loading } = useAuth();
   const [activeSection, setActiveSection] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -87,31 +88,83 @@ function App() {
       case 'dashboard':
         return <Dashboard />;
       case 'chantiers':
-        return <Chantiers />;
+        return (
+          <ProtectedRoute requiredPermission="read">
+            <Chantiers />
+          </ProtectedRoute>
+        );
       case 'photos':
-        return <PhotosManager />;
+        return (
+          <ProtectedRoute requiredPermission="read">
+            <PhotosManager />
+          </ProtectedRoute>
+        );
       case 'ouvriers':
-        return <Ouvriers />;
+        return (
+          <ProtectedRoute requiredPermission="manage_workers">
+            <Ouvriers />
+          </ProtectedRoute>
+        );
       case 'materiel':
-        return <MaterielSection />;
+        return (
+          <ProtectedRoute requiredPermission="manage_equipment">
+            <MaterielSection />
+          </ProtectedRoute>
+        );
       case 'clients':
-        return <Clients />;
+        return (
+          <ProtectedRoute requiredPermission="manage_clients">
+            <Clients />
+          </ProtectedRoute>
+        );
       case 'facturation':
-        return <Facturation />;
+        return (
+          <ProtectedRoute requiredPermission="manage_invoices">
+            <Facturation />
+          </ProtectedRoute>
+        );
       case 'heures':
-        return <SaisieHeures />;
+        return (
+          <ProtectedRoute requiredPermission="read">
+            <SaisieHeures />
+          </ProtectedRoute>
+        );
       case 'rapports':
-        return <Rapports />;
+        return (
+          <ProtectedRoute requiredPermission="view_reports">
+            <Rapports />
+          </ProtectedRoute>
+        );
       case 'utilisateurs':
-        return <Utilisateurs />;
+        return (
+          <ProtectedRoute requiredPermission="manage_users">
+            <Utilisateurs />
+          </ProtectedRoute>
+        );
       case 'planning':
-        return <Planning />;
+        return (
+          <ProtectedRoute requiredPermission="read">
+            <Planning />
+          </ProtectedRoute>
+        );
       case 'parametres':
-        return <ParametresHeuresSup />;
+        return (
+          <ProtectedRoute requiredPermission="admin_settings">
+            <ParametresHeuresSup />
+          </ProtectedRoute>
+        );
       case 'maintenance':
-        return <MaintenanceSection />;
+        return (
+          <ProtectedRoute requiredPermission="manage_equipment">
+            <MaintenanceSection />
+          </ProtectedRoute>
+        );
       case 'petit-materiel':
-        return <PetitMaterielSection />;
+        return (
+          <ProtectedRoute requiredPermission="manage_equipment">
+            <PetitMaterielSection />
+          </ProtectedRoute>
+        );
       default:
         return <Dashboard />;
     }
@@ -124,6 +177,7 @@ function App() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
           <p className="mt-4 text-gray-600">Chargement...</p>
+          <p className="mt-2 text-sm text-gray-500">Vérification de l'authentification...</p>
         </div>
       </div>
     );
