@@ -66,6 +66,50 @@ export interface Materiel {
   machineHours?: number;
 }
 
+export interface PetitMateriel {
+  id: string;
+  nom: string;
+  type: string;
+  marque: string;
+  modele: string;
+  numeroSerie: string;
+  codeBarre: string;
+  dateAchat: string;
+  valeur: number;
+  statut: 'disponible' | 'prete' | 'maintenance' | 'perdu' | 'hors_service';
+  localisation: string;
+  description?: string;
+  quantiteStock: number;
+  quantiteDisponible: number;
+  seuilAlerte: number;
+  poids?: number;
+  dimensions?: string;
+  garantie?: string;
+  fournisseur?: string;
+  prets: PretPetitMateriel[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface PretPetitMateriel {
+  id: string;
+  petitMaterielId: string;
+  ouvrierId: string;
+  chantierId?: string;
+  dateDebut: string;
+  dateFin?: string;
+  dateRetourPrevue: string;
+  dateRetourEffective?: string;
+  quantite: number;
+  statut: 'en_cours' | 'termine' | 'retard' | 'perdu';
+  notes?: string;
+  etatDepart: 'neuf' | 'bon' | 'moyen' | 'use';
+  etatRetour?: 'neuf' | 'bon' | 'moyen' | 'use' | 'endommage' | 'perdu';
+  ouvrierNom?: string;
+  chantierNom?: string;
+  petitMaterielNom?: string;
+}
+
 export interface Client {
   id: string;
   nom: string;

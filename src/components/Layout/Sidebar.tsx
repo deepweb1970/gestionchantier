@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Building2, Image, Users, Wrench, UserCheck, FileText, Clock, BarChart3, Shield, Calendar, Menu, X, Settings, UserCog, LogOut, Bell, HelpCircle, PenTool as Tool } from 'lucide-react';
+import { Package } from 'lucide-react';
 import { useAuth } from '../Auth/AuthProvider';
 
 interface SidebarProps {
@@ -15,6 +16,7 @@ const menuItems = [
   { id: 'ouvriers', label: 'Ouvriers', icon: Users },
   { id: 'materiel', label: 'Matériel', icon: Wrench },
   { id: 'maintenance', label: 'Maintenance', icon: Tool },
+  { id: 'petit-materiel', label: 'Petit Matériel', icon: Package },
   { id: 'clients', label: 'Clients', icon: UserCheck },
   { id: 'facturation', label: 'Facturation', icon: FileText },
   { id: 'heures', label: 'Saisie Heures', icon: Clock },

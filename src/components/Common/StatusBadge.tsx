@@ -63,6 +63,25 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, type = 'defaul
           default: return { bg: 'bg-gray-100 border border-gray-200', text: 'text-gray-800', label: status };
         }
         
+      case 'petit_materiel':
+        switch (status) {
+          case 'disponible': return { bg: 'bg-green-100 border border-green-200', text: 'text-green-800', label: 'Disponible' };
+          case 'prete': return { bg: 'bg-orange-100 border border-orange-200', text: 'text-orange-800', label: 'Prêté' };
+          case 'maintenance': return { bg: 'bg-yellow-100 border border-yellow-200', text: 'text-yellow-800', label: 'Maintenance' };
+          case 'perdu': return { bg: 'bg-red-100 border border-red-200', text: 'text-red-800', label: 'Perdu' };
+          case 'hors_service': return { bg: 'bg-gray-100 border border-gray-200', text: 'text-gray-800', label: 'Hors service' };
+          default: return { bg: 'bg-gray-100 border border-gray-200', text: 'text-gray-800', label: status };
+        }
+        
+      case 'pret':
+        switch (status) {
+          case 'en_cours': return { bg: 'bg-blue-100 border border-blue-200', text: 'text-blue-800', label: 'En cours' };
+          case 'termine': return { bg: 'bg-green-100 border border-green-200', text: 'text-green-800', label: 'Terminé' };
+          case 'retard': return { bg: 'bg-red-100 border border-red-200', text: 'text-red-800', label: 'En retard' };
+          case 'perdu': return { bg: 'bg-gray-100 border border-gray-200', text: 'text-gray-800', label: 'Perdu' };
+          default: return { bg: 'bg-gray-100 border border-gray-200', text: 'text-gray-800', label: status };
+        }
+        
       default:
         return { bg: 'bg-gray-100 border border-gray-200', text: 'text-gray-800', label: status };
     }
