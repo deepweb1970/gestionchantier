@@ -10,6 +10,17 @@ import { Plus, Edit, Trash2, Wrench, Calendar, Download, Euro, Clock, TrendingUp
   Eye, 
   QrCode, 
   Scan,
+} from 'lucide-react';
+import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
+import { PetitMaterielService } from '../../services/petitMaterielService';
+import { PretPetitMaterielService } from '../../services/petitMaterielService';
+import { ouvrierService } from '../../services/ouvrierService';
+import { chantierService } from '../../services/chantierService';
+import { PetitMateriel, PretPetitMateriel, Ouvrier, Chantier } from '../../types';
+import { Modal } from '../Common/Modal';
+import { Button } from '../Common/Button';
+import { StatusBadge } from '../Common/StatusBadge';
+
 export const PetitMaterielSection: React.FC = () => {
   const { data: petitMateriel, loading: materielLoading, error: materielError, refresh: refreshMateriel } = useRealtimeSupabase<PetitMateriel>({
     table: 'petit_materiel',
