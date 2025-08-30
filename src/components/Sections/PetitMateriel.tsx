@@ -58,12 +58,20 @@ export const PetitMaterielSection: React.FC = () => {
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [barcodeSearch, setBarcodeSearch] = useState('');
+  const [stockUpdateModalOpen, setStockUpdateModalOpen] = useState(false);
+  const [selectedMaterielForStock, setSelectedMaterielForStock] = useState<PetitMateriel | null>(null);
 
   const filteredMateriel = (petitMateriel || []).filter(item => {
-    const matchesSearch = item.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.marque.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.codeBarre.includes(searchTerm);
+    const searchLower = searchTerm.toLowerCase();
+    const matchesSearch = item.nom.toLowerCase().includes(searchLower) ||
+                         item.type.toLowerCase().includes(searchLower) ||
+                         item.marque.toLowerCase().includes(searchLower) ||
+                         item.modele.toLowerCase().includes(searchLower) ||
+                         item.codeBarre.toLowerCase().includes(searchLower) ||
+                         item.numeroSerie.toLowerCase().includes(searchLower) ||
+                         item.localisation.toLowerCase().includes(searchLower) ||
+                         (item.description && item.description.toLowerCase().includes(searchLower)) ||
+                         (item.fournisseur && item.fournisseur.toLowerCase().includes(searchLower));
     const matchesType = typeFilter === 'all' || item.type === typeFilter;
     const matchesStatus = statusFilter === 'all' || item.statut === statusFilter;
     return matchesSearch && matchesType && matchesStatus;
@@ -80,8 +88,17 @@ export const PetitMaterielSection: React.FC = () => {
   };
 
   const handlePret = (item: PetitMateriel) => {
+    if (item.quantiteDisponible === 0) {
+      alert('Aucune quantité disponible pour ce matériel');
+      return;
+    }
     setSelectedMateriel(item);
     setIsPretModalOpen(true);
+  };
+
+  const handleStockUpdate = (item: PetitMateriel) => {
+    setSelectedMaterielForStock(item);
+    setStockUpdateModalOpen(true);
   };
 
   const handleRetour = (pret: PretPetitMateriel) => {
@@ -189,19 +206,62 @@ export const PetitMaterielSection: React.FC = () => {
   };
 
   const handleBarcodeSearch = async () => {
-    if (!barcodeSearch.trim()) return;
+    if (!barcodeSearch.trim()) {
+      alert('Veuillez saisir un code-barres ou un nom');
+      return;
+    }
 
     try {
-      const item = await PetitMaterielService.getByBarcode(barcodeSearch);
+      // Recherche d'abord par code-barres exact
+      let item = await PetitMaterielService.getByBarcode(barcodeSearch.trim());
+      
+      // Si pas trouvé par code-barres, rechercher par nom
+      if (!item) {
+        const allItems = await PetitMaterielService.getAll();
+        const searchLower = barcodeSearch.toLowerCase().trim();
+        item = allItems.find(i => 
+          i.nom.toLowerCase().includes(searchLower) ||
+          i.marque.toLowerCase().includes(searchLower) ||
+          i.modele.toLowerCase().includes(searchLower) ||
+          i.numeroSerie.toLowerCase().includes(searchLower)
+        ) || null;
+      }
+      
       if (item) {
         setSelectedMateriel(item);
         setIsDetailModalOpen(true);
+        setBarcodeSearch(''); // Clear search after found
       } else {
-        alert('Aucun matériel trouvé avec ce code-barres');
+        alert('Aucun matériel trouvé avec ce code-barres ou ce nom');
       }
     } catch (error) {
       console.error('Erreur lors de la recherche:', error);
       alert('Erreur lors de la recherche');
+    }
+  };
+
+  const handleSaveStockUpdate = async (formData: FormData) => {
+    if (!selectedMaterielForStock) return;
+
+    const newQuantiteStock = parseInt(formData.get('quantiteStock') as string);
+    const newQuantiteDisponible = parseInt(formData.get('quantiteDisponible') as string);
+    const newSeuilAlerte = parseInt(formData.get('seuilAlerte') as string);
+    const newLocalisation = formData.get('localisation') as string;
+
+    try {
+      await PetitMaterielService.update(selectedMaterielForStock.id, {
+        quantiteStock: newQuantiteStock,
+        quantiteDisponible: newQuantiteDisponible,
+        seuilAlerte: newSeuilAlerte,
+        localisation: newLocalisation
+      });
+      
+      refreshMateriel();
+      setStockUpdateModalOpen(false);
+      setSelectedMaterielForStock(null);
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour du stock:', error);
+      alert('Erreur lors de la mise à jour du stock');
     }
   };
 
@@ -466,6 +526,82 @@ export const PetitMaterielSection: React.FC = () => {
         </Button>
         <Button type="submit">
           {editingMateriel ? 'Mettre à jour' : 'Créer'}
+        </Button>
+      </div>
+    </form>
+  );
+
+  const StockUpdateForm = () => (
+    <form onSubmit={(e) => {
+      e.preventDefault();
+      handleSaveStockUpdate(new FormData(e.currentTarget));
+    }}>
+      <div className="space-y-4">
+        {selectedMaterielForStock && (
+          <div className="bg-blue-50 p-4 rounded-lg">
+            <h3 className="font-medium text-blue-800 mb-2">
+              Mise à jour du stock: {selectedMaterielForStock.nom}
+            </h3>
+            <p className="text-sm text-blue-700">
+              {selectedMaterielForStock.marque} {selectedMaterielForStock.modele}
+            </p>
+          </div>
+        )}
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Quantité en stock</label>
+            <input
+              name="quantiteStock"
+              type="number"
+              min="0"
+              required
+              defaultValue={selectedMaterielForStock?.quantiteStock || 0}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Quantité disponible</label>
+            <input
+              name="quantiteDisponible"
+              type="number"
+              min="0"
+              required
+              defaultValue={selectedMaterielForStock?.quantiteDisponible || 0}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Seuil d'alerte</label>
+            <input
+              name="seuilAlerte"
+              type="number"
+              min="0"
+              required
+              defaultValue={selectedMaterielForStock?.seuilAlerte || 1}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Localisation</label>
+          <input
+            name="localisation"
+            type="text"
+            required
+            defaultValue={selectedMaterielForStock?.localisation || ''}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+      </div>
+      
+      <div className="flex justify-end space-x-3 mt-6">
+        <Button variant="secondary" onClick={() => setStockUpdateModalOpen(false)}>
+          Annuler
+        </Button>
+        <Button type="submit">
+          Mettre à jour le stock
         </Button>
       </div>
     </form>
@@ -781,14 +917,20 @@ export const PetitMaterielSection: React.FC = () => {
       <div className="bg-white rounded-lg shadow-sm border p-4">
         <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center">
           <QrCode className="w-5 h-5 mr-2 text-blue-500" />
-          Recherche par code-barres
+          Recherche par code-barres ou nom
         </h3>
         <div className="flex gap-3">
           <input
             type="text"
-            placeholder="Scanner ou saisir le code-barres..."
+            placeholder="Scanner le code-barres ou saisir le nom du matériel..."
             value={barcodeSearch}
             onChange={(e) => setBarcodeSearch(e.target.value)}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleBarcodeSearch();
+              }
+            }}
             className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <Button onClick={handleBarcodeSearch} disabled={!barcodeSearch.trim()}>
@@ -997,6 +1139,13 @@ export const PetitMaterielSection: React.FC = () => {
                             <User className="w-4 h-4" />
                           </button>
                           <button
+                            onClick={() => handleStockUpdate(item)}
+                            className="text-indigo-600 hover:text-indigo-900"
+                            title="Mettre à jour le stock"
+                          >
+                            <Package className="w-4 h-4" />
+                          </button>
+                          <button
                             onClick={() => handleEdit(item)}
                             className="text-purple-600 hover:text-purple-900"
                             title="Modifier"
@@ -1080,11 +1229,17 @@ export const PetitMaterielSection: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
-                        Début: {new Date(pret.dateDebut).toLocaleDateString()}
+                        Début: {pret.dateDebut ? new Date(pret.dateDebut).toLocaleDateString() : 'Date invalide'}
                       </div>
                       <div className="text-sm text-gray-500">
-                        Retour prévu: {new Date(pret.dateRetourPrevue).toLocaleDateString()}
+                        Retour prévu: {pret.dateRetourPrevue ? new Date(pret.dateRetourPrevue).toLocaleDateString() : 'Date invalide'}
                       </div>
+                      {pret.dateRetourPrevue && new Date(pret.dateRetourPrevue) < new Date() && pret.statut === 'en_cours' && (
+                        <div className="flex items-center text-red-600 mt-1">
+                          <AlertTriangle className="w-3 h-3 mr-1" />
+                          <span className="text-xs">En retard</span>
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <StatusBadge status={pret.statut} type="pret" />
@@ -1148,6 +1303,19 @@ export const PetitMaterielSection: React.FC = () => {
         size="md"
       >
         <RetourForm />
+      </Modal>
+
+      {/* Modal de mise à jour du stock */}
+      <Modal
+        isOpen={stockUpdateModalOpen}
+        onClose={() => {
+          setStockUpdateModalOpen(false);
+          setSelectedMaterielForStock(null);
+        }}
+        title="Mise à jour du stock"
+        size="md"
+      >
+        <StockUpdateForm />
       </Modal>
 
       {/* Modal de détails */}
