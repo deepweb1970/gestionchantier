@@ -36,7 +36,6 @@ import { PetitMaterielService, PretPetitMaterielService } from '../../services/p
 import { ouvrierService } from '../../services/ouvrierService';
 import { chantierService } from '../../services/chantierService';
 import { PetitMateriel, PretPetitMateriel, Ouvrier, Chantier } from '../../types';
-import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
 import { ouvrierService } from '../../services/ouvrierService';
 import { chantierService } from '../../services/chantierService';
 import { Modal } from '../Common/Modal';
