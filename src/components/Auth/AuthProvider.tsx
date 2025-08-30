@@ -114,13 +114,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     let mounted = true;
 
+    // Clear invalid session data on startup
+    const clearInvalidSession = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error && error.message.includes('refresh_token_not_found')) {
+          console.log('Clearing invalid session data...');
+          await supabase.auth.signOut();
+          localStorage.clear();
+          sessionStorage.clear();
+        }
+      } catch (err) {
+        console.log('Error checking session, clearing storage:', err);
+        await supabase.auth.signOut();
+        localStorage.clear();
+        sessionStorage.clear();
+      }
+    };
+
     // Récupérer la session actuelle
     const getInitialSession = async () => {
       try {
+        await clearInvalidSession();
+        
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.error('Erreur lors de la récupération de la session:', error);
+          if (error.message.includes('refresh_token_not_found')) {
+            console.log('Invalid refresh token, clearing session');
+            await supabase.auth.signOut();
+            localStorage.clear();
+            sessionStorage.clear();
+          } else {
+            console.error('Erreur lors de la récupération de la session:', error);
+          }
           if (mounted) {
             setLoading(false);
           }
@@ -157,6 +184,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!mounted) return;
 
       console.log('Auth state change:', event, session?.user?.email);
+      
+      if (event === 'TOKEN_REFRESHED' && !session) {
+        console.log('Token refresh failed, clearing session');
+        await supabase.auth.signOut();
+        localStorage.clear();
+        sessionStorage.clear();
+        if (mounted) {
+          setUser(null);
+          setUtilisateur(null);
+          setLoading(false);
+        }
+        return;
+      }
       
       setSession(session);
       setUser(session?.user ?? null);
@@ -256,6 +296,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOut = async () => {
     try {
       const { error } = await supabase.auth.signOut();
+      localStorage.clear();
+      sessionStorage.clear();
       if (error) {
         console.error('Erreur de déconnexion:', error);
         throw error;
