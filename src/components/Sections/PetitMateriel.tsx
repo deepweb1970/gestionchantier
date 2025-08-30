@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { 
+import { MaterielSection } from './Materiel';
   Plus, 
   Edit, 
   Trash2, 
@@ -31,181 +32,17 @@ import {
   Archive,
   RotateCcw
 } from 'lucide-react';
-import { PetitMateriel, PretPetitMateriel, Ouvrier, Chantier } from '../../types';
 import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
+import { PetitMaterielService, PretPetitMaterielService } from '../../services/petitMaterielService';
 import { ouvrierService } from '../../services/ouvrierService';
 import { chantierService } from '../../services/chantierService';
+import { PetitMateriel, PretPetitMateriel, Ouvrier, Chantier } from '../../types';
 import { Modal } from '../Common/Modal';
 import { Button } from '../Common/Button';
 import { StatusBadge } from '../Common/StatusBadge';
-import { exportToPDF } from '../../utils/pdfExport';
+import type { PetitMateriel as PetitMaterielType, PretPetitMateriel as PretPetitMaterielType, Ouvrier as OuvrierType, Chantier as ChantierType } from '../../types';
 
-// Mock data pour le petit matériel
-const mockPetitMateriel: PetitMateriel[] = [
-  {
-    id: '1',
-    nom: 'Perceuse sans fil Bosch',
-    type: 'Outillage électroportatif',
-    marque: 'Bosch',
-    modele: 'GSR 18V-60 C',
-    numeroSerie: 'BSH001234',
-    codeBarre: '3165140123456',
-    dateAchat: '2023-03-15',
-    valeur: 180,
-    statut: 'disponible',
-    localisation: 'Dépôt principal',
-    description: 'Perceuse-visseuse sans fil 18V avec 2 batteries',
-    quantiteStock: 5,
-    quantiteDisponible: 3,
-    seuilAlerte: 2,
-    poids: 1.2,
-    dimensions: '25x8x22 cm',
-    garantie: '2025-03-15',
-    fournisseur: 'Leroy Merlin',
-    prets: []
-  },
-  {
-    id: '2',
-    nom: 'Niveau laser Stabila',
-    type: 'Instrument de mesure',
-    marque: 'Stabila',
-    modele: 'LAX 50',
-    numeroSerie: 'STB567890',
-    codeBarre: '4007430123789',
-    dateAchat: '2023-06-20',
-    valeur: 95,
-    statut: 'prete',
-    localisation: 'Chantier Villa Moderne',
-    description: 'Niveau laser rotatif avec trépied',
-    quantiteStock: 2,
-    quantiteDisponible: 1,
-    seuilAlerte: 1,
-    poids: 0.8,
-    dimensions: '15x10x8 cm',
-    garantie: '2025-06-20',
-    fournisseur: 'Point P',
-    prets: [
-      {
-        id: '1',
-        petitMaterielId: '2',
-        ouvrierId: '1',
-        chantierId: '1',
-        dateDebut: '2024-01-15',
-        dateRetourPrevue: '2024-01-22',
-        quantite: 1,
-        statut: 'en_cours',
-        etatDepart: 'bon',
-        ouvrierNom: 'Jean Dubois',
-        chantierNom: 'Villa Moderne',
-        petitMaterielNom: 'Niveau laser Stabila'
-      }
-    ]
-  },
-  {
-    id: '3',
-    nom: 'Casque de sécurité',
-    type: 'EPI',
-    marque: 'Uvex',
-    modele: 'Pheos B-WR',
-    numeroSerie: 'UVX789012',
-    codeBarre: '4031101234567',
-    dateAchat: '2023-01-10',
-    valeur: 25,
-    statut: 'disponible',
-    localisation: 'Vestiaire',
-    description: 'Casque de protection avec visière',
-    quantiteStock: 20,
-    quantiteDisponible: 15,
-    seuilAlerte: 5,
-    poids: 0.4,
-    dimensions: 'Taille universelle',
-    garantie: '2026-01-10',
-    fournisseur: 'Würth',
-    prets: []
-  },
-  {
-    id: '4',
-    nom: 'Meuleuse d\'angle Makita',
-    type: 'Outillage électroportatif',
-    marque: 'Makita',
-    modele: 'DGA504Z',
-    numeroSerie: 'MAK345678',
-    codeBarre: '0088381234890',
-    dateAchat: '2023-08-12',
-    valeur: 220,
-    statut: 'maintenance',
-    localisation: 'Atelier',
-    description: 'Meuleuse sans fil 18V avec disques',
-    quantiteStock: 3,
-    quantiteDisponible: 2,
-    seuilAlerte: 1,
-    poids: 2.1,
-    dimensions: '30x12x15 cm',
-    garantie: '2025-08-12',
-    fournisseur: 'Brico Dépôt',
-    prets: []
-  }
-];
-
-const mockPrets: PretPetitMateriel[] = [
-  {
-    id: '1',
-    petitMaterielId: '2',
-    ouvrierId: '1',
-    chantierId: '1',
-    dateDebut: '2024-01-15',
-    dateRetourPrevue: '2024-01-22',
-    quantite: 1,
-    statut: 'en_cours',
-    etatDepart: 'bon',
-    ouvrierNom: 'Jean Dubois',
-    chantierNom: 'Villa Moderne',
-    petitMaterielNom: 'Niveau laser Stabila'
-  },
-  {
-    id: '2',
-    petitMaterielId: '1',
-    ouvrierId: '2',
-    chantierId: '2',
-    dateDebut: '2024-01-10',
-    dateRetourPrevue: '2024-01-17',
-    dateRetourEffective: '2024-01-16',
-    quantite: 2,
-    statut: 'termine',
-    etatDepart: 'bon',
-    etatRetour: 'bon',
-    ouvrierNom: 'Paul Martin',
-    chantierNom: 'Appartement Haussmannien',
-    petitMaterielNom: 'Perceuse sans fil Bosch'
-  },
-  {
-    id: '3',
-    petitMaterielId: '3',
-    ouvrierId: '3',
-    dateDebut: '2024-01-08',
-    dateRetourPrevue: '2024-01-15',
-    quantite: 5,
-    statut: 'retard',
-    etatDepart: 'neuf',
-    ouvrierNom: 'Michel Leroy',
-    petitMaterielNom: 'Casque de sécurité'
-  }
-];
-
-export const PetitMaterielSection: React.FC = () => {
-  const [petitMateriel, setPetitMateriel] = useState<PetitMateriel[]>(mockPetitMateriel);
-  const [prets, setPrets] = useState<PretPetitMateriel[]>(mockPrets);
-  
-  const { data: ouvriers } = useRealtimeSupabase<Ouvrier>({
-    table: 'ouvriers',
-    fetchFunction: ouvrierService.getAll
-  });
-  
-  const { data: chantiers } = useRealtimeSupabase<Chantier>({
-    table: 'chantiers',
-    fetchFunction: chantierService.getAll
-  });
-  
+export const PetitMaterielManagement = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isPretModalOpen, setIsPretModalOpen] = useState(false);
   const [isRetourModalOpen, setIsRetourModalOpen] = useState(false);
@@ -217,39 +54,25 @@ export const PetitMaterielSection: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
-  const [activeTab, setActiveTab] = useState<'materiel' | 'prets' | 'historique'>('materiel');
+  const [activeTab, setActiveTab] = useState('materiel');
   const [scannedBarcode, setScannedBarcode] = useState('');
 
-  const filteredMateriel = petitMateriel.filter(item => {
-    const matchesSearch = item.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.marque.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.codeBarre.includes(searchTerm) ||
-                         item.numeroSerie.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || item.statut === statusFilter;
-    const matchesType = typeFilter === 'all' || item.type === typeFilter;
-    return matchesSearch && matchesStatus && matchesType;
-  });
+  const generateBarcode = () => {
+    return Date.now().toString() + Math.random().toString(36).substr(2, 5);
+  };
 
-  const filteredPrets = prets.filter(pret => {
-    const materiel = petitMateriel.find(m => m.id === pret.petitMaterielId);
-    const matchesSearch = materiel?.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         pret.ouvrierNom?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         pret.chantierNom?.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesSearch;
-  });
-
-  const handleEdit = (item: PetitMateriel) => {
-    setEditingMateriel(item);
+  const handleEdit = (materiel: PetitMateriel) => {
+    setEditingMateriel(materiel);
     setIsModalOpen(true);
   };
 
-  const handleViewDetails = (item: PetitMateriel) => {
-    setSelectedMateriel(item);
+  const handleViewDetails = (materiel: PetitMateriel) => {
+    setSelectedMateriel(materiel);
     setIsDetailModalOpen(true);
   };
 
-  const handlePret = (item: PetitMateriel) => {
-    setSelectedMateriel(item);
+  const handlePret = (materiel: PetitMateriel) => {
+    setSelectedMateriel(materiel);
     setIsPretModalOpen(true);
   };
 
@@ -258,49 +81,46 @@ export const PetitMaterielSection: React.FC = () => {
     setIsRetourModalOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Êtes-vous sûr de vouloir supprimer ce petit matériel ?')) {
-      setPetitMateriel(petitMateriel.filter(m => m.id !== id));
+  const scanBarcode = async () => {
+    const foundMateriel = petitMateriel?.find(m => m.codeBarre === scannedBarcode);
+    if (foundMateriel) {
+      setSelectedMateriel(foundMateriel);
+      setIsDetailModalOpen(true);
+      setIsBarcodeModalOpen(false);
+    } else {
+      alert('Aucun matériel trouvé avec ce code-barres');
     }
   };
 
-  const handleSave = (formData: FormData) => {
-    const materielData: PetitMateriel = {
-      id: editingMateriel?.id || Date.now().toString(),
-      nom: formData.get('nom') as string,
-      type: formData.get('type') as string,
-      marque: formData.get('marque') as string,
-      modele: formData.get('modele') as string,
-      numeroSerie: formData.get('numeroSerie') as string,
-      codeBarre: formData.get('codeBarre') as string,
-      dateAchat: formData.get('dateAchat') as string,
-      valeur: parseFloat(formData.get('valeur') as string),
-      statut: formData.get('statut') as PetitMateriel['statut'],
-      localisation: formData.get('localisation') as string,
-      description: formData.get('description') as string,
-      quantiteStock: parseInt(formData.get('quantiteStock') as string),
-      quantiteDisponible: parseInt(formData.get('quantiteDisponible') as string),
-      seuilAlerte: parseInt(formData.get('seuilAlerte') as string),
-      poids: parseFloat(formData.get('poids') as string) || undefined,
-      dimensions: formData.get('dimensions') as string || undefined,
-      garantie: formData.get('garantie') as string || undefined,
-      fournisseur: formData.get('fournisseur') as string || undefined,
-      prets: editingMateriel?.prets || [],
-      createdAt: editingMateriel?.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+  const exportToPDFReport = () => {
+    const data = filteredMateriel.map(item => ({
+      'Nom': item.nom,
+      'Type': item.type,
+      'Code-barres': item.codeBarre,
+      'Statut': item.statut,
+    }));
+
+    const stats = {
+      'Total articles': petitMateriel?.length.toString() || '0',
+      'Articles disponibles': petitMateriel?.filter(m => m.statut === 'disponible').length.toString() || '0',
+      'Prêts en cours': prets?.filter(p => p.statut === 'en_cours').length.toString() || '0',
+      'Articles en alerte': petitMateriel?.filter(m => m.quantiteDisponible <= m.seuilAlerte).length.toString() || '0'
     };
 
-    if (editingMateriel) {
-      setPetitMateriel(petitMateriel.map(m => m.id === editingMateriel.id ? materielData : m));
-    } else {
-      setPetitMateriel([...petitMateriel, materielData]);
-    }
-    
-    setIsModalOpen(false);
-    setEditingMateriel(null);
+    exportToPDF({
+      title: 'Inventaire Petit Matériel',
+      columns: [
+        { header: 'Nom', dataKey: 'Nom', width: 40 },
+        { header: 'Type', dataKey: 'Type', width: 30 },
+        { header: 'Code-barres', dataKey: 'Code-barres', width: 25 },
+        { header: 'Statut', dataKey: 'Statut', width: 20 },
+      ],
+      data,
+      stats
+    });
   };
 
-  const handleSavePret = (formData: FormData) => {
+  const handleSavePret = async (formData: FormData) => {
     if (!selectedMateriel) return;
 
     const quantitePretee = parseInt(formData.get('quantite') as string);
@@ -323,18 +143,49 @@ export const PetitMaterielSection: React.FC = () => {
     };
 
     // Mettre à jour les quantités
-    setPetitMateriel(petitMateriel.map(m => 
+    setPetitMateriel(petitMateriel?.map(m => 
       m.id === selectedMateriel.id 
         ? { ...m, quantiteDisponible: m.quantiteDisponible - quantitePretee, statut: m.quantiteDisponible - quantitePretee === 0 ? 'prete' : m.statut }
         : m
-    ));
+    ) || []);
 
-    setPrets([...prets, pretData]);
+    setPrets([...(prets || []), pretData]);
     setIsPretModalOpen(false);
     setSelectedMateriel(null);
+
+    try {
+      await PretPetitMaterielService.create(pretData);
+      refreshPrets();
+      refreshPetitMateriel(); // Refresh pour mettre à jour les quantités
+      setIsPretModalOpen(false);
+      setSelectedMateriel(null);
+    } catch (error) {
+      console.error('Erreur lors de la création du prêt:', error);
+      alert('Erreur lors de la création du prêt');
+    }
   };
 
-  const handleSaveRetour = (formData: FormData) => {
+  const { data: petitMateriel, loading: petitMaterielLoading, error: petitMaterielError, refresh: refreshPetitMateriel } = useRealtimeSupabase<PetitMateriel>({
+    table: 'petit_materiel',
+    fetchFunction: PetitMaterielService.getAll
+  });
+  
+  const { data: prets, loading: pretsLoading, error: pretsError, refresh: refreshPrets } = useRealtimeSupabase<PretPetitMateriel>({
+    table: 'prets_petit_materiel',
+    fetchFunction: PretPetitMaterielService.getAll
+  });
+  
+  const { data: ouvriers } = useRealtimeSupabase<Ouvrier>({
+    table: 'ouvriers',
+    fetchFunction: ouvrierService.getAll
+  });
+  
+  const { data: chantiers } = useRealtimeSupabase<ChantierType>({
+    table: 'chantiers',
+    fetchFunction: chantierService.getAll
+  });
+
+  const handleSaveRetour = async (formData: FormData) => {
     if (!selectedPret) return;
 
     const quantiteRetournee = parseInt(formData.get('quantiteRetournee') as string);
@@ -349,103 +200,147 @@ export const PetitMaterielSection: React.FC = () => {
       notes: (selectedPret.notes || '') + '\n' + (formData.get('notesRetour') as string)
     };
 
-    setPrets(prets.map(p => p.id === selectedPret.id ? updatedPret : p));
+    const retourData = {
+      dateRetourEffective: formData.get('dateRetourEffective') as string,
+      etatRetour,
+      statut: 'termine',
+      notes: (selectedPret.notes || '') + '\n' + (formData.get('notesRetour') as string)
+    };
+
+    setPrets(prets?.map(p => p.id === selectedPret.id ? updatedPret : p) || []);
 
     // Mettre à jour les quantités du matériel
-    const materiel = petitMateriel.find(m => m.id === selectedPret.petitMaterielId);
+    const materiel = petitMateriel?.find(m => m.id === selectedPret.petitMaterielId);
     if (materiel) {
       const nouvelleQuantiteDisponible = materiel.quantiteDisponible + quantiteRetournee;
       const nouveauStatut = etatRetour === 'perdu' ? 'perdu' : 
                            nouvelleQuantiteDisponible === materiel.quantiteStock ? 'disponible' : 
                            materiel.statut;
 
-      setPetitMateriel(petitMateriel.map(m => 
+      setPetitMateriel(petitMateriel?.map(m => 
         m.id === selectedPret.petitMaterielId 
           ? { ...m, quantiteDisponible: nouvelleQuantiteDisponible, statut: nouveauStatut }
           : m
-      ));
+      ) || []);
     }
 
     setIsRetourModalOpen(false);
-    setSelectedPret(null);
-  };
 
-  const generateBarcode = () => {
-    // Génération d'un code-barres EAN-13 simple
-    const timestamp = Date.now().toString();
-    return '31651' + timestamp.slice(-8);
-  };
-
-  const scanBarcode = () => {
-    // Simulation du scan de code-barres
-    const foundMateriel = petitMateriel.find(m => m.codeBarre === scannedBarcode);
-    if (foundMateriel) {
-      setSelectedMateriel(foundMateriel);
-      setIsDetailModalOpen(true);
-      setIsBarcodeModalOpen(false);
-      setScannedBarcode('');
-    } else {
-      alert('Matériel non trouvé avec ce code-barres');
+    try {
+      await PretPetitMaterielService.update(selectedPret.id, retourData);
+      refreshPrets();
+      refreshPetitMateriel(); // Refresh pour mettre à jour les quantités
+      setIsRetourModalOpen(false);
+      setSelectedPret(null);
+    } catch (error) {
+      console.error('Erreur lors du retour:', error);
+      alert('Erreur lors du retour du matériel');
     }
   };
 
-  const exportToPDFReport = () => {
-    const data = filteredMateriel.map(item => ({
-      'Nom': item.nom,
-      'Type': item.type,
-      'Marque': item.marque,
-      'Modèle': item.modele,
-      'Code-barres': item.codeBarre,
-      'Statut': item.statut,
-      'Stock': `${item.quantiteDisponible}/${item.quantiteStock}`,
-      'Valeur': `${item.valeur}€`,
-      'Localisation': item.localisation
-    }));
+  const filteredMateriel = (petitMateriel || []).filter(item => {
+    const matchesSearch = item.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         item.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         item.marque.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         item.codeBarre.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || item.statut === statusFilter;
+    const matchesType = typeFilter === 'all' || item.type === typeFilter;
+    
+    return matchesSearch && matchesStatus && matchesType;
+  });
 
-    const stats = {
-      'Total articles': petitMateriel.length.toString(),
-      'Articles disponibles': petitMateriel.filter(m => m.statut === 'disponible').length.toString(),
-      'Articles prêtés': petitMateriel.filter(m => m.statut === 'prete').length.toString(),
-      'Valeur totale': `${petitMateriel.reduce((sum, m) => sum + (m.valeur * m.quantiteStock), 0).toLocaleString()}€`,
-      'Prêts en cours': prets.filter(p => p.statut === 'en_cours').length.toString(),
-      'Articles en alerte': petitMateriel.filter(m => m.quantiteDisponible <= m.seuilAlerte).length.toString()
+  const filteredPrets = (prets || []).filter(pret => {
+    const matchesSearch = pret.petitMaterielNom?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         pret.ouvrierNom?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         pret.chantierNom?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    return matchesSearch;
+  });
+
+  const pretsEnCours = (prets || []).filter(pret => pret.statut === 'en_cours' || pret.statut === 'retard');
+
+  const handleDelete = async (id: string) => {
+    if (confirm('Êtes-vous sûr de vouloir supprimer ce matériel ?')) {
+      try {
+        await PetitMaterielService.delete(id);
+        refreshPetitMateriel();
+      } catch (error) {
+        console.error('Erreur lors de la suppression:', error);
+        alert('Erreur lors de la suppression du matériel');
+      }
+    }
+  };
+
+  const handleSave = async (formData: FormData) => {
+    const materielData = {
+      nom: formData.get('nom') as string,
+      type: formData.get('type') as string,
+      marque: formData.get('marque') as string,
+      modele: formData.get('modele') as string,
+      description: formData.get('description') as string,
+      numeroSerie: formData.get('numeroSerie') as string,
+      codeBarre: formData.get('codeBarre') as string,
+      quantiteStock: parseInt(formData.get('quantiteStock') as string),
+      quantiteDisponible: parseInt(formData.get('quantiteDisponible') as string),
+      seuilAlerte: parseInt(formData.get('seuilAlerte') as string),
+      localisation: formData.get('localisation') as string,
+      statut: formData.get('statut') as PetitMateriel['statut'],
+      dateAchat: formData.get('dateAchat') as string,
+      valeur: parseFloat(formData.get('valeur') as string),
+      fournisseur: formData.get('fournisseur') as string,
+      poids: parseFloat(formData.get('poids') as string) || undefined,
+      dimensions: formData.get('dimensions') as string,
+      garantie: formData.get('garantie') as string,
+      etatDepart: formData.get('etatDepart') as PretPetitMateriel['etatDepart']
     };
 
-    exportToPDF({
-      title: 'Inventaire Petit Matériel',
-      subtitle: `Généré le ${new Date().toLocaleDateString()}`,
-      data,
-      columns: [
-        { header: 'Nom', dataKey: 'Nom', width: 40 },
-        { header: 'Type', dataKey: 'Type', width: 30 },
-        { header: 'Marque', dataKey: 'Marque', width: 25 },
-        { header: 'Code-barres', dataKey: 'Code-barres', width: 25 },
-        { header: 'Statut', dataKey: 'Statut', width: 20 },
-        { header: 'Stock', dataKey: 'Stock', width: 15 },
-        { header: 'Valeur', dataKey: 'Valeur', width: 15 },
-        { header: 'Localisation', dataKey: 'Localisation', width: 30 }
-      ],
-      filename: `petit-materiel-${new Date().toISOString().split('T')[0]}`,
-      includeStats: true,
-      stats
-    });
+    try {
+      if (editingMateriel) {
+        await PetitMaterielService.update(editingMateriel.id, materielData);
+      } else {
+        await PetitMaterielService.create(materielData);
+      }
+      
+      refreshPetitMateriel();
+      setIsModalOpen(false);
+      setEditingMateriel(null);
+    } catch (error) {
+      console.error('Erreur lors de l\'enregistrement:', error);
+      alert('Erreur lors de l\'enregistrement du matériel');
+    }
+  };
+
+  const handleBarcodeSearch = async () => {
+    try {
+      const found = await PetitMaterielService.getByBarcode(barcodeSearch);
+      if (found) {
+        setSelectedMateriel(found);
+        setIsDetailModalOpen(true);
+      } else {
+        alert('Aucun matériel trouvé avec ce code-barres');
+      }
+    } catch (error) {
+      console.error('Erreur lors de la recherche:', error);
+      alert('Erreur lors de la recherche par code-barres');
+    }
   };
 
   const getStatistics = () => {
-    const total = petitMateriel.length;
-    const disponible = petitMateriel.filter(m => m.statut === 'disponible').length;
-    const prete = petitMateriel.filter(m => m.statut === 'prete').length;
-    const maintenance = petitMateriel.filter(m => m.statut === 'maintenance').length;
-    const valeurTotale = petitMateriel.reduce((sum, m) => sum + (m.valeur * m.quantiteStock), 0);
-    const pretsEnCours = prets.filter(p => p.statut === 'en_cours').length;
-    const pretsEnRetard = prets.filter(p => p.statut === 'retard').length;
-    const alertesStock = petitMateriel.filter(m => m.quantiteDisponible <= m.seuilAlerte).length;
+    const total = (petitMateriel || []).length;
+    const disponible = (petitMateriel || []).filter(item => item.statut === 'disponible').length;
+    const prete = (petitMateriel || []).filter(item => item.statut === 'prete').length;
+    const maintenance = (petitMateriel || []).filter(item => item.statut === 'maintenance').length;
+    const stockFaible = (petitMateriel || []).filter(item => item.quantiteDisponible <= item.seuilAlerte).length;
+    const valeurTotale = (petitMateriel || []).reduce((sum, item) => sum + (item.valeur * item.quantiteStock), 0);
+    const pretsEnCours = (prets || []).filter(p => p.statut === 'en_cours').length;
+    const pretsEnRetard = (prets || []).filter(p => p.statut === 'retard').length;
+    const alertesStock = (petitMateriel || []).filter(m => m.quantiteDisponible <= m.seuilAlerte).length;
 
     return { total, disponible, prete, maintenance, valeurTotale, pretsEnCours, pretsEnRetard, alertesStock };
   };
 
   const getUniqueTypes = () => {
-    return Array.from(new Set(petitMateriel.map(m => m.type)));
+    return [...new Set((petitMateriel || []).map(item => item.type))];
   };
 
   const MaterielForm = () => (
@@ -764,7 +659,7 @@ export const PetitMaterielSection: React.FC = () => {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Sélectionner un ouvrier</option>
-              {ouvriers?.filter(o => o.statut === 'actif').map(ouvrier => (
+              {(ouvriers || []).filter(o => o.statut === 'actif').map(ouvrier => (
                 <option key={ouvrier.id} value={ouvrier.id}>
                   {ouvrier.prenom} {ouvrier.nom} - {ouvrier.qualification}
                 </option>
@@ -778,7 +673,7 @@ export const PetitMaterielSection: React.FC = () => {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Aucun chantier spécifique</option>
-              {chantiers?.filter(c => c.statut === 'actif' || c.statut === 'planifie').map(chantier => (
+              {(chantiers || []).filter(c => c.statut === 'actif' || c.statut === 'planifie').map(chantier => (
                 <option key={chantier.id} value={chantier.id}>
                   {chantier.nom}
                 </option>
@@ -949,8 +844,8 @@ export const PetitMaterielSection: React.FC = () => {
   const DetailModal = () => {
     if (!selectedMateriel) return null;
 
-    const pretsActifs = prets.filter(p => p.petitMaterielId === selectedMateriel.id && p.statut === 'en_cours');
-    const historiqueComplet = prets.filter(p => p.petitMaterielId === selectedMateriel.id);
+    const pretsActifs = (prets || []).filter(p => p.petitMaterielId === selectedMateriel.id && p.statut === 'en_cours');
+    const historiqueComplet = (prets || []).filter(p => p.petitMaterielId === selectedMateriel.id);
 
     return (
       <div className="space-y-6">
@@ -1229,363 +1124,393 @@ export const PetitMaterielSection: React.FC = () => {
 
       {/* Onglets */}
       <div className="bg-white rounded-lg shadow-sm border">
-        <div className="border-b">
-          <nav className="flex space-x-8 px-6">
-            <button
-              onClick={() => setActiveTab('materiel')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'materiel'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <Package className="w-4 h-4 inline mr-2" />
-              Matériel ({petitMateriel.length})
-            </button>
-            <button
-              onClick={() => setActiveTab('prets')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'prets'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <Truck className="w-4 h-4 inline mr-2" />
-              Prêts en cours ({prets.filter(p => p.statut === 'en_cours').length})
-              {stats.pretsEnRetard > 0 && (
-                <span className="ml-1 bg-red-500 text-white rounded-full px-2 py-1 text-xs">
-                  {stats.pretsEnRetard}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab('historique')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'historique'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <Clock className="w-4 h-4 inline mr-2" />
-              Historique ({prets.length})
-            </button>
-          </nav>
-        </div>
+        {petitMaterielLoading ? (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Chargement des données...</p>
+          </div>
+        ) : petitMaterielError ? (
+          <div className="text-center py-8 text-red-500">
+            <p>Erreur lors du chargement des données</p>
+            <p className="text-sm">{petitMaterielError.message}</p>
+          </div>
+        ) : (
+          <>
+            <nav className="flex space-x-8 px-6">
+              <button
+                onClick={() => setActiveTab('materiel')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'materiel'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Package className="w-4 h-4 inline mr-2" />
+                Matériel ({(petitMateriel || []).length})
+              </button>
+              <button
+                onClick={() => setActiveTab('prets')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'prets'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Truck className="w-4 h-4 inline mr-2" />
+                Prêts en cours ({(prets || []).filter(p => p.statut === 'en_cours').length})
+                {stats.pretsEnRetard > 0 && (
+                  <span className="ml-1 bg-red-500 text-white rounded-full px-2 py-1 text-xs">
+                    {stats.pretsEnRetard}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => setActiveTab('historique')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'historique'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Clock className="w-4 h-4 inline mr-2" />
+                Historique ({(prets || []).length})
+              </button>
+            </nav>
 
-        <div className="p-4 border-b">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <input
-                type="text"
-                placeholder="Rechercher..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+            <div className="p-4 border-b space-y-4">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <input
+                    type="text"
+                    placeholder="Rechercher..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                {activeTab === 'materiel' && (
+                  <div className="flex items-center space-x-2">
+                    <Filter className="w-4 h-4 text-gray-500" />
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="all">Tous les statuts</option>
+                      <option value="disponible">Disponible</option>
+                      <option value="prete">Prêté</option>
+                      <option value="maintenance">Maintenance</option>
+                      <option value="perdu">Perdu</option>
+                      <option value="hors_service">Hors service</option>
+                    </select>
+                    <select
+                      value={typeFilter}
+                      onChange={(e) => setTypeFilter(e.target.value)}
+                      className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="all">Tous les types</option>
+                      {uniqueTypes.map(type => (
+                        <option key={type} value={type}>{type}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
             </div>
+
+            {/* Contenu des onglets */}
             {activeTab === 'materiel' && (
-              <div className="flex items-center space-x-2">
-                <Filter className="w-4 h-4 text-gray-500" />
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="all">Tous les statuts</option>
-                  <option value="disponible">Disponible</option>
-                  <option value="prete">Prêté</option>
-                  <option value="maintenance">Maintenance</option>
-                  <option value="perdu">Perdu</option>
-                  <option value="hors_service">Hors service</option>
-                </select>
-                <select
-                  value={typeFilter}
-                  onChange={(e) => setTypeFilter(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="all">Tous les types</option>
-                  {uniqueTypes.map(type => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
-                </select>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Matériel
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Identification
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Stock
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Statut
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Valeur
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {filteredMateriel.map((item) => (
+                      <tr key={item.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0 h-10 w-10">
+                              <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center">
+                                <Package className="h-5 w-5 text-white" />
+                              </div>
+                            </div>
+                            <div className="ml-4">
+                              <div className="text-sm font-medium text-gray-900">{item.nom}</div>
+                              <div className="text-sm text-gray-500">{item.marque} {item.modele}</div>
+                              <div className="text-xs text-gray-400">{item.type}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm">
+                            <div className="flex items-center">
+                              <Barcode className="w-4 h-4 mr-1 text-gray-400" />
+                              <span className="font-mono">{item.codeBarre}</span>
+                            </div>
+                            <div className="text-gray-500 mt-1">S/N: {item.numeroSerie}</div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm">
+                            <div className={`font-medium ${item.quantiteDisponible <= item.seuilAlerte ? 'text-red-600' : 'text-gray-900'}`}>
+                              {item.quantiteDisponible}/{item.quantiteStock}
+                            </div>
+                            <div className="text-gray-500">
+                              Seuil: {item.seuilAlerte}
+                              {item.quantiteDisponible <= item.seuilAlerte && (
+                                <AlertTriangle className="w-3 h-3 inline ml-1 text-red-500" />
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <StatusBadge status={item.statut} type="petit_materiel" />
+                          <div className="text-xs text-gray-500 mt-1">{item.localisation}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm">
+                            <div className="font-medium text-gray-900">{item.valeur}€</div>
+                            <div className="text-gray-500">Total: {(item.valeur * item.quantiteStock).toLocaleString()}€</div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={() => handleViewDetails(item)}
+                              className="text-green-600 hover:text-green-900"
+                              title="Voir détails"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handlePret(item)}
+                              className="text-purple-600 hover:text-purple-900"
+                              title="Nouveau prêt"
+                              disabled={item.quantiteDisponible === 0}
+                            >
+                              <ArrowRight className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleEdit(item)}
+                              className="text-blue-600 hover:text-blue-900"
+                              title="Modifier"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(item.id)}
+                              className="text-red-600 hover:text-red-900"
+                              title="Supprimer"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  {filteredMateriel.length === 0 && (
+                    <tfoot>
+                      <tr>
+                        <td colSpan={6} className="px-6 py-10 text-center text-gray-500 bg-gray-50">
+                          Aucun matériel trouvé
+                        </td>
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
               </div>
             )}
-          </div>
-        </div>
 
-        {/* Contenu des onglets */}
-        {activeTab === 'materiel' && (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Matériel
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Identification
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Stock
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Statut
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Valeur
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredMateriel.map((item) => (
-                  <tr key={item.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0 h-10 w-10">
-                          <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center">
-                            <Package className="h-5 w-5 text-white" />
-                          </div>
-                        </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">{item.nom}</div>
-                          <div className="text-sm text-gray-500">{item.marque} {item.modele}</div>
-                          <div className="text-xs text-gray-400">{item.type}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm">
-                        <div className="flex items-center">
-                          <Barcode className="w-4 h-4 mr-1 text-gray-400" />
-                          <span className="font-mono">{item.codeBarre}</span>
-                        </div>
-                        <div className="text-gray-500 mt-1">S/N: {item.numeroSerie}</div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm">
-                        <div className={`font-medium ${item.quantiteDisponible <= item.seuilAlerte ? 'text-red-600' : 'text-gray-900'}`}>
-                          {item.quantiteDisponible}/{item.quantiteStock}
-                        </div>
-                        <div className="text-gray-500">
-                          Seuil: {item.seuilAlerte}
-                          {item.quantiteDisponible <= item.seuilAlerte && (
-                            <AlertTriangle className="w-3 h-3 inline ml-1 text-red-500" />
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <StatusBadge status={item.statut} type="petit_materiel" />
-                      <div className="text-xs text-gray-500 mt-1">{item.localisation}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm">
-                        <div className="font-medium text-gray-900">{item.valeur}€</div>
-                        <div className="text-gray-500">Total: {(item.valeur * item.quantiteStock).toLocaleString()}€</div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => handleViewDetails(item)}
-                          className="text-green-600 hover:text-green-900"
-                          title="Voir détails"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handlePret(item)}
-                          className="text-purple-600 hover:text-purple-900"
-                          title="Nouveau prêt"
-                          disabled={item.quantiteDisponible === 0}
-                        >
-                          <ArrowRight className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleEdit(item)}
-                          className="text-blue-600 hover:text-blue-900"
-                          title="Modifier"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(item.id)}
-                          className="text-red-600 hover:text-red-900"
-                          title="Supprimer"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {activeTab === 'prets' && (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Matériel
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Ouvrier
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Chantier
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Période
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Quantité
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Statut
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredPrets.filter(p => p.statut === 'en_cours' || p.statut === 'retard').map((pret) => {
-                  const isOverdue = new Date(pret.dateRetourPrevue) < new Date() && pret.statut === 'en_cours';
-                  
-                  return (
-                    <tr key={pret.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{pret.petitMaterielNom}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <User className="w-4 h-4 mr-2 text-gray-400" />
-                          <span className="text-sm text-gray-900">{pret.ouvrierNom}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {pret.chantierNom ? (
-                          <div className="flex items-center">
-                            <Building2 className="w-4 h-4 mr-2 text-gray-400" />
-                            <span className="text-sm text-gray-900">{pret.chantierNom}</span>
-                          </div>
-                        ) : (
-                          <span className="text-sm text-gray-500">-</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm">
-                          <div className="text-gray-900">
-                            {new Date(pret.dateDebut).toLocaleDateString()}
-                          </div>
-                          <div className={`text-gray-500 ${isOverdue ? 'text-red-600 font-medium' : ''}`}>
-                            → {new Date(pret.dateRetourPrevue).toLocaleDateString()}
-                            {isOverdue && <AlertTriangle className="w-3 h-3 inline ml-1" />}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {pret.quantite}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <StatusBadge status={isOverdue ? 'retard' : pret.statut} type="pret" />
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <Button size="sm" onClick={() => handleRetour(pret)}>
-                          <ArrowLeft className="w-4 h-4 mr-1" />
-                          Retour
-                        </Button>
-                      </td>
+            {activeTab === 'prets' && (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Matériel
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Ouvrier
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Chantier
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Période
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Quantité
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Statut
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {filteredPrets.filter(p => p.statut === 'en_cours' || p.statut === 'retard').map((pret) => {
+                      const isOverdue = new Date(pret.dateRetourPrevue) < new Date() && pret.statut === 'en_cours';
+                      
+                      return (
+                        <tr key={pret.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">{pret.petitMaterielNom}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <User className="w-4 h-4 mr-2 text-gray-400" />
+                              <span className="text-sm text-gray-900">{pret.ouvrierNom}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {pret.chantierNom ? (
+                              <div className="flex items-center">
+                                <Building2 className="w-4 h-4 mr-2 text-gray-400" />
+                                <span className="text-sm text-gray-900">{pret.chantierNom}</span>
+                              </div>
+                            ) : (
+                              <span className="text-sm text-gray-500">-</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm">
+                              <div className="text-gray-900">
+                                {new Date(pret.dateDebut).toLocaleDateString()}
+                              </div>
+                              <div className={`text-gray-500 ${isOverdue ? 'text-red-600 font-medium' : ''}`}>
+                                → {new Date(pret.dateRetourPrevue).toLocaleDateString()}
+                                {isOverdue && <AlertTriangle className="w-3 h-3 inline ml-1" />}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {pret.quantite}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <StatusBadge status={isOverdue ? 'retard' : pret.statut} type="pret" />
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <Button size="sm" onClick={() => handleRetour(pret)}>
+                              <ArrowLeft className="w-4 h-4 mr-1" />
+                              Retour
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  {pretsEnCours.length === 0 && (
+                    <tfoot>
+                      <tr>
+                        <td colSpan={6} className="px-6 py-8 text-center text-gray-500 bg-gray-50">
+                          Aucun prêt en cours
+                        </td>
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </div>
+            )}
 
-        {activeTab === 'historique' && (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Matériel
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Ouvrier
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Période
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Durée
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    État
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Statut
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredPrets.map((pret) => {
-                  const duree = pret.dateRetourEffective 
-                    ? Math.ceil((new Date(pret.dateRetourEffective).getTime() - new Date(pret.dateDebut).getTime()) / (1000 * 60 * 60 * 24))
-                    : Math.ceil((new Date().getTime() - new Date(pret.dateDebut).getTime()) / (1000 * 60 * 60 * 24));
-                  
-                  return (
-                    <tr key={pret.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{pret.petitMaterielNom}</div>
-                        <div className="text-sm text-gray-500">Qté: {pret.quantite}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{pret.ouvrierNom}</div>
-                        {pret.chantierNom && (
-                          <div className="text-sm text-gray-500">{pret.chantierNom}</div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm">
-                          <div className="text-gray-900">{new Date(pret.dateDebut).toLocaleDateString()}</div>
-                          <div className="text-gray-500">
-                            → {pret.dateRetourEffective 
-                              ? new Date(pret.dateRetourEffective).toLocaleDateString()
-                              : new Date(pret.dateRetourPrevue).toLocaleDateString() + ' (prévu)'}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {duree} jour{duree > 1 ? 's' : ''}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm">
-                          <div className="text-gray-900">Départ: {pret.etatDepart}</div>
-                          {pret.etatRetour && (
-                            <div className="text-gray-500">Retour: {pret.etatRetour}</div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <StatusBadge status={pret.statut} type="pret" />
-                      </td>
+            {activeTab === 'historique' && (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Matériel
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Ouvrier
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Période
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Durée
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        État
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Statut
+                      </th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {filteredPrets.map((pret) => {
+                      const duree = pret.dateRetourEffective 
+                        ? Math.ceil((new Date(pret.dateRetourEffective).getTime() - new Date(pret.dateDebut).getTime()) / (1000 * 60 * 60 * 24))
+                        : Math.ceil((new Date().getTime() - new Date(pret.dateDebut).getTime()) / (1000 * 60 * 60 * 24));
+                      
+                      return (
+                        <tr key={pret.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">{pret.petitMaterielNom}</div>
+                            <div className="text-sm text-gray-500">Qté: {pret.quantite}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">{pret.ouvrierNom}</div>
+                            {pret.chantierNom && (
+                              <div className="text-sm text-gray-500">{pret.chantierNom}</div>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm">
+                              <div className="text-gray-900">{new Date(pret.dateDebut).toLocaleDateString()}</div>
+                              <div className="text-gray-500">
+                                → {pret.dateRetourEffective 
+                                  ? new Date(pret.dateRetourEffective).toLocaleDateString()
+                                  : new Date(pret.dateRetourPrevue).toLocaleDateString() + ' (prévu)'}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {duree} jour{duree > 1 ? 's' : ''}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm">
+                              <div className="text-gray-900">Départ: {pret.etatDepart}</div>
+                              {pret.etatRetour && (
+                                <div className="text-gray-500">Retour: {pret.etatRetour}</div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <StatusBadge status={pret.statut} type="pret" />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -1599,7 +1524,7 @@ export const PetitMaterielSection: React.FC = () => {
         title={editingMateriel ? 'Modifier le petit matériel' : 'Nouveau petit matériel'}
         size="xl"
       >
-        <MaterielForm />
+        {!petitMaterielLoading && <MaterielForm />}
       </Modal>
 
       <Modal
@@ -1611,7 +1536,7 @@ export const PetitMaterielSection: React.FC = () => {
         title="Nouveau prêt de matériel"
         size="lg"
       >
-        <PretForm />
+        {selectedMateriel && !pretsLoading && <PretForm />}
       </Modal>
 
       <Modal
@@ -1623,7 +1548,7 @@ export const PetitMaterielSection: React.FC = () => {
         title="Retour de matériel"
         size="lg"
       >
-        <RetourForm />
+        {selectedPret && !pretsLoading && <RetourForm />}
       </Modal>
 
       <Modal
@@ -1652,3 +1577,6 @@ export const PetitMaterielSection: React.FC = () => {
     </div>
   );
 };
+
+// Export alias pour correspondre à l'import dans App.tsx
+export const PetitMaterielSection = MaterielSection;
