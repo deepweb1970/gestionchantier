@@ -342,7 +342,7 @@ export const PetitMaterielManagement = () => {
   };
 
   const getUniqueTypes = () => {
-    return Array.from(new Set((petitMateriel || []).map(m => m.type)));
+    return [...new Set((petitMateriel || []).map(item => item.type))];
   };
 
   const MaterielForm = () => (
