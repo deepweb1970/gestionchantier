@@ -194,13 +194,25 @@ export const PetitMaterielSection: React.FC = () => {
 
   const handleSavePret = async (formData: FormData) => {
     if (!selectedMateriel) return;
+      const petitMaterielId = formData.get('petitMaterielId')?.toString() || '';
+      const ouvrierId = formData.get('ouvrierId')?.toString() || '';
+      const chantierId = formData.get('chantierId')?.toString() || '';
+      const dateDebut = formData.get('dateDebut')?.toString() || '';
+      const dateRetourPrevue = formData.get('dateRetourPrevue')?.toString() || '';
+      const quantiteStr = formData.get('quantite')?.toString() || '1';
+      const quantite = parseInt(quantiteStr);
+      const notes = formData.get('notes')?.toString()?.trim() || '';
 
-    const pretData = {
-      petitMaterielId: (formData.get('petitMaterielId') as string).trim(),
-      ouvrierId: (formData.get('ouvrierId') as string).trim(),
-      chantierId: (formData.get('chantierId') as string || '').trim() || undefined,
-      dateDebut: (formData.get('dateDebut') as string).trim(),
-      dateRetourPrevue: (formData.get('dateRetourPrevue') as string).trim(),
+      // Validation des champs requis
+      if (!petitMaterielId || !ouvrierId || !dateDebut || !dateRetourPrevue) {
+        alert('Veuillez remplir tous les champs obligatoires');
+        return;
+      }
+
+      if (isNaN(quantite) || quantite <= 0) {
+        alert('La quantité doit être un nombre positif');
+        return;
+      }
       quantite: parseInt((formData.get('quantite') as string).trim()),
       statut: 'en_cours' as const,
       notes: (formData.get('notes') as string || '').trim() || undefined,
