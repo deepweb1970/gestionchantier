@@ -40,6 +40,7 @@ import { Modal } from '../Common/Modal';
 import { Button } from '../Common/Button';
 import { StatusBadge } from '../Common/StatusBadge';
 import type { PetitMateriel as PetitMaterielType, PretPetitMateriel as PretPetitMaterielType, Ouvrier as OuvrierType, Chantier as ChantierType } from '../../types';
+import { MaterielSection } from './Materiel';
 
 export const PetitMaterielManagement = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
