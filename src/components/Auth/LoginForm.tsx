@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import { 
   Mail, 
   Lock, 
-  AlertTriangle 
+  AlertTriangle,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { Button } from '../Common/Button';
 import { useAuth } from './AuthProvider';
@@ -10,6 +12,7 @@ import { useAuth } from './AuthProvider';
 export const LoginForm: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -22,20 +25,49 @@ export const LoginForm: React.FC = () => {
     
     try {
       await signIn(email, password);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Identifiants incorrects. Veuillez réessayer.';
-      
-      if (errorMessage.includes('Invalid login credentials')) {
-        setError('Email ou mot de passe incorrect. Veuillez vérifier vos identifiants.');
-      } else if (errorMessage.includes('Email not confirmed')) {
-        setError('Votre compte n\'est pas encore activé. Veuillez contacter un administrateur.');
-      } else {
-        setError('Erreur de connexion. Veuillez réessayer ou contacter un administrateur.');
-      }
+    } catch (err: any) {
       console.error('Erreur de connexion:', err);
+      
+      let errorMessage = 'Erreur de connexion. Veuillez réessayer.';
+      
+      if (err?.message) {
+        if (err.message.includes('Invalid login credentials')) {
+          errorMessage = 'Email ou mot de passe incorrect.';
+        } else if (err.message.includes('Email not confirmed')) {
+          errorMessage = 'Compte non activé. Contactez un administrateur.';
+        } else if (err.message.includes('Too many requests')) {
+          errorMessage = 'Trop de tentatives. Patientez quelques minutes.';
+        } else {
+          errorMessage = err.message;
+        }
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleTestLogin = async (testEmail: string, testPassword: string) => {
+    setEmail(testEmail);
+    setPassword(testPassword);
+    
+    // Utiliser la fonction de connexion normale
+    const form = document.createElement('form');
+    const emailInput = document.createElement('input');
+    emailInput.name = 'email';
+    emailInput.value = testEmail;
+    const passwordInput = document.createElement('input');
+    passwordInput.name = 'password';
+    passwordInput.value = testPassword;
+    
+    form.appendChild(emailInput);
+    form.appendChild(passwordInput);
+    
+    const formData = new FormData(form);
+    const event = { preventDefault: () => {}, currentTarget: form } as any;
+    
+    handleSubmit(event);
   };
 
   return (
@@ -83,34 +115,21 @@ export const LoginForm: React.FC = () => {
             <input
               id="password"
               name="password"
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               autoComplete="current-password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="pl-10 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="pl-10 pr-10 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="••••••••"
             />
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between">
-          <div className="flex items-center">
-            <input
-              id="remember-me"
-              name="remember-me"
-              type="checkbox"
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-            />
-            <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
-              Se souvenir de moi
-            </label>
-          </div>
-
-          <div className="text-sm">
-            <a href="#" className="font-medium text-blue-600 hover:text-blue-500">
-              Mot de passe oublié ?
-            </a>
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute inset-y-0 right-0 pr-3 flex items-center"
+            >
+              {showPassword ? <EyeOff className="h-4 w-4 text-gray-400" /> : <Eye className="h-4 w-4 text-gray-400" />}
+            </button>
           </div>
         </div>
 
@@ -124,6 +143,12 @@ export const LoginForm: React.FC = () => {
           </Button>
         </div>
       </form>
+      
+      <div className="mt-6 space-y-2">
+        <div className="text-center text-sm text-gray-600 mb-3">
+          Pour tester l'application, utilisez votre email Supabase ou créez un compte
+        </div>
+      </div>
     </div>
   );
 };
