@@ -14,6 +14,7 @@ import { GlobalSearch } from '../Common/GlobalSearch';
 import { NotificationCenter } from '../Common/NotificationCenter';
 import { BackupSystem } from '../Common/BackupSystem';
 import { HistoryTracker } from '../Common/HistoryTracker';
+import { useAuth } from '../Auth/AuthProvider';
 
 interface HeaderProps {
   onMenuToggle: () => void;
@@ -21,11 +22,13 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ onMenuToggle, onNavigate }) => {
+  const { utilisateur, signOut } = useAuth();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [isBackupOpen, setIsBackupOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     // Ctrl/Cmd + K pour ouvrir la recherche
@@ -52,6 +55,16 @@ export const Header: React.FC<HeaderProps> = ({ onMenuToggle, onNavigate }) => {
   const handleNavigate = (section: string, id?: string) => {
     if (onNavigate) {
       onNavigate(section, id);
+    }
+  };
+
+  const handleSignOut = async () => {
+    if (confirm('Êtes-vous sûr de vouloir vous déconnecter ?')) {
+      try {
+        await signOut();
+      } catch (error) {
+        console.error('Erreur lors de la déconnexion:', error);
+      }
     }
   };
 
@@ -138,9 +151,86 @@ export const Header: React.FC<HeaderProps> = ({ onMenuToggle, onNavigate }) => {
             </button>
             
             {/* Profil utilisateur */}
-            <div className="flex items-center space-x-2 pl-2 border-l">
-              <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-                <User className="w-4 h-4 text-white" />
+            <div className="flex items-center space-x-2 pl-2 border-l relative">
+              <button
+                onClick={() => setShowUserMenu(!showUserMenu)}
+                className="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                  utilisateur?.role === 'admin' ? 'bg-red-500' :
+                  utilisateur?.role === 'manager' ? 'bg-blue-500' :
+                  'bg-green-500'
+                }`}>
+                  <User className="w-4 h-4 text-white" />
+                </div>
+                <div className="hidden sm:block text-left">
+                  <span className="text-sm font-medium text-gray-700">
+                    {utilisateur ? `${utilisateur.prenom} ${utilisateur.nom}` : 'Utilisateur'}
+                  </span>
+                  <div className="text-xs text-gray-500 capitalize">
+                    {utilisateur?.role || 'Employé'}
+                  </div>
+                </div>
+              </button>
+              
+              {/* Menu déroulant utilisateur */}
+              {showUserMenu && (
+                <div className="absolute top-full right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border overflow-hidden z-50">
+                  <div className="py-1">
+                    <div className="px-4 py-2 border-b bg-gray-50">
+                      <p className="text-sm font-medium text-gray-900">
+                        {utilisateur ? `${utilisateur.prenom} ${utilisateur.nom}` : 'Utilisateur'}
+                      </p>
+                      <p className="text-xs text-gray-500">{utilisateur?.email}</p>
+                    </div>
+                    <button 
+                      onClick={handleSignOut}
+                      className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center"
+                    >
+                      <User className="w-4 h-4 mr-2 text-red-500" />
+                      Déconnexion
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Fermer le menu utilisateur en cliquant ailleurs */}
+      {showUserMenu && (
+        <div 
+          className="fixed inset-0 z-40" 
+          onClick={() => setShowUserMenu(false)}
+        />
+      )}
+
+      {/* Composants modaux */}
+      <GlobalSearch
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+        onNavigate={handleNavigate}
+      />
+
+      <NotificationCenter
+        isOpen={isNotificationOpen}
+        onClose={() => setIsNotificationOpen(false)}
+        onNavigate={handleNavigate}
+      />
+
+      <BackupSystem
+        isOpen={isBackupOpen}
+        onClose={() => setIsBackupOpen(false)}
+      />
+
+      <HistoryTracker
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+      />
+    </>
+  );
+};
               </div>
               <div className="hidden sm:block">
                 <span className="text-sm font-medium text-gray-700">Admin</span>
