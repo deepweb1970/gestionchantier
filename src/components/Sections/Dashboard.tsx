@@ -21,6 +21,23 @@ import { useAuth } from '../Auth/AuthProvider';
 export const Dashboard: React.FC = () => {
   const { utilisateur, hasPermission } = useAuth();
   
+  // État de connexion
+  const [isOnline, setIsOnline] = React.useState(navigator.onLine);
+
+  // Gestion du statut en ligne/hors ligne
+  React.useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
   // Récupérer les données en temps réel
   const { data: clients, loading: clientsLoading } = useRealtimeSupabase({
     table: 'clients',
@@ -284,15 +301,15 @@ export const Dashboard: React.FC = () => {
           <div className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="text-center">
-                <div className="text-2xl font-bold text-red-600">1</div>
+                <div className="text-2xl font-bold text-red-600">{utilisateurs?.filter(u => u.role === 'admin').length || 0}</div>
                 <div className="text-sm text-gray-600">Administrateurs</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">1</div>
+                <div className="text-2xl font-bold text-blue-600">{utilisateurs?.filter(u => u.role === 'manager').length || 0}</div>
                 <div className="text-sm text-gray-600">Managers</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">1</div>
+                <div className="text-2xl font-bold text-green-600">{utilisateurs?.filter(u => u.role === 'employe').length || 0}</div>
                 <div className="text-sm text-gray-600">Employés</div>
               </div>
             </div>
