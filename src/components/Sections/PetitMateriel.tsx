@@ -192,7 +192,7 @@ const mockPrets: PretPetitMateriel[] = [
   }
 ];
 
-export const PetitMateriel: React.FC = () => {
+export const PetitMaterielSection: React.FC = () => {
   const [petitMateriel, setPetitMateriel] = useState<PetitMateriel[]>(mockPetitMateriel);
   const [prets, setPrets] = useState<PretPetitMateriel[]>(mockPrets);
   

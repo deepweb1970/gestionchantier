@@ -17,7 +17,7 @@ import { RealtimeStatus } from './components/Common/RealtimeStatus';
 import { Planning } from './components/Sections/Planning';
 import { ParametresHeuresSup } from './components/Sections/ParametresHeuresSup';
 import { MaintenanceSection } from './components/Sections/Maintenance';
-import { PetitMateriel } from './components/Sections/PetitMateriel';
+import { PetitMaterielSection } from './components/Sections/PetitMateriel';
 
 function App() {
   const { user, loading } = useAuth();
@@ -111,7 +111,7 @@ function App() {
       case 'maintenance':
         return <MaintenanceSection />;
       case 'petit-materiel':
-        return <PetitMateriel />;
+        return <PetitMaterielSection />;
       default:
         return <Dashboard />;
     }
