@@ -61,6 +61,42 @@ export const PetitMaterielSection: React.FC = () => {
   const [stockUpdateModalOpen, setStockUpdateModalOpen] = useState(false);
   const [selectedMaterielForStock, setSelectedMaterielForStock] = useState<PetitMateriel | null>(null);
 
+  // Fonction utilitaire pour formater les dates de manière sécurisée
+  const formatDate = (dateString: string | null | undefined): string => {
+    if (!dateString) return 'Date non définie';
+    
+    try {
+      const date = new Date(dateString);
+      // Vérifier si la date est valide
+      if (isNaN(date.getTime())) {
+        return 'Date invalide';
+      }
+      return date.toLocaleDateString('fr-FR');
+    } catch (error) {
+      console.error('Erreur lors du formatage de la date:', error);
+      return 'Date invalide';
+    }
+  };
+
+  // Fonction utilitaire pour vérifier si un prêt est en retard
+  const isLoanOverdue = (dateRetourPrevue: string | null | undefined): boolean => {
+    if (!dateRetourPrevue) return false;
+    
+    try {
+      const returnDate = new Date(dateRetourPrevue);
+      if (isNaN(returnDate.getTime())) return false;
+      
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Reset time to start of day
+      returnDate.setHours(0, 0, 0, 0);
+      
+      return returnDate < today;
+    } catch (error) {
+      console.error('Erreur lors de la vérification de retard:', error);
+      return false;
+    }
+  };
+
   const filteredMateriel = (petitMateriel || []).filter(item => {
     const searchLower = searchTerm.toLowerCase();
     const matchesSearch = item.nom.toLowerCase().includes(searchLower) ||
@@ -160,16 +196,35 @@ export const PetitMaterielSection: React.FC = () => {
     if (!selectedMateriel) return;
 
     const pretData = {
-      petitMaterielId: selectedMateriel.id,
-      ouvrierId: formData.get('ouvrierId') as string,
-      chantierId: formData.get('chantierId') as string || undefined,
-      dateDebut: formData.get('dateDebut') as string,
-      dateRetourPrevue: formData.get('dateRetourPrevue') as string,
-      quantite: parseInt(formData.get('quantite') as string),
+      petitMaterielId: (formData.get('petitMaterielId') as string).trim(),
+      ouvrierId: (formData.get('ouvrierId') as string).trim(),
+      chantierId: (formData.get('chantierId') as string || '').trim() || undefined,
+      dateDebut: (formData.get('dateDebut') as string).trim(),
+      dateRetourPrevue: (formData.get('dateRetourPrevue') as string).trim(),
+      quantite: parseInt((formData.get('quantite') as string).trim()),
       statut: 'en_cours' as const,
-      notes: formData.get('notes') as string || undefined,
-      etatDepart: formData.get('etatDepart') as PretPetitMateriel['etatDepart']
+      notes: (formData.get('notes') as string || '').trim() || undefined,
+      etatDepart: (formData.get('etatDepart') as string).trim() as PretPetitMateriel['etatDepart']
     };
+
+    // Validation des dates
+    const dateDebut = new Date(pretData.dateDebut);
+    const dateRetourPrevue = new Date(pretData.dateRetourPrevue);
+    
+    if (isNaN(dateDebut.getTime())) {
+      alert('Date de début invalide');
+      return;
+    }
+    
+    if (isNaN(dateRetourPrevue.getTime())) {
+      alert('Date de retour prévue invalide');
+      return;
+    }
+    
+    if (dateRetourPrevue <= dateDebut) {
+      alert('La date de retour prévue doit être postérieure à la date de début');
+      return;
+    }
 
     try {
       await PretPetitMaterielService.create(pretData);
@@ -663,7 +718,10 @@ export const PetitMaterielSection: React.FC = () => {
               name="dateDebut"
               type="date"
               required
-              defaultValue={new Date().toISOString().split('T')[0]}
+              defaultValue={(() => {
+                const today = new Date();
+                return today.toISOString().split('T')[0];
+              })()}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -673,7 +731,11 @@ export const PetitMaterielSection: React.FC = () => {
               name="dateRetourPrevue"
               type="date"
               required
-              defaultValue={new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
+              defaultValue={(() => {
+                const nextWeek = new Date();
+                nextWeek.setDate(nextWeek.getDate() + 7);
+                return nextWeek.toISOString().split('T')[0];
+              })()}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -874,22 +936,31 @@ export const PetitMaterielSection: React.FC = () => {
           <div className="bg-white border rounded-lg p-4">
             <h4 className="font-medium text-gray-700 mb-3">Prêts en cours</h4>
             <div className="space-y-2">
-              {pretsActifs.map(pret => (
-                <div key={pret.id} className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                  <div>
-                    <p className="font-medium">{pret.ouvrierNom}</p>
-                    <p className="text-sm text-gray-600">
-                      Retour prévu: {new Date(pret.dateRetourPrevue).toLocaleDateString()}
-                    </p>
+              {pretsActifs.map(pret => {
+                const isOverdue = isLoanOverdue(pret.dateRetourPrevue) && pret.statut === 'en_cours';
+                return (
+                  <div key={pret.id} className="flex justify-between items-center p-3 bg-gray-50 rounded">
+                    <div>
+                      <p className="font-medium">{pret.ouvrierNom}</p>
+                      <p className="text-sm text-gray-600">
+                        Retour prévu: {formatDate(pret.dateRetourPrevue)}
+                      </p>
+                      {isOverdue && (
+                        <div className="text-xs text-red-600 font-medium mt-1 flex items-center">
+                          <AlertTriangle className="w-3 h-3 mr-1" />
+                          En retard
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium">Qté: {pret.quantite}</p>
+                      <Button size="sm" onClick={() => handleRetour(pret)}>
+                        Retour
+                      </Button>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-medium">Qté: {pret.quantite}</p>
-                    <Button size="sm" onClick={() => handleRetour(pret)}>
-                      Retour
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -1103,10 +1174,10 @@ export const PetitMaterielSection: React.FC = () => {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm">
                           <div className="flex items-center">
-                            <span className="font-medium text-gray-900">{item.quantiteDisponible}</span>
+                         {pret.date_debut ? new Date(pret.date_debut).toLocaleDateString('fr-FR') : 'Date non définie'}
                             <span className="text-gray-500 mx-1">/</span>
                             <span className="text-gray-600">{item.quantiteStock}</span>
-                          </div>
+                         {pret.date_retour_prevue ? new Date(pret.date_retour_prevue).toLocaleDateString('fr-FR') : 'Date non définie'}
                           {item.quantiteDisponible <= item.seuilAlerte && (
                             <div className="flex items-center text-orange-600 mt-1">
                               <AlertTriangle className="w-3 h-3 mr-1" />
@@ -1229,10 +1300,10 @@ export const PetitMaterielSection: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
-                        Début: {pret.dateDebut ? new Date(pret.dateDebut).toLocaleDateString() : 'Date invalide'}
+                        Début: {formatDate(pret.dateDebut)}
                       </div>
                       <div className="text-sm text-gray-500">
-                        Retour prévu: {pret.dateRetourPrevue ? new Date(pret.dateRetourPrevue).toLocaleDateString() : 'Date invalide'}
+                        Retour prévu: {formatDate(pret.dateRetourPrevue)}
                       </div>
                       {pret.dateRetourPrevue && new Date(pret.dateRetourPrevue) < new Date() && pret.statut === 'en_cours' && (
                         <div className="flex items-center text-red-600 mt-1">
