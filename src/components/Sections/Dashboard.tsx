@@ -21,23 +21,6 @@ import { useAuth } from '../Auth/AuthProvider';
 export const Dashboard: React.FC = () => {
   const { utilisateur, hasPermission } = useAuth();
   
-  // État de connexion
-  const [isOnline, setIsOnline] = React.useState(navigator.onLine);
-
-  // Gestion du statut en ligne/hors ligne
-  React.useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-
   // Récupérer les données en temps réel
   const { data: clients, loading: clientsLoading } = useRealtimeSupabase({
     table: 'clients',

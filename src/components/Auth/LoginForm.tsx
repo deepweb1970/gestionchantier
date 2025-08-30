@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import { 
   Mail, 
   Lock, 
-  AlertTriangle 
+  AlertTriangle,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { Button } from '../Common/Button';
 import { useAuth } from './AuthProvider';
@@ -10,6 +12,7 @@ import { useAuth } from './AuthProvider';
 export const LoginForm: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -22,18 +25,18 @@ export const LoginForm: React.FC = () => {
     
     try {
       await signIn(email, password);
-    } catch (err) {
-      console.error('Erreur de connexion complète:', err);
+    } catch (err: any) {
+      console.error('Erreur de connexion:', err);
       
       let errorMessage = 'Erreur de connexion. Veuillez réessayer.';
       
-      if (err instanceof Error) {
+      if (err?.message) {
         if (err.message.includes('Invalid login credentials')) {
-          errorMessage = 'Email ou mot de passe incorrect. Veuillez vérifier vos identifiants.';
+          errorMessage = 'Email ou mot de passe incorrect.';
         } else if (err.message.includes('Email not confirmed')) {
-          errorMessage = 'Votre compte n\'est pas encore activé. Veuillez contacter un administrateur.';
+          errorMessage = 'Compte non activé. Contactez un administrateur.';
         } else if (err.message.includes('Too many requests')) {
-          errorMessage = 'Trop de tentatives de connexion. Veuillez patienter quelques minutes.';
+          errorMessage = 'Trop de tentatives. Patientez quelques minutes.';
         } else {
           errorMessage = err.message;
         }
@@ -45,27 +48,17 @@ export const LoginForm: React.FC = () => {
     }
   };
 
-  // Fonction pour tester la connexion avec un utilisateur par défaut
-  const handleTestLogin = async () => {
-    setEmail('admin@chantier.com');
-    setPassword('admin123');
+  const handleTestLogin = async (testEmail: string, testPassword: string) => {
+    setEmail(testEmail);
+    setPassword(testPassword);
     setLoading(true);
     setError(null);
     
     try {
-      await signIn('admin@chantier.com', 'admin123');
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Erreur de test de connexion';
-      
-      if (errorMessage.includes('Invalid login credentials')) {
-        setError('Email ou mot de passe incorrect. Veuillez vérifier vos identifiants.');
-      } else if (errorMessage.includes('Email not confirmed')) {
-        setError('Votre compte n\'est pas encore activé. Veuillez contacter un administrateur.');
-      } else if (errorMessage.includes('User not found')) {
-        setError('Utilisateur de test non trouvé. Veuillez créer un compte administrateur.');
-      } else {
-        setError(errorMessage);
-      }
+      await signIn(testEmail, testPassword);
+    } catch (err: any) {
+      console.error('Erreur de test de connexion:', err);
+      setError('Erreur lors de la connexion de test. Vérifiez que les comptes de test existent.');
     } finally {
       setLoading(false);
     }
@@ -116,34 +109,21 @@ export const LoginForm: React.FC = () => {
             <input
               id="password"
               name="password"
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               autoComplete="current-password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="pl-10 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="pl-10 pr-10 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="••••••••"
             />
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between">
-          <div className="flex items-center">
-            <input
-              id="remember-me"
-              name="remember-me"
-              type="checkbox"
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-            />
-            <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
-              Se souvenir de moi
-            </label>
-          </div>
-
-          <div className="text-sm">
-            <a href="#" className="font-medium text-blue-600 hover:text-blue-500">
-              Mot de passe oublié ?
-            </a>
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute inset-y-0 right-0 pr-3 flex items-center"
+            >
+              {showPassword ? <EyeOff className="h-4 w-4 text-gray-400" /> : <Eye className="h-4 w-4 text-gray-400" />}
+            </button>
           </div>
         </div>
 
@@ -156,27 +136,40 @@ export const LoginForm: React.FC = () => {
             {loading ? 'Connexion en cours...' : 'Se connecter'}
           </Button>
         </div>
-
-        <div className="mt-4">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={handleTestLogin}
-            disabled={loading}
-            className="w-full"
-          >
-            Connexion test (admin@chantier.com)
-          </Button>
-        </div>
       </form>
       
-      <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-        <h3 className="text-sm font-medium text-gray-700 mb-2">Comptes de test disponibles :</h3>
-        <div className="text-xs text-gray-600 space-y-1">
-          <p><strong>Admin :</strong> admin@chantier.com / admin123</p>
-          <p><strong>Manager :</strong> manager@chantier.com / manager123</p>
-          <p><strong>Employé :</strong> employe@chantier.com / employe123</p>
-        </div>
+      <div className="mt-6 space-y-2">
+        <div className="text-center text-sm text-gray-600 mb-3">Comptes de test :</div>
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => handleTestLogin('admin@chantier.com', 'admin123')}
+          disabled={loading}
+          className="w-full text-sm"
+          size="sm"
+        >
+          Connexion Admin
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => handleTestLogin('manager@chantier.com', 'manager123')}
+          disabled={loading}
+          className="w-full text-sm"
+          size="sm"
+        >
+          Connexion Manager
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => handleTestLogin('employe@chantier.com', 'employe123')}
+          disabled={loading}
+          className="w-full text-sm"
+          size="sm"
+        >
+          Connexion Employé
+        </Button>
       </div>
     </div>
   );

@@ -27,7 +27,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   // Fonction pour récupérer les données utilisateur depuis la base
-  const fetchUserData = async (userEmail: string) => {
+  const fetchUserData = async (userEmail: string): Promise<UtilisateurRow | null> => {
     try {
       const { data, error } = await supabase
         .from('utilisateurs')
@@ -37,18 +37,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (error) {
         if (error.code === 'PGRST116') {
-          // Utilisateur non trouvé dans la table utilisateurs
-          console.log('Utilisateur non trouvé dans la table utilisateurs, création automatique...');
+          console.log('Utilisateur non trouvé dans la table utilisateurs');
           return null;
         }
         console.error('Erreur lors de la récupération des données utilisateur:', error);
-        throw error;
+        return null;
       }
       
       return data;
     } catch (error) {
       console.error('Erreur lors de la récupération des données utilisateur:', error);
-      throw error;
+      return null;
     }
   };
 
@@ -65,30 +64,52 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
+    let mounted = true;
+
     // Récupérer la session actuelle
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user?.email) {
-        try {
-          const userData = await fetchUserData(session.user.email);
-          setUtilisateur(userData);
-          
-          if (userData) {
-            await updateLastConnection(userData.id);
+    const getInitialSession = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Erreur lors de la récupération de la session:', error);
+          if (mounted) {
+            setLoading(false);
           }
-        } catch (error) {
-          console.error('Erreur lors du chargement des données utilisateur:', error);
-          setUtilisateur(null);
+          return;
+        }
+
+        if (mounted) {
+          setSession(session);
+          setUser(session?.user ?? null);
+          
+          if (session?.user?.email) {
+            const userData = await fetchUserData(session.user.email);
+            setUtilisateur(userData);
+            
+            if (userData) {
+              await updateLastConnection(userData.id);
+            }
+          }
+          
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('Erreur lors de l\'initialisation de la session:', error);
+        if (mounted) {
+          setLoading(false);
         }
       }
-      
-      setLoading(false);
-    });
+    };
+
+    getInitialSession();
 
     // Écouter les changements d'authentification
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return;
+
+      console.log('Auth state change:', event, session?.user?.email);
+      
       setSession(session);
       setUser(session?.user ?? null);
       
@@ -112,30 +133,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     return () => {
+      mounted = false;
       subscription.unsubscribe();
     };
   }, []);
 
   const signIn = async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
+      setLoading(true);
+      const { data, error } = await supabase.auth.signInWithPassword({ 
+        email: email.trim(), 
+        password 
+      });
       
-      // Les données utilisateur seront chargées automatiquement par onAuthStateChange
+      if (error) {
+        console.error('Erreur de connexion Supabase:', error);
+        throw error;
+      }
+      
+      console.log('Connexion réussie:', data.user?.email);
     } catch (error) {
       console.error('Erreur de connexion:', error);
+      setLoading(false);
       throw error;
     }
   };
 
   const signUp = async (email: string, password: string, userData: any) => {
     try {
+      setLoading(true);
+      
+      // Créer l'utilisateur dans Supabase Auth
       const { data, error } = await supabase.auth.signUp({
-        email,
+        email: email.trim(),
         password,
       });
       
-      if (error) throw error;
+      if (error) {
+        console.error('Erreur d\'inscription Supabase:', error);
+        throw error;
+      }
       
       // Créer l'utilisateur dans la table utilisateurs
       if (data.user) {
@@ -144,7 +181,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           .insert({
             nom: userData.nom,
             prenom: userData.prenom,
-            email: email,
+            email: email.trim(),
             role: userData.role || 'employe',
             actif: true,
             permissions: userData.role === 'admin' 
@@ -159,8 +196,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           throw insertError;
         }
       }
+      
+      console.log('Inscription réussie:', data.user?.email);
     } catch (error) {
       console.error('Erreur d\'inscription:', error);
+      setLoading(false);
       throw error;
     }
   };
@@ -168,7 +208,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOut = async () => {
     try {
       const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+      if (error) {
+        console.error('Erreur de déconnexion:', error);
+        throw error;
+      }
       setUtilisateur(null);
     } catch (error) {
       console.error('Erreur de déconnexion:', error);
@@ -192,7 +235,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const hasPermission = (permission: string): boolean => {
     if (!utilisateur) return false;
     if (!utilisateur.permissions) return false;
-    return utilisateur.permissions?.includes(permission) || false;
+    return utilisateur.permissions.includes(permission);
   };
 
   // Fonction pour vérifier le rôle
@@ -200,6 +243,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!utilisateur) return false;
     return utilisateur.role === role;
   };
+
   const value = {
     session,
     user,
