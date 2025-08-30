@@ -231,38 +231,3 @@ export const Header: React.FC<HeaderProps> = ({ onMenuToggle, onNavigate }) => {
     </>
   );
 };
-              </div>
-              <div className="hidden sm:block">
-                <span className="text-sm font-medium text-gray-700">Admin</span>
-                <div className="text-xs text-gray-500">Administrateur</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Composants modaux */}
-      <GlobalSearch
-        isOpen={isSearchOpen}
-        onClose={() => setIsSearchOpen(false)}
-        onNavigate={handleNavigate}
-      />
-
-      <NotificationCenter
-        isOpen={isNotificationOpen}
-        onClose={() => setIsNotificationOpen(false)}
-        onNavigate={handleNavigate}
-      />
-
-      <BackupSystem
-        isOpen={isBackupOpen}
-        onClose={() => setIsBackupOpen(false)}
-      />
-
-      <HistoryTracker
-        isOpen={isHistoryOpen}
-        onClose={() => setIsHistoryOpen(false)}
-      />
-    </>
-  );
-};
