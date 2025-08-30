@@ -31,6 +31,10 @@ import {
   Archive,
   RotateCcw
 } from 'lucide-react';
+import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
+import { PetitMaterielService, PretPetitMaterielService } from '../../services/petitMaterielService';
+import { ouvrierService } from '../../services/ouvrierService';
+import { chantierService } from '../../services/chantierService';
 import { PetitMateriel, PretPetitMateriel, Ouvrier, Chantier } from '../../types';
 import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
 import { ouvrierService } from '../../services/ouvrierService';
@@ -38,272 +42,7 @@ import { chantierService } from '../../services/chantierService';
 import { Modal } from '../Common/Modal';
 import { Button } from '../Common/Button';
 import { StatusBadge } from '../Common/StatusBadge';
-import { exportToPDF } from '../../utils/pdfExport';
-
-// Mock data pour le petit matériel
-const mockPetitMateriel: PetitMateriel[] = [
-  {
-    id: '1',
-    nom: 'Perceuse sans fil Bosch',
-    type: 'Outillage électroportatif',
-    marque: 'Bosch',
-    modele: 'GSR 18V-60 C',
-    numeroSerie: 'BSH001234',
-    codeBarre: '3165140123456',
-    dateAchat: '2023-03-15',
-    valeur: 180,
-    statut: 'disponible',
-    localisation: 'Dépôt principal',
-    description: 'Perceuse-visseuse sans fil 18V avec 2 batteries',
-    quantiteStock: 5,
-    quantiteDisponible: 3,
-    seuilAlerte: 2,
-    poids: 1.2,
-    dimensions: '25x8x22 cm',
-    garantie: '2025-03-15',
-    fournisseur: 'Leroy Merlin',
-    prets: []
-  },
-  {
-    id: '2',
-    nom: 'Niveau laser Stabila',
-    type: 'Instrument de mesure',
-    marque: 'Stabila',
-    modele: 'LAX 50',
-    numeroSerie: 'STB567890',
-    codeBarre: '4007430123789',
-    dateAchat: '2023-06-20',
-    valeur: 95,
-    statut: 'prete',
-    localisation: 'Chantier Villa Moderne',
-    description: 'Niveau laser rotatif avec trépied',
-    quantiteStock: 2,
-    quantiteDisponible: 1,
-    seuilAlerte: 1,
-    poids: 0.8,
-    dimensions: '15x10x8 cm',
-    garantie: '2025-06-20',
-    fournisseur: 'Point P',
-    prets: [
-      {
-        id: '1',
-        petitMaterielId: '2',
-        ouvrierId: '1',
-        chantierId: '1',
-        dateDebut: '2024-01-15',
-        dateRetourPrevue: '2024-01-22',
-        quantite: 1,
-        statut: 'en_cours',
-        etatDepart: 'bon',
-        ouvrierNom: 'Jean Dubois',
-        chantierNom: 'Villa Moderne',
-        petitMaterielNom: 'Niveau laser Stabila'
-      }
-    ]
-  },
-  {
-    id: '3',
-    nom: 'Casque de sécurité',
-    type: 'EPI',
-    marque: 'Uvex',
-    modele: 'Pheos B-WR',
-    numeroSerie: 'UVX789012',
-    codeBarre: '4031101234567',
-    dateAchat: '2023-01-10',
-    valeur: 25,
-    statut: 'disponible',
-    localisation: 'Vestiaire',
-    description: 'Casque de protection avec visière',
-    quantiteStock: 20,
-    quantiteDisponible: 15,
-    seuilAlerte: 5,
-    poids: 0.4,
-    dimensions: 'Taille universelle',
-    garantie: '2026-01-10',
-    fournisseur: 'Würth',
-    prets: []
-  },
-  {
-    id: '4',
-    nom: 'Meuleuse d\'angle Makita',
-    type: 'Outillage électroportatif',
-    marque: 'Makita',
-    modele: 'DGA504Z',
-    numeroSerie: 'MAK345678',
-    codeBarre: '0088381234890',
-    dateAchat: '2023-08-12',
-    valeur: 220,
-    statut: 'maintenance',
-    localisation: 'Atelier',
-    description: 'Meuleuse sans fil 18V avec disques',
-    quantiteStock: 3,
-    quantiteDisponible: 2,
-    seuilAlerte: 1,
-    poids: 2.1,
-    dimensions: '30x12x15 cm',
-    garantie: '2025-08-12',
-    fournisseur: 'Brico Dépôt',
-    prets: []
-  }
-];
-
-const mockPrets: PretPetitMateriel[] = [
-  {
-    id: '1',
-    petitMaterielId: '2',
-    ouvrierId: '1',
-    chantierId: '1',
-    dateDebut: '2024-01-15',
-    dateRetourPrevue: '2024-01-22',
-    quantite: 1,
-    statut: 'en_cours',
-    etatDepart: 'bon',
-    ouvrierNom: 'Jean Dubois',
-    chantierNom: 'Villa Moderne',
-    petitMaterielNom: 'Niveau laser Stabila'
-  },
-  {
-    id: '2',
-    petitMaterielId: '1',
-    ouvrierId: '2',
-    chantierId: '2',
-    dateDebut: '2024-01-10',
-    dateRetourPrevue: '2024-01-17',
-    dateRetourEffective: '2024-01-16',
-    quantite: 2,
-    statut: 'termine',
-    etatDepart: 'bon',
-    etatRetour: 'bon',
-    ouvrierNom: 'Paul Martin',
-    chantierNom: 'Appartement Haussmannien',
-    petitMaterielNom: 'Perceuse sans fil Bosch'
-  },
-  {
-    id: '3',
-    petitMaterielId: '3',
-    ouvrierId: '3',
-    dateDebut: '2024-01-08',
-    dateRetourPrevue: '2024-01-15',
-    quantite: 5,
-    statut: 'retard',
-    etatDepart: 'neuf',
-    ouvrierNom: 'Michel Leroy',
-    petitMaterielNom: 'Casque de sécurité'
-  }
-];
-
-export const PetitMaterielSection: React.FC = () => {
-  const [petitMateriel, setPetitMateriel] = useState<PetitMateriel[]>(mockPetitMateriel);
-  const [prets, setPrets] = useState<PretPetitMateriel[]>(mockPrets);
-  
-  const { data: ouvriers } = useRealtimeSupabase<Ouvrier>({
-    table: 'ouvriers',
-    fetchFunction: ouvrierService.getAll
-  });
-  
-  const { data: chantiers } = useRealtimeSupabase<Chantier>({
-    table: 'chantiers',
-    fetchFunction: chantierService.getAll
-  });
-  
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isPretModalOpen, setIsPretModalOpen] = useState(false);
-  const [isRetourModalOpen, setIsRetourModalOpen] = useState(false);
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-  const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false);
-  const [editingMateriel, setEditingMateriel] = useState<PetitMateriel | null>(null);
-  const [selectedMateriel, setSelectedMateriel] = useState<PetitMateriel | null>(null);
-  const [selectedPret, setSelectedPret] = useState<PretPetitMateriel | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [typeFilter, setTypeFilter] = useState('all');
-  const [activeTab, setActiveTab] = useState<'materiel' | 'prets' | 'historique'>('materiel');
-  const [scannedBarcode, setScannedBarcode] = useState('');
-
-  const filteredMateriel = petitMateriel.filter(item => {
-    const matchesSearch = item.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.marque.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.codeBarre.includes(searchTerm) ||
-                         item.numeroSerie.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || item.statut === statusFilter;
-    const matchesType = typeFilter === 'all' || item.type === typeFilter;
-    return matchesSearch && matchesStatus && matchesType;
-  });
-
-  const filteredPrets = prets.filter(pret => {
-    const materiel = petitMateriel.find(m => m.id === pret.petitMaterielId);
-    const matchesSearch = materiel?.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         pret.ouvrierNom?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         pret.chantierNom?.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesSearch;
-  });
-
-  const handleEdit = (item: PetitMateriel) => {
-    setEditingMateriel(item);
-    setIsModalOpen(true);
-  };
-
-  const handleViewDetails = (item: PetitMateriel) => {
-    setSelectedMateriel(item);
-    setIsDetailModalOpen(true);
-  };
-
-  const handlePret = (item: PetitMateriel) => {
-    setSelectedMateriel(item);
-    setIsPretModalOpen(true);
-  };
-
-  const handleRetour = (pret: PretPetitMateriel) => {
-    setSelectedPret(pret);
-    setIsRetourModalOpen(true);
-  };
-
-  const handleDelete = (id: string) => {
-    if (confirm('Êtes-vous sûr de vouloir supprimer ce petit matériel ?')) {
-      setPetitMateriel(petitMateriel.filter(m => m.id !== id));
-    }
-  };
-
-  const handleSave = (formData: FormData) => {
-    const materielData: PetitMateriel = {
-      id: editingMateriel?.id || Date.now().toString(),
-      nom: formData.get('nom') as string,
-      type: formData.get('type') as string,
-      marque: formData.get('marque') as string,
-      modele: formData.get('modele') as string,
-      numeroSerie: formData.get('numeroSerie') as string,
-      codeBarre: formData.get('codeBarre') as string,
-      dateAchat: formData.get('dateAchat') as string,
-      valeur: parseFloat(formData.get('valeur') as string),
-      statut: formData.get('statut') as PetitMateriel['statut'],
-      localisation: formData.get('localisation') as string,
-      description: formData.get('description') as string,
-      quantiteStock: parseInt(formData.get('quantiteStock') as string),
-      quantiteDisponible: parseInt(formData.get('quantiteDisponible') as string),
-      seuilAlerte: parseInt(formData.get('seuilAlerte') as string),
-      poids: parseFloat(formData.get('poids') as string) || undefined,
-      dimensions: formData.get('dimensions') as string || undefined,
-      garantie: formData.get('garantie') as string || undefined,
-      fournisseur: formData.get('fournisseur') as string || undefined,
-      prets: editingMateriel?.prets || [],
-      createdAt: editingMateriel?.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-
-    if (editingMateriel) {
-      setPetitMateriel(petitMateriel.map(m => m.id === editingMateriel.id ? materielData : m));
-    } else {
-      setPetitMateriel([...petitMateriel, materielData]);
-    }
-    
-    setIsModalOpen(false);
-    setEditingMateriel(null);
-  };
-
-  const handleSavePret = (formData: FormData) => {
-    if (!selectedMateriel) return;
-
-    const quantitePretee = parseInt(formData.get('quantite') as string);
+import { PetitMateriel, PretPetitMateriel, Ouvrier, Chantier } from '../../types';
     
     const pretData: PretPetitMateriel = {
       id: Date.now().toString(),
@@ -333,8 +72,26 @@ export const PetitMaterielSection: React.FC = () => {
     setIsPretModalOpen(false);
     setSelectedMateriel(null);
   };
-
-  const handleSaveRetour = (formData: FormData) => {
+  const { data: petitMateriel, loading: petitMaterielLoading, error: petitMaterielError, refresh: refreshPetitMateriel } = useRealtimeSupabase<PetitMateriel>({
+    table: 'petit_materiel',
+    fetchFunction: PetitMaterielService.getAll
+  });
+  
+  const { data: prets, loading: pretsLoading, error: pretsError, refresh: refreshPrets } = useRealtimeSupabase<PretPetitMateriel>({
+    table: 'prets_petit_materiel',
+    fetchFunction: PretPetitMaterielService.getAll
+  });
+  
+  const { data: ouvriers } = useRealtimeSupabase<Ouvrier>({
+    table: 'ouvriers',
+    fetchFunction: ouvrierService.getAll
+  });
+  
+  const { data: chantiers } = useRealtimeSupabase<Chantier>({
+    table: 'chantiers',
+    fetchFunction: chantierService.getAll
+  });
+  
     if (!selectedPret) return;
 
     const quantiteRetournee = parseInt(formData.get('quantiteRetournee') as string);
@@ -348,7 +105,7 @@ export const PetitMaterielSection: React.FC = () => {
       statut: 'termine',
       notes: (selectedPret.notes || '') + '\n' + (formData.get('notesRetour') as string)
     };
-
+  const filteredMateriel = (petitMateriel || []).filter(item => {
     setPrets(prets.map(p => p.id === selectedPret.id ? updatedPret : p));
 
     // Mettre à jour les quantités du matériel
@@ -361,82 +118,101 @@ export const PetitMaterielSection: React.FC = () => {
 
       setPetitMateriel(petitMateriel.map(m => 
         m.id === selectedPret.petitMaterielId 
-          ? { ...m, quantiteDisponible: nouvelleQuantiteDisponible, statut: nouveauStatut }
+  const pretsEnCours = (prets || []).filter(pret => pret.statut === 'en_cours' || pret.statut === 'retard');
           : m
       ));
     }
 
     setIsRetourModalOpen(false);
-    setSelectedPret(null);
-  };
-
-  const generateBarcode = () => {
-    // Génération d'un code-barres EAN-13 simple
-    const timestamp = Date.now().toString();
-    return '31651' + timestamp.slice(-8);
-  };
-
-  const scanBarcode = () => {
-    // Simulation du scan de code-barres
+    try {
+      if (editingMateriel) {
+        await PetitMaterielService.update(editingMateriel.id, materielData);
+      } else {
+        await PetitMaterielService.create(materielData);
+      }
+      
+      refreshPetitMateriel();
+      setIsModalOpen(false);
+      setEditingMateriel(null);
+    } catch (error) {
+      console.error('Erreur lors de l\'enregistrement:', error);
+      alert('Erreur lors de l\'enregistrement du matériel');
     const foundMateriel = petitMateriel.find(m => m.codeBarre === scannedBarcode);
-    if (foundMateriel) {
-      setSelectedMateriel(foundMateriel);
-      setIsDetailModalOpen(true);
       setIsBarcodeModalOpen(false);
-      setScannedBarcode('');
-    } else {
-      alert('Matériel non trouvé avec ce code-barres');
+  const handleDelete = async (id: string) => {
+  const handleSavePret = async (formData: FormData) => {
+      try {
+        await PetitMaterielService.delete(id);
+        refreshPetitMateriel();
+        console.error('Erreur lors de la suppression:', error);
+        alert('Erreur lors de la suppression du matériel');
+      }
     }
   };
 
-  const exportToPDFReport = () => {
+  const handleSave = async (formData: FormData) => {
     const data = filteredMateriel.map(item => ({
-      'Nom': item.nom,
-      'Type': item.type,
-      'Marque': item.marque,
-      'Modèle': item.modele,
+      etatDepart: formData.get('etatDepart') as PretPetitMateriel['etatDepart']
       'Code-barres': item.codeBarre,
       'Statut': item.statut,
-      'Stock': `${item.quantiteDisponible}/${item.quantiteStock}`,
-      'Valeur': `${item.valeur}€`,
-      'Localisation': item.localisation
+    try {
+      await PretPetitMaterielService.create(pretData);
+      refreshPrets();
+      refreshPetitMateriel(); // Refresh pour mettre à jour les quantités
+      setIsPretModalOpen(false);
+      setSelectedMateriel(null);
+    } catch (error) {
+      console.error('Erreur lors de la création du prêt:', error);
+      alert('Erreur lors de la création du prêt');
+    }
     }));
 
-    const stats = {
+  const handleSaveRetour = async (formData: FormData) => {
       'Total articles': petitMateriel.length.toString(),
       'Articles disponibles': petitMateriel.filter(m => m.statut === 'disponible').length.toString(),
-      'Articles prêtés': petitMateriel.filter(m => m.statut === 'prete').length.toString(),
-      'Valeur totale': `${petitMateriel.reduce((sum, m) => sum + (m.valeur * m.quantiteStock), 0).toLocaleString()}€`,
+    const retourData = {
       'Prêts en cours': prets.filter(p => p.statut === 'en_cours').length.toString(),
       'Articles en alerte': petitMateriel.filter(m => m.quantiteDisponible <= m.seuilAlerte).length.toString()
     };
 
     exportToPDF({
       title: 'Inventaire Petit Matériel',
-      subtitle: `Généré le ${new Date().toLocaleDateString()}`,
-      data,
-      columns: [
+    try {
+      await PretPetitMaterielService.update(selectedPret.id, retourData);
+      refreshPrets();
+      refreshPetitMateriel(); // Refresh pour mettre à jour les quantités
+      setIsRetourModalOpen(false);
+      setSelectedPret(null);
+    } catch (error) {
+      console.error('Erreur lors du retour:', error);
+      alert('Erreur lors du retour du matériel');
+    }
         { header: 'Nom', dataKey: 'Nom', width: 40 },
         { header: 'Type', dataKey: 'Type', width: 30 },
-        { header: 'Marque', dataKey: 'Marque', width: 25 },
+  const handleBarcodeSearch = async () => {
         { header: 'Code-barres', dataKey: 'Code-barres', width: 25 },
         { header: 'Statut', dataKey: 'Statut', width: 20 },
-        { header: 'Stock', dataKey: 'Stock', width: 15 },
-        { header: 'Valeur', dataKey: 'Valeur', width: 15 },
-        { header: 'Localisation', dataKey: 'Localisation', width: 30 }
-      ],
-      filename: `petit-materiel-${new Date().toISOString().split('T')[0]}`,
-      includeStats: true,
+    try {
+      const found = await PetitMaterielService.getByBarcode(barcodeSearch);
+      if (found) {
+        setSelectedMateriel(found);
+        setIsDetailModalOpen(true);
+      } else {
+        alert('Aucun matériel trouvé avec ce code-barres');
+      }
+    } catch (error) {
+      console.error('Erreur lors de la recherche:', error);
+      alert('Erreur lors de la recherche par code-barres');
       stats
     });
   };
 
   const getStatistics = () => {
-    const total = petitMateriel.length;
-    const disponible = petitMateriel.filter(m => m.statut === 'disponible').length;
-    const prete = petitMateriel.filter(m => m.statut === 'prete').length;
-    const maintenance = petitMateriel.filter(m => m.statut === 'maintenance').length;
-    const valeurTotale = petitMateriel.reduce((sum, m) => sum + (m.valeur * m.quantiteStock), 0);
+    const total = (petitMateriel || []).length;
+    const disponible = (petitMateriel || []).filter(item => item.statut === 'disponible').length;
+    const prete = (petitMateriel || []).filter(item => item.statut === 'prete').length;
+    const stockFaible = (petitMateriel || []).filter(item => item.quantiteDisponible <= item.seuilAlerte).length;
+    const valeurTotale = (petitMateriel || []).reduce((sum, item) => sum + (item.valeur * item.quantiteStock), 0);
     const pretsEnCours = prets.filter(p => p.statut === 'en_cours').length;
     const pretsEnRetard = prets.filter(p => p.statut === 'retard').length;
     const alertesStock = petitMateriel.filter(m => m.quantiteDisponible <= m.seuilAlerte).length;
@@ -764,10 +540,11 @@ export const PetitMaterielSection: React.FC = () => {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Sélectionner un ouvrier</option>
-              {ouvriers?.filter(o => o.statut === 'actif').map(ouvrier => (
+              {(ouvriers || []).filter(o => o.statut === 'actif').map(ouvrier => (
                 <option key={ouvrier.id} value={ouvrier.id}>
                   {ouvrier.prenom} {ouvrier.nom} - {ouvrier.qualification}
                 </option>
+              ))}
               ))}
             </select>
           </div>
@@ -778,9 +555,11 @@ export const PetitMaterielSection: React.FC = () => {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Aucun chantier spécifique</option>
-              {chantiers?.filter(c => c.statut === 'actif' || c.statut === 'planifie').map(chantier => (
+              {(chantiers || []).filter(c => c.statut === 'actif' || c.statut === 'planifie').map(chantier => (
                 <option key={chantier.id} value={chantier.id}>
                   {chantier.nom}
+                </option>
+              ))}
                 </option>
               ))}
             </select>
@@ -1143,7 +922,7 @@ export const PetitMaterielSection: React.FC = () => {
           Rechercher
         </Button>
       </div>
-    </div>
+    return [...new Set((petitMateriel || []).map(item => item.type))];
   );
 
   const stats = getStatistics();
@@ -1229,7 +1008,19 @@ export const PetitMaterielSection: React.FC = () => {
 
       {/* Onglets */}
       <div className="bg-white rounded-lg shadow-sm border">
-        <div className="border-b">
+        {petitMaterielLoading ? (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Chargement des données...</p>
+          </div>
+        ) : petitMaterielError ? (
+          <div className="text-center py-8 text-red-500">
+            <p>Erreur lors du chargement des données</p>
+            <p className="text-sm">{petitMaterielError.message}</p>
+          </div>
+        ) : (
+          <>
+            <div className="p-4 border-b space-y-4">
           <nav className="flex space-x-8 px-6">
             <button
               onClick={() => setActiveTab('materiel')}
@@ -1335,7 +1126,7 @@ export const PetitMaterielSection: React.FC = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Valeur
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <div className="overflow-x-auto">
                     Actions
                   </th>
                 </tr>
@@ -1517,7 +1308,18 @@ export const PetitMaterielSection: React.FC = () => {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50">
-                <tr>
+        {pretsLoading ? (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Chargement des prêts...</p>
+          </div>
+        ) : pretsError ? (
+          <div className="text-center py-8 text-red-500">
+            <p>Erreur lors du chargement des prêts</p>
+            <p className="text-sm">{pretsError.message}</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Matériel
                   </th>
@@ -1549,14 +1351,14 @@ export const PetitMaterielSection: React.FC = () => {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">{pret.petitMaterielNom}</div>
                         <div className="text-sm text-gray-500">Qté: {pret.quantite}</div>
-                      </td>
+                        {pret.petitMaterielNom || 'Matériel inconnu'}
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">{pret.ouvrierNom}</div>
                         {pret.chantierNom && (
                           <div className="text-sm text-gray-500">{pret.chantierNom}</div>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                          {pret.ouvrierNom || 'Ouvrier inconnu'}
                         <div className="text-sm">
                           <div className="text-gray-900">{new Date(pret.dateDebut).toLocaleDateString()}</div>
                           <div className="text-gray-500">
@@ -1564,7 +1366,7 @@ export const PetitMaterielSection: React.FC = () => {
                               ? new Date(pret.dateRetourEffective).toLocaleDateString()
                               : new Date(pret.dateRetourPrevue).toLocaleDateString() + ' (prévu)'}
                           </div>
-                        </div>
+                          {pret.chantierNom || 'Aucun chantier'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {duree} jour{duree > 1 ? 's' : ''}
@@ -1585,7 +1387,28 @@ export const PetitMaterielSection: React.FC = () => {
                 })}
               </tbody>
             </table>
+            {filteredMateriel.length === 0 && (
+              <tfoot>
+                <tr>
+                  <td colSpan={6} className="px-6 py-10 text-center text-gray-500 bg-gray-50">
+                    Aucun matériel trouvé
+                  </td>
+                </tr>
+              </tfoot>
+            )}
           </div>
+        )}
+            {pretsEnCours.length === 0 && (
+              <tfoot>
+                <tr>
+                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500 bg-gray-50">
+                    Aucun prêt en cours
+                  </td>
+                </tr>
+              </tfoot>
+            )}
+          </>
+        )}
         )}
       </div>
 
@@ -1599,7 +1422,7 @@ export const PetitMaterielSection: React.FC = () => {
         title={editingMateriel ? 'Modifier le petit matériel' : 'Nouveau petit matériel'}
         size="xl"
       >
-        <MaterielForm />
+        {!petitMaterielLoading && <MaterielForm />}
       </Modal>
 
       <Modal
@@ -1611,7 +1434,7 @@ export const PetitMaterielSection: React.FC = () => {
         title="Nouveau prêt de matériel"
         size="lg"
       >
-        <PretForm />
+        {selectedMateriel && !pretsLoading && <PretForm />}
       </Modal>
 
       <Modal
@@ -1623,7 +1446,7 @@ export const PetitMaterielSection: React.FC = () => {
         title="Retour de matériel"
         size="lg"
       >
-        <RetourForm />
+        {selectedPret && !pretsLoading && <RetourForm />}
       </Modal>
 
       <Modal
