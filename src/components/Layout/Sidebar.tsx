@@ -10,7 +10,7 @@ interface SidebarProps {
   onToggle: () => void;
 }
 
-const allMenuItems = [
+const menuItems = [
   { id: 'chantiers', label: 'Chantiers', icon: Building2 },
   { id: 'photos', label: 'Photos', icon: Image },
   { id: 'ouvriers', label: 'Ouvriers', icon: Users },
@@ -26,39 +26,14 @@ const allMenuItems = [
   { id: 'parametres', label: 'Paramètres', icon: Settings },
 ];
 
-// Permissions requises pour chaque section
-const sectionPermissions: { [key: string]: string[] } = {
-  'chantiers': ['read'],
-  'photos': ['read'],
-  'ouvriers': ['manage_workers'],
-  'materiel': ['manage_equipment'],
-  'maintenance': ['manage_equipment'],
-  'petit-materiel': ['manage_equipment'],
-  'clients': ['manage_clients'],
-  'facturation': ['manage_invoices'],
-  'heures': ['read'],
-  'rapports': ['view_reports'],
-  'utilisateurs': ['manage_users'],
-  'planning': ['read'],
-  'parametres': ['admin_settings'],
-};
 export const Sidebar: React.FC<SidebarProps> = ({ 
   activeSection, 
   onSectionChange, 
   isOpen, 
   onToggle 
 }) => {
-  const { user, utilisateur, signOut, hasPermission } = useAuth();
+  const { user, signOut } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
-
-  // Filtrer les éléments du menu selon les permissions
-  const menuItems = allMenuItems.filter(item => {
-    const requiredPermissions = sectionPermissions[item.id];
-    if (!requiredPermissions) return true; // Si pas de permission requise, afficher
-    
-    // Vérifier si l'utilisateur a au moins une des permissions requises
-    return requiredPermissions.some(permission => hasPermission(permission));
-  });
 
   const handleSignOut = async () => {
     if (confirm('Êtes-vous sûr de vouloir vous déconnecter ?')) {
@@ -129,22 +104,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onClick={() => setShowUserMenu(!showUserMenu)}
                 className="w-full flex items-center p-2 rounded-lg hover:bg-gray-100"
               >
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                  utilisateur?.role === 'admin' ? 'bg-red-500' :
-                  utilisateur?.role === 'manager' ? 'bg-blue-500' :
-                  'bg-green-500'
-                }`}>
+                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
                   <UserCog className="w-4 h-4 text-white" />
                 </div>
                 <div className="ml-2 text-left">
-                  <p className="text-sm font-medium text-gray-700">
-                    {utilisateur ? `${utilisateur.prenom} ${utilisateur.nom}` : user?.email}
-                  </p>
-                  <p className="text-xs text-gray-500 capitalize">
-                    {utilisateur?.role === 'admin' ? 'Administrateur' :
-                     utilisateur?.role === 'manager' ? 'Manager' :
-                     'Employé'}
-                  </p>
+                  <p className="text-sm font-medium text-gray-700">{user?.email}</p>
+                  <p className="text-xs text-gray-500">Administrateur</p>
                 </div>
               </button>
               
@@ -152,13 +117,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {showUserMenu && (
                 <div className="absolute bottom-full left-0 mb-2 w-full bg-white rounded-lg shadow-lg border overflow-hidden">
                   <div className="py-1">
-                    <div className="px-4 py-2 border-b bg-gray-50">
-                      <p className="text-sm font-medium text-gray-900">
-                        {utilisateur ? `${utilisateur.prenom} ${utilisateur.nom}` : 'Utilisateur'}
-                      </p>
-                      <p className="text-xs text-gray-500">{utilisateur?.email}</p>
-                      <p className="text-xs text-blue-600 capitalize">{utilisateur?.role}</p>
-                    </div>
                     <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
                       <UserCog className="w-4 h-4 mr-2 text-gray-500" />
                       Mon profil
