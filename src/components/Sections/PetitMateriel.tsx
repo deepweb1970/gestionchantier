@@ -43,6 +43,89 @@ import { Modal } from '../Common/Modal';
 import { Button } from '../Common/Button';
 import { StatusBadge } from '../Common/StatusBadge';
 import { PetitMateriel, PretPetitMateriel, Ouvrier, Chantier } from '../../types';
+
+export const PetitMaterielManagement = () => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isPretModalOpen, setIsPretModalOpen] = useState(false);
+  const [isRetourModalOpen, setIsRetourModalOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false);
+  const [editingMateriel, setEditingMateriel] = useState<PetitMateriel | null>(null);
+  const [selectedMateriel, setSelectedMateriel] = useState<PetitMateriel | null>(null);
+  const [selectedPret, setSelectedPret] = useState<PretPetitMateriel | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [activeTab, setActiveTab] = useState('materiel');
+  const [scannedBarcode, setScannedBarcode] = useState('');
+
+  const generateBarcode = () => {
+    return Date.now().toString() + Math.random().toString(36).substr(2, 5);
+  };
+
+  const handleEdit = (materiel: PetitMateriel) => {
+    setEditingMateriel(materiel);
+    setIsModalOpen(true);
+  };
+
+  const handleViewDetails = (materiel: PetitMateriel) => {
+    setSelectedMateriel(materiel);
+    setIsDetailModalOpen(true);
+  };
+
+  const handlePret = (materiel: PetitMateriel) => {
+    setSelectedMateriel(materiel);
+    setIsPretModalOpen(true);
+  };
+
+  const handleRetour = (pret: PretPetitMateriel) => {
+    setSelectedPret(pret);
+    setIsRetourModalOpen(true);
+  };
+
+  const scanBarcode = async () => {
+    const foundMateriel = petitMateriel?.find(m => m.codeBarre === scannedBarcode);
+    if (foundMateriel) {
+      setSelectedMateriel(foundMateriel);
+      setIsDetailModalOpen(true);
+      setIsBarcodeModalOpen(false);
+    } else {
+      alert('Aucun matériel trouvé avec ce code-barres');
+    }
+  };
+
+  const exportToPDFReport = () => {
+    const data = filteredMateriel.map(item => ({
+      'Nom': item.nom,
+      'Type': item.type,
+      'Code-barres': item.codeBarre,
+      'Statut': item.statut,
+    }));
+
+    const stats = {
+      'Total articles': petitMateriel?.length.toString() || '0',
+      'Articles disponibles': petitMateriel?.filter(m => m.statut === 'disponible').length.toString() || '0',
+      'Prêts en cours': prets?.filter(p => p.statut === 'en_cours').length.toString() || '0',
+      'Articles en alerte': petitMateriel?.filter(m => m.quantiteDisponible <= m.seuilAlerte).length.toString() || '0'
+    };
+
+    exportToPDF({
+      title: 'Inventaire Petit Matériel',
+      columns: [
+        { header: 'Nom', dataKey: 'Nom', width: 40 },
+        { header: 'Type', dataKey: 'Type', width: 30 },
+        { header: 'Code-barres', dataKey: 'Code-barres', width: 25 },
+        { header: 'Statut', dataKey: 'Statut', width: 20 },
+      ],
+      data,
+      stats
+    });
+  };
+
+  const handleSavePret = async (formData: FormData) => {
+    if (!selectedMateriel) return;
+
+    const quantitePretee = parseInt(formData.get('quantite') as string);
     
     const pretData: PretPetitMateriel = {
       id: Date.now().toString(),
@@ -62,16 +145,28 @@ import { PetitMateriel, PretPetitMateriel, Ouvrier, Chantier } from '../../types
     };
 
     // Mettre à jour les quantités
-    setPetitMateriel(petitMateriel.map(m => 
+    setPetitMateriel(petitMateriel?.map(m => 
       m.id === selectedMateriel.id 
         ? { ...m, quantiteDisponible: m.quantiteDisponible - quantitePretee, statut: m.quantiteDisponible - quantitePretee === 0 ? 'prete' : m.statut }
         : m
-    ));
+    ) || []);
 
-    setPrets([...prets, pretData]);
+    setPrets([...(prets || []), pretData]);
     setIsPretModalOpen(false);
     setSelectedMateriel(null);
+
+    try {
+      await PretPetitMaterielService.create(pretData);
+      refreshPrets();
+      refreshPetitMateriel(); // Refresh pour mettre à jour les quantités
+      setIsPretModalOpen(false);
+      setSelectedMateriel(null);
+    } catch (error) {
+      console.error('Erreur lors de la création du prêt:', error);
+      alert('Erreur lors de la création du prêt');
+    }
   };
+
   const { data: petitMateriel, loading: petitMaterielLoading, error: petitMaterielError, refresh: refreshPetitMateriel } = useRealtimeSupabase<PetitMateriel>({
     table: 'petit_materiel',
     fetchFunction: PetitMaterielService.getAll
@@ -91,7 +186,8 @@ import { PetitMateriel, PretPetitMateriel, Ouvrier, Chantier } from '../../types
     table: 'chantiers',
     fetchFunction: chantierService.getAll
   });
-  
+
+  const handleSaveRetour = async (formData: FormData) => {
     if (!selectedPret) return;
 
     const quantiteRetournee = parseInt(formData.get('quantiteRetournee') as string);
@@ -105,25 +201,101 @@ import { PetitMateriel, PretPetitMateriel, Ouvrier, Chantier } from '../../types
       statut: 'termine',
       notes: (selectedPret.notes || '') + '\n' + (formData.get('notesRetour') as string)
     };
-  const filteredMateriel = (petitMateriel || []).filter(item => {
-    setPrets(prets.map(p => p.id === selectedPret.id ? updatedPret : p));
+
+    const retourData = {
+      dateRetourEffective: formData.get('dateRetourEffective') as string,
+      etatRetour,
+      statut: 'termine',
+      notes: (selectedPret.notes || '') + '\n' + (formData.get('notesRetour') as string)
+    };
+
+    setPrets(prets?.map(p => p.id === selectedPret.id ? updatedPret : p) || []);
 
     // Mettre à jour les quantités du matériel
-    const materiel = petitMateriel.find(m => m.id === selectedPret.petitMaterielId);
+    const materiel = petitMateriel?.find(m => m.id === selectedPret.petitMaterielId);
     if (materiel) {
       const nouvelleQuantiteDisponible = materiel.quantiteDisponible + quantiteRetournee;
       const nouveauStatut = etatRetour === 'perdu' ? 'perdu' : 
                            nouvelleQuantiteDisponible === materiel.quantiteStock ? 'disponible' : 
                            materiel.statut;
 
-      setPetitMateriel(petitMateriel.map(m => 
+      setPetitMateriel(petitMateriel?.map(m => 
         m.id === selectedPret.petitMaterielId 
-  const pretsEnCours = (prets || []).filter(pret => pret.statut === 'en_cours' || pret.statut === 'retard');
+          ? { ...m, quantiteDisponible: nouvelleQuantiteDisponible, statut: nouveauStatut }
           : m
-      ));
+      ) || []);
     }
 
     setIsRetourModalOpen(false);
+
+    try {
+      await PretPetitMaterielService.update(selectedPret.id, retourData);
+      refreshPrets();
+      refreshPetitMateriel(); // Refresh pour mettre à jour les quantités
+      setIsRetourModalOpen(false);
+      setSelectedPret(null);
+    } catch (error) {
+      console.error('Erreur lors du retour:', error);
+      alert('Erreur lors du retour du matériel');
+    }
+  };
+
+  const filteredMateriel = (petitMateriel || []).filter(item => {
+    const matchesSearch = item.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         item.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         item.marque.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         item.codeBarre.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || item.statut === statusFilter;
+    const matchesType = typeFilter === 'all' || item.type === typeFilter;
+    
+    return matchesSearch && matchesStatus && matchesType;
+  });
+
+  const filteredPrets = (prets || []).filter(pret => {
+    const matchesSearch = pret.petitMaterielNom?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         pret.ouvrierNom?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         pret.chantierNom?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    return matchesSearch;
+  });
+
+  const pretsEnCours = (prets || []).filter(pret => pret.statut === 'en_cours' || pret.statut === 'retard');
+
+  const handleDelete = async (id: string) => {
+    if (confirm('Êtes-vous sûr de vouloir supprimer ce matériel ?')) {
+      try {
+        await PetitMaterielService.delete(id);
+        refreshPetitMateriel();
+      } catch (error) {
+        console.error('Erreur lors de la suppression:', error);
+        alert('Erreur lors de la suppression du matériel');
+      }
+    }
+  };
+
+  const handleSave = async (formData: FormData) => {
+    const materielData = {
+      nom: formData.get('nom') as string,
+      type: formData.get('type') as string,
+      marque: formData.get('marque') as string,
+      modele: formData.get('modele') as string,
+      description: formData.get('description') as string,
+      numeroSerie: formData.get('numeroSerie') as string,
+      codeBarre: formData.get('codeBarre') as string,
+      quantiteStock: parseInt(formData.get('quantiteStock') as string),
+      quantiteDisponible: parseInt(formData.get('quantiteDisponible') as string),
+      seuilAlerte: parseInt(formData.get('seuilAlerte') as string),
+      localisation: formData.get('localisation') as string,
+      statut: formData.get('statut') as PetitMateriel['statut'],
+      dateAchat: formData.get('dateAchat') as string,
+      valeur: parseFloat(formData.get('valeur') as string),
+      fournisseur: formData.get('fournisseur') as string,
+      poids: parseFloat(formData.get('poids') as string) || undefined,
+      dimensions: formData.get('dimensions') as string,
+      garantie: formData.get('garantie') as string,
+      etatDepart: formData.get('etatDepart') as PretPetitMateriel['etatDepart']
+    };
+
     try {
       if (editingMateriel) {
         await PetitMaterielService.update(editingMateriel.id, materielData);
@@ -137,61 +309,10 @@ import { PetitMateriel, PretPetitMateriel, Ouvrier, Chantier } from '../../types
     } catch (error) {
       console.error('Erreur lors de l\'enregistrement:', error);
       alert('Erreur lors de l\'enregistrement du matériel');
-    const foundMateriel = petitMateriel.find(m => m.codeBarre === scannedBarcode);
-      setIsBarcodeModalOpen(false);
-  const handleDelete = async (id: string) => {
-  const handleSavePret = async (formData: FormData) => {
-      try {
-        await PetitMaterielService.delete(id);
-        refreshPetitMateriel();
-        console.error('Erreur lors de la suppression:', error);
-        alert('Erreur lors de la suppression du matériel');
-      }
     }
   };
 
-  const handleSave = async (formData: FormData) => {
-    const data = filteredMateriel.map(item => ({
-      etatDepart: formData.get('etatDepart') as PretPetitMateriel['etatDepart']
-      'Code-barres': item.codeBarre,
-      'Statut': item.statut,
-    try {
-      await PretPetitMaterielService.create(pretData);
-      refreshPrets();
-      refreshPetitMateriel(); // Refresh pour mettre à jour les quantités
-      setIsPretModalOpen(false);
-      setSelectedMateriel(null);
-    } catch (error) {
-      console.error('Erreur lors de la création du prêt:', error);
-      alert('Erreur lors de la création du prêt');
-    }
-    }));
-
-  const handleSaveRetour = async (formData: FormData) => {
-      'Total articles': petitMateriel.length.toString(),
-      'Articles disponibles': petitMateriel.filter(m => m.statut === 'disponible').length.toString(),
-    const retourData = {
-      'Prêts en cours': prets.filter(p => p.statut === 'en_cours').length.toString(),
-      'Articles en alerte': petitMateriel.filter(m => m.quantiteDisponible <= m.seuilAlerte).length.toString()
-    };
-
-    exportToPDF({
-      title: 'Inventaire Petit Matériel',
-    try {
-      await PretPetitMaterielService.update(selectedPret.id, retourData);
-      refreshPrets();
-      refreshPetitMateriel(); // Refresh pour mettre à jour les quantités
-      setIsRetourModalOpen(false);
-      setSelectedPret(null);
-    } catch (error) {
-      console.error('Erreur lors du retour:', error);
-      alert('Erreur lors du retour du matériel');
-    }
-        { header: 'Nom', dataKey: 'Nom', width: 40 },
-        { header: 'Type', dataKey: 'Type', width: 30 },
   const handleBarcodeSearch = async () => {
-        { header: 'Code-barres', dataKey: 'Code-barres', width: 25 },
-        { header: 'Statut', dataKey: 'Statut', width: 20 },
     try {
       const found = await PetitMaterielService.getByBarcode(barcodeSearch);
       if (found) {
@@ -203,25 +324,25 @@ import { PetitMateriel, PretPetitMateriel, Ouvrier, Chantier } from '../../types
     } catch (error) {
       console.error('Erreur lors de la recherche:', error);
       alert('Erreur lors de la recherche par code-barres');
-      stats
-    });
+    }
   };
 
   const getStatistics = () => {
     const total = (petitMateriel || []).length;
     const disponible = (petitMateriel || []).filter(item => item.statut === 'disponible').length;
     const prete = (petitMateriel || []).filter(item => item.statut === 'prete').length;
+    const maintenance = (petitMateriel || []).filter(item => item.statut === 'maintenance').length;
     const stockFaible = (petitMateriel || []).filter(item => item.quantiteDisponible <= item.seuilAlerte).length;
     const valeurTotale = (petitMateriel || []).reduce((sum, item) => sum + (item.valeur * item.quantiteStock), 0);
-    const pretsEnCours = prets.filter(p => p.statut === 'en_cours').length;
-    const pretsEnRetard = prets.filter(p => p.statut === 'retard').length;
-    const alertesStock = petitMateriel.filter(m => m.quantiteDisponible <= m.seuilAlerte).length;
+    const pretsEnCours = (prets || []).filter(p => p.statut === 'en_cours').length;
+    const pretsEnRetard = (prets || []).filter(p => p.statut === 'retard').length;
+    const alertesStock = (petitMateriel || []).filter(m => m.quantiteDisponible <= m.seuilAlerte).length;
 
     return { total, disponible, prete, maintenance, valeurTotale, pretsEnCours, pretsEnRetard, alertesStock };
   };
 
   const getUniqueTypes = () => {
-    return Array.from(new Set(petitMateriel.map(m => m.type)));
+    return Array.from(new Set((petitMateriel || []).map(m => m.type)));
   };
 
   const MaterielForm = () => (
@@ -545,7 +666,6 @@ import { PetitMateriel, PretPetitMateriel, Ouvrier, Chantier } from '../../types
                   {ouvrier.prenom} {ouvrier.nom} - {ouvrier.qualification}
                 </option>
               ))}
-              ))}
             </select>
           </div>
           <div>
@@ -558,8 +678,6 @@ import { PetitMateriel, PretPetitMateriel, Ouvrier, Chantier } from '../../types
               {(chantiers || []).filter(c => c.statut === 'actif' || c.statut === 'planifie').map(chantier => (
                 <option key={chantier.id} value={chantier.id}>
                   {chantier.nom}
-                </option>
-              ))}
                 </option>
               ))}
             </select>
@@ -728,8 +846,8 @@ import { PetitMateriel, PretPetitMateriel, Ouvrier, Chantier } from '../../types
   const DetailModal = () => {
     if (!selectedMateriel) return null;
 
-    const pretsActifs = prets.filter(p => p.petitMaterielId === selectedMateriel.id && p.statut === 'en_cours');
-    const historiqueComplet = prets.filter(p => p.petitMaterielId === selectedMateriel.id);
+    const pretsActifs = (prets || []).filter(p => p.petitMaterielId === selectedMateriel.id && p.statut === 'en_cours');
+    const historiqueComplet = (prets || []).filter(p => p.petitMaterielId === selectedMateriel.id);
 
     return (
       <div className="space-y-6">
@@ -922,7 +1040,7 @@ import { PetitMateriel, PretPetitMateriel, Ouvrier, Chantier } from '../../types
           Rechercher
         </Button>
       </div>
-    return [...new Set((petitMateriel || []).map(item => item.type))];
+    </div>
   );
 
   const stats = getStatistics();
@@ -1020,395 +1138,381 @@ import { PetitMateriel, PretPetitMateriel, Ouvrier, Chantier } from '../../types
           </div>
         ) : (
           <>
-            <div className="p-4 border-b space-y-4">
-          <nav className="flex space-x-8 px-6">
-            <button
-              onClick={() => setActiveTab('materiel')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'materiel'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <Package className="w-4 h-4 inline mr-2" />
-              Matériel ({petitMateriel.length})
-            </button>
-            <button
-              onClick={() => setActiveTab('prets')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'prets'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <Truck className="w-4 h-4 inline mr-2" />
-              Prêts en cours ({prets.filter(p => p.statut === 'en_cours').length})
-              {stats.pretsEnRetard > 0 && (
-                <span className="ml-1 bg-red-500 text-white rounded-full px-2 py-1 text-xs">
-                  {stats.pretsEnRetard}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab('historique')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'historique'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <Clock className="w-4 h-4 inline mr-2" />
-              Historique ({prets.length})
-            </button>
-          </nav>
-        </div>
+            <nav className="flex space-x-8 px-6">
+              <button
+                onClick={() => setActiveTab('materiel')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'materiel'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Package className="w-4 h-4 inline mr-2" />
+                Matériel ({(petitMateriel || []).length})
+              </button>
+              <button
+                onClick={() => setActiveTab('prets')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'prets'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Truck className="w-4 h-4 inline mr-2" />
+                Prêts en cours ({(prets || []).filter(p => p.statut === 'en_cours').length})
+                {stats.pretsEnRetard > 0 && (
+                  <span className="ml-1 bg-red-500 text-white rounded-full px-2 py-1 text-xs">
+                    {stats.pretsEnRetard}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => setActiveTab('historique')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'historique'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Clock className="w-4 h-4 inline mr-2" />
+                Historique ({(prets || []).length})
+              </button>
+            </nav>
 
-        <div className="p-4 border-b">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <input
-                type="text"
-                placeholder="Rechercher..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+            <div className="p-4 border-b space-y-4">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <input
+                    type="text"
+                    placeholder="Rechercher..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                {activeTab === 'materiel' && (
+                  <div className="flex items-center space-x-2">
+                    <Filter className="w-4 h-4 text-gray-500" />
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="all">Tous les statuts</option>
+                      <option value="disponible">Disponible</option>
+                      <option value="prete">Prêté</option>
+                      <option value="maintenance">Maintenance</option>
+                      <option value="perdu">Perdu</option>
+                      <option value="hors_service">Hors service</option>
+                    </select>
+                    <select
+                      value={typeFilter}
+                      onChange={(e) => setTypeFilter(e.target.value)}
+                      className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="all">Tous les types</option>
+                      {uniqueTypes.map(type => (
+                        <option key={type} value={type}>{type}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
             </div>
+
+            {/* Contenu des onglets */}
             {activeTab === 'materiel' && (
-              <div className="flex items-center space-x-2">
-                <Filter className="w-4 h-4 text-gray-500" />
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="all">Tous les statuts</option>
-                  <option value="disponible">Disponible</option>
-                  <option value="prete">Prêté</option>
-                  <option value="maintenance">Maintenance</option>
-                  <option value="perdu">Perdu</option>
-                  <option value="hors_service">Hors service</option>
-                </select>
-                <select
-                  value={typeFilter}
-                  onChange={(e) => setTypeFilter(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="all">Tous les types</option>
-                  {uniqueTypes.map(type => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
-                </select>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Matériel
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Identification
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Stock
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Statut
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Valeur
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {filteredMateriel.map((item) => (
+                      <tr key={item.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0 h-10 w-10">
+                              <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center">
+                                <Package className="h-5 w-5 text-white" />
+                              </div>
+                            </div>
+                            <div className="ml-4">
+                              <div className="text-sm font-medium text-gray-900">{item.nom}</div>
+                              <div className="text-sm text-gray-500">{item.marque} {item.modele}</div>
+                              <div className="text-xs text-gray-400">{item.type}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm">
+                            <div className="flex items-center">
+                              <Barcode className="w-4 h-4 mr-1 text-gray-400" />
+                              <span className="font-mono">{item.codeBarre}</span>
+                            </div>
+                            <div className="text-gray-500 mt-1">S/N: {item.numeroSerie}</div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm">
+                            <div className={`font-medium ${item.quantiteDisponible <= item.seuilAlerte ? 'text-red-600' : 'text-gray-900'}`}>
+                              {item.quantiteDisponible}/{item.quantiteStock}
+                            </div>
+                            <div className="text-gray-500">
+                              Seuil: {item.seuilAlerte}
+                              {item.quantiteDisponible <= item.seuilAlerte && (
+                                <AlertTriangle className="w-3 h-3 inline ml-1 text-red-500" />
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <StatusBadge status={item.statut} type="petit_materiel" />
+                          <div className="text-xs text-gray-500 mt-1">{item.localisation}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm">
+                            <div className="font-medium text-gray-900">{item.valeur}€</div>
+                            <div className="text-gray-500">Total: {(item.valeur * item.quantiteStock).toLocaleString()}€</div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={() => handleViewDetails(item)}
+                              className="text-green-600 hover:text-green-900"
+                              title="Voir détails"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handlePret(item)}
+                              className="text-purple-600 hover:text-purple-900"
+                              title="Nouveau prêt"
+                              disabled={item.quantiteDisponible === 0}
+                            >
+                              <ArrowRight className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleEdit(item)}
+                              className="text-blue-600 hover:text-blue-900"
+                              title="Modifier"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(item.id)}
+                              className="text-red-600 hover:text-red-900"
+                              title="Supprimer"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  {filteredMateriel.length === 0 && (
+                    <tfoot>
+                      <tr>
+                        <td colSpan={6} className="px-6 py-10 text-center text-gray-500 bg-gray-50">
+                          Aucun matériel trouvé
+                        </td>
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
               </div>
             )}
-          </div>
-        </div>
 
-        {/* Contenu des onglets */}
-        {activeTab === 'materiel' && (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Matériel
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Identification
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Stock
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Statut
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Valeur
-                  </th>
-            <div className="overflow-x-auto">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredMateriel.map((item) => (
-                  <tr key={item.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0 h-10 w-10">
-                          <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center">
-                            <Package className="h-5 w-5 text-white" />
-                          </div>
-                        </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">{item.nom}</div>
-                          <div className="text-sm text-gray-500">{item.marque} {item.modele}</div>
-                          <div className="text-xs text-gray-400">{item.type}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm">
-                        <div className="flex items-center">
-                          <Barcode className="w-4 h-4 mr-1 text-gray-400" />
-                          <span className="font-mono">{item.codeBarre}</span>
-                        </div>
-                        <div className="text-gray-500 mt-1">S/N: {item.numeroSerie}</div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm">
-                        <div className={`font-medium ${item.quantiteDisponible <= item.seuilAlerte ? 'text-red-600' : 'text-gray-900'}`}>
-                          {item.quantiteDisponible}/{item.quantiteStock}
-                        </div>
-                        <div className="text-gray-500">
-                          Seuil: {item.seuilAlerte}
-                          {item.quantiteDisponible <= item.seuilAlerte && (
-                            <AlertTriangle className="w-3 h-3 inline ml-1 text-red-500" />
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <StatusBadge status={item.statut} type="petit_materiel" />
-                      <div className="text-xs text-gray-500 mt-1">{item.localisation}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm">
-                        <div className="font-medium text-gray-900">{item.valeur}€</div>
-                        <div className="text-gray-500">Total: {(item.valeur * item.quantiteStock).toLocaleString()}€</div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => handleViewDetails(item)}
-                          className="text-green-600 hover:text-green-900"
-                          title="Voir détails"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handlePret(item)}
-                          className="text-purple-600 hover:text-purple-900"
-                          title="Nouveau prêt"
-                          disabled={item.quantiteDisponible === 0}
-                        >
-                          <ArrowRight className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleEdit(item)}
-                          className="text-blue-600 hover:text-blue-900"
-                          title="Modifier"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(item.id)}
-                          className="text-red-600 hover:text-red-900"
-                          title="Supprimer"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {activeTab === 'prets' && (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Matériel
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Ouvrier
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Chantier
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Période
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Quantité
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Statut
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredPrets.filter(p => p.statut === 'en_cours' || p.statut === 'retard').map((pret) => {
-                  const isOverdue = new Date(pret.dateRetourPrevue) < new Date() && pret.statut === 'en_cours';
-                  
-                  return (
-                    <tr key={pret.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{pret.petitMaterielNom}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <User className="w-4 h-4 mr-2 text-gray-400" />
-                          <span className="text-sm text-gray-900">{pret.ouvrierNom}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {pret.chantierNom ? (
-                          <div className="flex items-center">
-                            <Building2 className="w-4 h-4 mr-2 text-gray-400" />
-                            <span className="text-sm text-gray-900">{pret.chantierNom}</span>
-                          </div>
-                        ) : (
-                          <span className="text-sm text-gray-500">-</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm">
-                          <div className="text-gray-900">
-                            {new Date(pret.dateDebut).toLocaleDateString()}
-                          </div>
-                          <div className={`text-gray-500 ${isOverdue ? 'text-red-600 font-medium' : ''}`}>
-                            → {new Date(pret.dateRetourPrevue).toLocaleDateString()}
-                            {isOverdue && <AlertTriangle className="w-3 h-3 inline ml-1" />}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {pret.quantite}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <StatusBadge status={isOverdue ? 'retard' : pret.statut} type="pret" />
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <Button size="sm" onClick={() => handleRetour(pret)}>
-                          <ArrowLeft className="w-4 h-4 mr-1" />
-                          Retour
-                        </Button>
-                      </td>
+            {activeTab === 'prets' && (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Matériel
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Ouvrier
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Chantier
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Période
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Quantité
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Statut
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {activeTab === 'historique' && (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-        {pretsLoading ? (
-          <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Chargement des prêts...</p>
-          </div>
-        ) : pretsError ? (
-          <div className="text-center py-8 text-red-500">
-            <p>Erreur lors du chargement des prêts</p>
-            <p className="text-sm">{pretsError.message}</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Matériel
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Ouvrier
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Période
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Durée
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    État
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Statut
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredPrets.map((pret) => {
-                  const duree = pret.dateRetourEffective 
-                    ? Math.ceil((new Date(pret.dateRetourEffective).getTime() - new Date(pret.dateDebut).getTime()) / (1000 * 60 * 60 * 24))
-                    : Math.ceil((new Date().getTime() - new Date(pret.dateDebut).getTime()) / (1000 * 60 * 60 * 24));
-                  
-                  return (
-                    <tr key={pret.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{pret.petitMaterielNom}</div>
-                        <div className="text-sm text-gray-500">Qté: {pret.quantite}</div>
-                        {pret.petitMaterielNom || 'Matériel inconnu'}
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{pret.ouvrierNom}</div>
-                        {pret.chantierNom && (
-                          <div className="text-sm text-gray-500">{pret.chantierNom}</div>
-                        )}
-                      </td>
-                          {pret.ouvrierNom || 'Ouvrier inconnu'}
-                        <div className="text-sm">
-                          <div className="text-gray-900">{new Date(pret.dateDebut).toLocaleDateString()}</div>
-                          <div className="text-gray-500">
-                            → {pret.dateRetourEffective 
-                              ? new Date(pret.dateRetourEffective).toLocaleDateString()
-                              : new Date(pret.dateRetourPrevue).toLocaleDateString() + ' (prévu)'}
-                          </div>
-                          {pret.chantierNom || 'Aucun chantier'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {duree} jour{duree > 1 ? 's' : ''}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm">
-                          <div className="text-gray-900">Départ: {pret.etatDepart}</div>
-                          {pret.etatRetour && (
-                            <div className="text-gray-500">Retour: {pret.etatRetour}</div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <StatusBadge status={pret.statut} type="pret" />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            {filteredMateriel.length === 0 && (
-              <tfoot>
-                <tr>
-                  <td colSpan={6} className="px-6 py-10 text-center text-gray-500 bg-gray-50">
-                    Aucun matériel trouvé
-                  </td>
-                </tr>
-              </tfoot>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {filteredPrets.filter(p => p.statut === 'en_cours' || p.statut === 'retard').map((pret) => {
+                      const isOverdue = new Date(pret.dateRetourPrevue) < new Date() && pret.statut === 'en_cours';
+                      
+                      return (
+                        <tr key={pret.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">{pret.petitMaterielNom}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <User className="w-4 h-4 mr-2 text-gray-400" />
+                              <span className="text-sm text-gray-900">{pret.ouvrierNom}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {pret.chantierNom ? (
+                              <div className="flex items-center">
+                                <Building2 className="w-4 h-4 mr-2 text-gray-400" />
+                                <span className="text-sm text-gray-900">{pret.chantierNom}</span>
+                              </div>
+                            ) : (
+                              <span className="text-sm text-gray-500">-</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm">
+                              <div className="text-gray-900">
+                                {new Date(pret.dateDebut).toLocaleDateString()}
+                              </div>
+                              <div className={`text-gray-500 ${isOverdue ? 'text-red-600 font-medium' : ''}`}>
+                                → {new Date(pret.dateRetourPrevue).toLocaleDateString()}
+                                {isOverdue && <AlertTriangle className="w-3 h-3 inline ml-1" />}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {pret.quantite}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <StatusBadge status={isOverdue ? 'retard' : pret.statut} type="pret" />
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <Button size="sm" onClick={() => handleRetour(pret)}>
+                              <ArrowLeft className="w-4 h-4 mr-1" />
+                              Retour
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  {pretsEnCours.length === 0 && (
+                    <tfoot>
+                      <tr>
+                        <td colSpan={6} className="px-6 py-8 text-center text-gray-500 bg-gray-50">
+                          Aucun prêt en cours
+                        </td>
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </div>
             )}
-          </div>
-        )}
-            {pretsEnCours.length === 0 && (
-              <tfoot>
-                <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500 bg-gray-50">
-                    Aucun prêt en cours
-                  </td>
-                </tr>
-              </tfoot>
+
+            {activeTab === 'historique' && (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Matériel
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Ouvrier
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Période
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Durée
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        État
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Statut
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {filteredPrets.map((pret) => {
+                      const duree = pret.dateRetourEffective 
+                        ? Math.ceil((new Date(pret.dateRetourEffective).getTime() - new Date(pret.dateDebut).getTime()) / (1000 * 60 * 60 * 24))
+                        : Math.ceil((new Date().getTime() - new Date(pret.dateDebut).getTime()) / (1000 * 60 * 60 * 24));
+                      
+                      return (
+                        <tr key={pret.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">{pret.petitMaterielNom}</div>
+                            <div className="text-sm text-gray-500">Qté: {pret.quantite}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">{pret.ouvrierNom}</div>
+                            {pret.chantierNom && (
+                              <div className="text-sm text-gray-500">{pret.chantierNom}</div>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm">
+                              <div className="text-gray-900">{new Date(pret.dateDebut).toLocaleDateString()}</div>
+                              <div className="text-gray-500">
+                                → {pret.dateRetourEffective 
+                                  ? new Date(pret.dateRetourEffective).toLocaleDateString()
+                                  : new Date(pret.dateRetourPrevue).toLocaleDateString() + ' (prévu)'}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {duree} jour{duree > 1 ? 's' : ''}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm">
+                              <div className="text-gray-900">Départ: {pret.etatDepart}</div>
+                              {pret.etatRetour && (
+                                <div className="text-gray-500">Retour: {pret.etatRetour}</div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <StatusBadge status={pret.statut} type="pret" />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             )}
           </>
-        )}
         )}
       </div>
 
