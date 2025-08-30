@@ -1576,3 +1576,6 @@ export const PetitMaterielManagement = () => {
     </div>
   );
 };
+
+// Export alias pour correspondre à l'import dans App.tsx
+export const PetitMaterielSection = MaterielSection;
