@@ -51,17 +51,23 @@ export const LoginForm: React.FC = () => {
   const handleTestLogin = async (testEmail: string, testPassword: string) => {
     setEmail(testEmail);
     setPassword(testPassword);
-    setLoading(true);
-    setError(null);
     
-    try {
-      await signIn(testEmail, testPassword);
-    } catch (err: any) {
-      console.error('Erreur de test de connexion:', err);
-      setError('Erreur lors de la connexion de test. Vérifiez que les comptes de test existent.');
-    } finally {
-      setLoading(false);
-    }
+    // Utiliser la fonction de connexion normale
+    const form = document.createElement('form');
+    const emailInput = document.createElement('input');
+    emailInput.name = 'email';
+    emailInput.value = testEmail;
+    const passwordInput = document.createElement('input');
+    passwordInput.name = 'password';
+    passwordInput.value = testPassword;
+    
+    form.appendChild(emailInput);
+    form.appendChild(passwordInput);
+    
+    const formData = new FormData(form);
+    const event = { preventDefault: () => {}, currentTarget: form } as any;
+    
+    handleSubmit(event);
   };
 
   return (
@@ -139,37 +145,9 @@ export const LoginForm: React.FC = () => {
       </form>
       
       <div className="mt-6 space-y-2">
-        <div className="text-center text-sm text-gray-600 mb-3">Comptes de test :</div>
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={() => handleTestLogin('admin@chantier.com', 'admin123')}
-          disabled={loading}
-          className="w-full text-sm"
-          size="sm"
-        >
-          Connexion Admin
-        </Button>
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={() => handleTestLogin('manager@chantier.com', 'manager123')}
-          disabled={loading}
-          className="w-full text-sm"
-          size="sm"
-        >
-          Connexion Manager
-        </Button>
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={() => handleTestLogin('employe@chantier.com', 'employe123')}
-          disabled={loading}
-          className="w-full text-sm"
-          size="sm"
-        >
-          Connexion Employé
-        </Button>
+        <div className="text-center text-sm text-gray-600 mb-3">
+          Pour tester l'application, utilisez votre email Supabase ou créez un compte
+        </div>
       </div>
     </div>
   );

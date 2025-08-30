@@ -33,20 +33,68 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .from('utilisateurs')
         .select('*')
         .eq('email', userEmail)
-        .single();
+        .maybeSingle();
       
       if (error) {
-        if (error.code === 'PGRST116') {
-          console.log('Utilisateur non trouvé dans la table utilisateurs');
-          return null;
-        }
         console.error('Erreur lors de la récupération des données utilisateur:', error);
         return null;
+      }
+      
+      if (!data) {
+        console.log('Utilisateur non trouvé dans la table utilisateurs, création automatique...');
+        // Créer automatiquement l'utilisateur dans la table utilisateurs
+        return await createUserInDatabase(userEmail);
       }
       
       return data;
     } catch (error) {
       console.error('Erreur lors de la récupération des données utilisateur:', error);
+      return null;
+    }
+  };
+
+  // Fonction pour créer automatiquement un utilisateur dans la base de données
+  const createUserInDatabase = async (userEmail: string): Promise<UtilisateurRow | null> => {
+    try {
+      // Déterminer le rôle par défaut selon l'email
+      let role: 'admin' | 'manager' | 'employe' = 'employe';
+      let permissions: string[] = ['read', 'view_reports'];
+      
+      if (userEmail.includes('admin')) {
+        role = 'admin';
+        permissions = ['read', 'write', 'delete', 'manage_users', 'manage_workers', 'manage_projects', 'manage_equipment', 'manage_clients', 'manage_invoices', 'view_reports', 'create_reports', 'admin_settings'];
+      } else if (userEmail.includes('manager')) {
+        role = 'manager';
+        permissions = ['read', 'write', 'manage_workers', 'manage_projects', 'manage_equipment', 'manage_clients', 'manage_invoices', 'view_reports', 'create_reports'];
+      }
+      
+      // Extraire nom et prénom de l'email ou utiliser des valeurs par défaut
+      const emailParts = userEmail.split('@')[0].split('.');
+      const prenom = emailParts[0] || 'Utilisateur';
+      const nom = emailParts[1] || 'Nouveau';
+      
+      const { data, error } = await supabase
+        .from('utilisateurs')
+        .insert({
+          nom: nom.charAt(0).toUpperCase() + nom.slice(1),
+          prenom: prenom.charAt(0).toUpperCase() + prenom.slice(1),
+          email: userEmail,
+          role,
+          actif: true,
+          permissions
+        })
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('Erreur lors de la création automatique de l\'utilisateur:', error);
+        return null;
+      }
+      
+      console.log('Utilisateur créé automatiquement dans la base de données:', data);
+      return data;
+    } catch (error) {
+      console.error('Erreur lors de la création automatique de l\'utilisateur:', error);
       return null;
     }
   };
