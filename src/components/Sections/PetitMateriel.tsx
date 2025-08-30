@@ -14,7 +14,13 @@ import {
   Truck, 
   Calendar, 
   User, 
-  Building2, 
+  Clock,
+  ArrowRight,
+  ArrowLeft,
+  UserCheck,
+  MapPin,
+  FileText,
+  Truck
   Clock, 
   BarChart3, 
   TrendingDown, 
@@ -26,6 +32,8 @@ import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
 import { PetitMaterielService, PretPetitMaterielService } from '../../services/petitMaterielService';
 import { ouvrierService } from '../../services/ouvrierService';
 import { chantierService } from '../../services/chantierService';
+import { ouvrierService } from '../../services/ouvrierService';
+import { chantierService } from '../../services/chantierService';
 import { PetitMateriel, PretPetitMateriel, Ouvrier, Chantier } from '../../types';
 import { Modal } from '../Common/Modal';
 import { Button } from '../Common/Button';
@@ -35,6 +43,21 @@ export const PetitMaterielSection: React.FC = () => {
   const { data: petitMateriel, loading, error, refresh } = useRealtimeSupabase<PetitMateriel>({
     table: 'petit_materiel',
     fetchFunction: PetitMaterielService.getAll
+  });
+  
+  const { data: prets, loading: pretsLoading, refresh: refreshPrets } = useRealtimeSupabase<PretPetitMateriel>({
+    table: 'prets_petit_materiel',
+    fetchFunction: PretPetitMaterielService.getAll
+  });
+  
+  const { data: ouvriers } = useRealtimeSupabase({
+    table: 'ouvriers',
+    fetchFunction: ouvrierService.getAll
+  });
+  
+  const { data: chantiers } = useRealtimeSupabase({
+    table: 'chantiers',
+    fetchFunction: chantierService.getAll
   });
   
   const { data: prets, refresh: refreshPrets } = useRealtimeSupabase<PretPetitMateriel>({
@@ -54,16 +77,23 @@ export const PetitMaterielSection: React.FC = () => {
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isPretModalOpen, setIsPretModalOpen] = useState(false);
+  const [isRetourModalOpen, setIsRetourModalOpen] = useState(false);
+  const [isPretsListModalOpen, setIsPretsListModalOpen] = useState(false);
+  const [isPretModalOpen, setIsPretModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isRetourModalOpen, setIsRetourModalOpen] = useState(false);
   const [editingMateriel, setEditingMateriel] = useState<PetitMateriel | null>(null);
+  const [selectedMaterielForPret, setSelectedMaterielForPret] = useState<PetitMateriel | null>(null);
+  const [selectedPretForReturn, setSelectedPretForReturn] = useState<PretPetitMateriel | null>(null);
   const [selectedMateriel, setSelectedMateriel] = useState<PetitMateriel | null>(null);
   const [selectedPret, setSelectedPret] = useState<PretPetitMateriel | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
+  const [pretFilter, setPretFilter] = useState('all');
   const [stockFilter, setStockFilter] = useState('all');
   const [barcodeSearch, setBarcodeSearch] = useState('');
+  const [activeTab, setActiveTab] = useState<'materiel' | 'prets'>('materiel');
 
   const filteredMateriel = (petitMateriel || []).filter(item => {
     const matchesSearch = item.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -84,9 +114,31 @@ export const PetitMaterielSection: React.FC = () => {
     return matchesSearch && matchesStatus && matchesType && matchesStock;
   });
 
+  const filteredPrets = (prets || []).filter(pret => {
+    const matchesPretFilter = pretFilter === 'all' || pret.statut === pretFilter;
+    const matchesSearch = pret.ouvrierNom?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         pret.chantierNom?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         pret.petitMaterielNom?.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesPretFilter && matchesSearch;
+  });
+
   const handleEdit = (materiel: PetitMateriel) => {
     setEditingMateriel(materiel);
     setIsModalOpen(true);
+  };
+
+  const handlePret = (materiel: PetitMateriel) => {
+    if (materiel.quantiteDisponible <= 0) {
+      alert('Aucune quantité disponible pour ce matériel');
+      return;
+    }
+    setSelectedMaterielForPret(materiel);
+    setIsPretModalOpen(true);
+  };
+
+  const handleRetour = (pret: PretPetitMateriel) => {
+    setSelectedPretForReturn(pret);
+    setIsRetourModalOpen(true);
   };
 
   const handleViewDetails = (materiel: PetitMateriel) => {
@@ -219,6 +271,72 @@ export const PetitMaterielSection: React.FC = () => {
     }
   };
 
+  const handleSavePret = async (formData: FormData) => {
+    if (!selectedMaterielForPret) return;
+    
+    const pretData = {
+      petitMaterielId: selectedMaterielForPret.id,
+      ouvrierId: formData.get('ouvrierId') as string,
+      chantierId: formData.get('chantierId') as string || undefined,
+      dateDebut: formData.get('dateDebut') as string,
+      dateRetourPrevue: formData.get('dateRetourPrevue') as string,
+      quantite: parseInt(formData.get('quantite') as string),
+      etatDepart: formData.get('etatDepart') as PretPetitMateriel['etatDepart'],
+      notes: formData.get('notes') as string || undefined,
+      statut: 'en_cours' as const
+    };
+
+    try {
+      await PretPetitMaterielService.create(pretData);
+      refreshPrets();
+      refresh(); // Refresh materiel to update quantities
+      setIsPretModalOpen(false);
+      setSelectedMaterielForPret(null);
+    } catch (error) {
+      console.error('Erreur lors de la création du prêt:', error);
+      alert('Erreur lors de la création du prêt');
+    }
+  };
+
+  const handleSaveRetour = async (formData: FormData) => {
+    if (!selectedPretForReturn) return;
+    
+    const retourData = {
+      dateRetourEffective: formData.get('dateRetourEffective') as string,
+      etatRetour: formData.get('etatRetour') as PretPetitMateriel['etatRetour'],
+      notes: formData.get('notes') as string || undefined,
+      statut: 'termine' as const
+    };
+
+    try {
+      await PretPetitMaterielService.update(selectedPretForReturn.id, retourData);
+      refreshPrets();
+      refresh(); // Refresh materiel to update quantities
+      setIsRetourModalOpen(false);
+      setSelectedPretForReturn(null);
+    } catch (error) {
+      console.error('Erreur lors du retour:', error);
+      alert('Erreur lors du retour du matériel');
+    }
+  };
+
+  // Calculer les statistiques des prêts
+  const getPretsStats = () => {
+    const total = (prets || []).length;
+    const enCours = (prets || []).filter(p => p.statut === 'en_cours').length;
+    const enRetard = (prets || []).filter(p => p.statut === 'retard').length;
+    const termines = (prets || []).filter(p => p.statut === 'termine').length;
+    
+    return { total, enCours, enRetard, termines };
+  };
+
+  const getActiveLoansForMateriel = (materielId: string) => {
+    return (prets || []).filter(p => 
+      p.petitMaterielId === materielId && 
+      (p.statut === 'en_cours' || p.statut === 'retard')
+    );
+  };
+
   // Statistiques
   const getStatistics = () => {
     const total = (petitMateriel || []).length;
@@ -231,6 +349,225 @@ export const PetitMaterielSection: React.FC = () => {
   };
 
   const stats = getStatistics();
+  const pretsStats = getPretsStats();
+
+  const PretForm = () => {
+    if (!selectedMaterielForPret) return null;
+    
+    return (
+      <form onSubmit={(e) => {
+        e.preventDefault();
+        handleSavePret(new FormData(e.currentTarget));
+      }}>
+        <div className="space-y-6">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h3 className="font-medium text-blue-800 mb-2">Matériel à prêter</h3>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="text-blue-700">Nom: <span className="font-medium">{selectedMaterielForPret.nom}</span></p>
+                <p className="text-blue-700">Type: <span className="font-medium">{selectedMaterielForPret.type}</span></p>
+              </div>
+              <div>
+                <p className="text-blue-700">Stock disponible: <span className="font-medium">{selectedMaterielForPret.quantiteDisponible}</span></p>
+                <p className="text-blue-700">Localisation: <span className="font-medium">{selectedMaterielForPret.localisation}</span></p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Ouvrier</label>
+              <select
+                name="ouvrierId"
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Sélectionner un ouvrier</option>
+                {(ouvriers || [])
+                  .filter(o => o.statut === 'actif')
+                  .sort((a, b) => `${a.nom} ${a.prenom}`.localeCompare(`${b.nom} ${b.prenom}`))
+                  .map(ouvrier => (
+                    <option key={ouvrier.id} value={ouvrier.id}>
+                      {ouvrier.prenom} {ouvrier.nom} - {ouvrier.qualification}
+                    </option>
+                  ))
+                }
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Chantier (optionnel)</label>
+              <select
+                name="chantierId"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Aucun chantier</option>
+                {(chantiers || [])
+                  .filter(c => c.statut === 'actif' || c.statut === 'planifie')
+                  .sort((a, b) => a.nom.localeCompare(b.nom))
+                  .map(chantier => (
+                    <option key={chantier.id} value={chantier.id}>
+                      {chantier.nom}
+                    </option>
+                  ))
+                }
+              </select>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Date de début</label>
+              <input
+                name="dateDebut"
+                type="date"
+                required
+                defaultValue={new Date().toISOString().split('T')[0]}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Date de retour prévue</label>
+              <input
+                name="dateRetourPrevue"
+                type="date"
+                required
+                defaultValue={new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Quantité</label>
+              <input
+                name="quantite"
+                type="number"
+                min="1"
+                max={selectedMaterielForPret.quantiteDisponible}
+                required
+                defaultValue="1"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">État au départ</label>
+            <select
+              name="etatDepart"
+              required
+              defaultValue="bon"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="neuf">Neuf</option>
+              <option value="bon">Bon état</option>
+              <option value="moyen">État moyen</option>
+              <option value="use">Usé</option>
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optionnel)</label>
+            <textarea
+              name="notes"
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Informations complémentaires sur le prêt..."
+            />
+          </div>
+        </div>
+        
+        <div className="flex justify-end space-x-3 mt-6">
+          <Button variant="secondary" onClick={() => setIsPretModalOpen(false)}>
+            Annuler
+          </Button>
+          <Button type="submit">
+            <ArrowRight className="w-4 h-4 mr-2" />
+            Créer le prêt
+          </Button>
+        </div>
+      </form>
+    );
+  };
+
+  const RetourForm = () => {
+    if (!selectedPretForReturn) return null;
+    
+    return (
+      <form onSubmit={(e) => {
+        e.preventDefault();
+        handleSaveRetour(new FormData(e.currentTarget));
+      }}>
+        <div className="space-y-6">
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <h3 className="font-medium text-green-800 mb-2">Informations du prêt</h3>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="text-green-700">Matériel: <span className="font-medium">{selectedPretForReturn.petitMaterielNom}</span></p>
+                <p className="text-green-700">Ouvrier: <span className="font-medium">{selectedPretForReturn.ouvrierNom}</span></p>
+              </div>
+              <div>
+                <p className="text-green-700">Quantité: <span className="font-medium">{selectedPretForReturn.quantite}</span></p>
+                <p className="text-green-700">État départ: <span className="font-medium">{selectedPretForReturn.etatDepart}</span></p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Date de retour effective</label>
+              <input
+                name="dateRetourEffective"
+                type="date"
+                required
+                defaultValue={new Date().toISOString().split('T')[0]}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">État au retour</label>
+              <select
+                name="etatRetour"
+                required
+                defaultValue={selectedPretForReturn.etatDepart}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                <option value="neuf">Neuf</option>
+                <option value="bon">Bon état</option>
+                <option value="moyen">État moyen</option>
+                <option value="use">Usé</option>
+                <option value="endommage">Endommagé</option>
+                <option value="perdu">Perdu</option>
+              </select>
+            </div>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Notes de retour</label>
+            <textarea
+              name="notes"
+              rows={3}
+              defaultValue={selectedPretForReturn.notes || ''}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+              placeholder="Observations sur l'état du matériel au retour..."
+            />
+          </div>
+        </div>
+        
+        <div className="flex justify-end space-x-3 mt-6">
+          <Button variant="secondary" onClick={() => setIsRetourModalOpen(false)}>
+            Annuler
+          </Button>
+          <Button type="submit" variant="success">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Confirmer le retour
+          </Button>
+        </div>
+      </form>
+    );
+  };
 
   // Obtenir les types uniques pour le filtre
   const uniqueTypes = React.useMemo(() => {
@@ -503,6 +840,179 @@ export const PetitMaterielSection: React.FC = () => {
         </Button>
       </div>
     </form>
+  );
+
+  const PretsListModal = () => (
+    <div className="space-y-6">
+      {/* Statistiques des prêts */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-blue-700">Total Prêts</p>
+              <p className="text-2xl font-bold text-blue-800">{pretsStats.total}</p>
+            </div>
+            <Truck className="w-8 h-8 text-blue-600" />
+          </div>
+        </div>
+        
+        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-orange-700">En Cours</p>
+              <p className="text-2xl font-bold text-orange-800">{pretsStats.enCours}</p>
+            </div>
+            <Clock className="w-8 h-8 text-orange-600" />
+          </div>
+        </div>
+        
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-red-700">En Retard</p>
+              <p className="text-2xl font-bold text-red-800">{pretsStats.enRetard}</p>
+            </div>
+            <AlertTriangle className="w-8 h-8 text-red-600" />
+          </div>
+        </div>
+        
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-green-700">Terminés</p>
+              <p className="text-2xl font-bold text-green-800">{pretsStats.termines}</p>
+            </div>
+            <CheckCircle className="w-8 h-8 text-green-600" />
+          </div>
+        </div>
+      </div>
+      
+      {/* Filtres pour les prêts */}
+      <div className="flex gap-4">
+        <div className="flex-1 relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <input
+            type="text"
+            placeholder="Rechercher un prêt..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <select
+          value={pretFilter}
+          onChange={(e) => setPretFilter(e.target.value)}
+          className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="all">Tous les statuts</option>
+          <option value="en_cours">En cours</option>
+          <option value="retard">En retard</option>
+          <option value="termine">Terminés</option>
+          <option value="perdu">Perdus</option>
+        </select>
+      </div>
+      
+      {/* Liste des prêts */}
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Matériel</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ouvrier</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Chantier</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dates</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantité</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Statut</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {filteredPrets.map(pret => {
+              const isOverdue = new Date(pret.dateRetourPrevue) < new Date() && pret.statut === 'en_cours';
+              
+              return (
+                <tr key={pret.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-4">
+                    <div className="flex items-center">
+                      <Package className="w-8 h-8 text-blue-500 mr-3" />
+                      <div>
+                        <div className="font-medium text-gray-900">{pret.petitMaterielNom}</div>
+                        <div className="text-sm text-gray-500">Qté: {pret.quantite}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-4">
+                    <div className="flex items-center">
+                      <User className="w-4 h-4 text-gray-400 mr-2" />
+                      <span className="text-sm text-gray-900">{pret.ouvrierNom}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-4">
+                    <div className="flex items-center">
+                      <Building2 className="w-4 h-4 text-gray-400 mr-2" />
+                      <span className="text-sm text-gray-900">{pret.chantierNom || '-'}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-4">
+                    <div className="text-sm">
+                      <div>Début: {new Date(pret.dateDebut).toLocaleDateString()}</div>
+                      <div className={isOverdue ? 'text-red-600 font-medium' : ''}>
+                        Retour prévu: {new Date(pret.dateRetourPrevue).toLocaleDateString()}
+                      </div>
+                      {pret.dateRetourEffective && (
+                        <div className="text-green-600">
+                          Retour effectif: {new Date(pret.dateRetourEffective).toLocaleDateString()}
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-4 py-4">
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-gray-900">{pret.quantite}</div>
+                      <div className="text-xs text-gray-500">
+                        {pret.etatDepart}
+                        {pret.etatRetour && ` → ${pret.etatRetour}`}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-4">
+                    <StatusBadge status={pret.statut} type="pret" />
+                    {isOverdue && (
+                      <div className="flex items-center mt-1">
+                        <AlertTriangle className="w-3 h-3 text-red-500 mr-1" />
+                        <span className="text-xs text-red-600">En retard</span>
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-4 py-4">
+                    <div className="flex space-x-2">
+                      {(pret.statut === 'en_cours' || pret.statut === 'retard') && (
+                        <button
+                          onClick={() => handleRetour(pret)}
+                          className="text-green-600 hover:text-green-900"
+                          title="Retour"
+                        >
+                          <ArrowLeft className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+          {filteredPrets.length === 0 && (
+            <tfoot>
+              <tr>
+                <td colSpan={7} className="px-6 py-10 text-center text-gray-500 bg-gray-50">
+                  Aucun prêt trouvé
+                </td>
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
+    </div>
   );
 
   const PretForm = () => (
@@ -834,6 +1344,10 @@ export const PetitMaterielSection: React.FC = () => {
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-800">Gestion du Petit Matériel</h1>
         <div className="flex space-x-3">
+          <Button onClick={() => setIsPretsListModalOpen(true)} variant="secondary">
+            <Truck className="w-4 h-4 mr-2" />
+            Voir tous les prêts
+          </Button>
           <Button onClick={() => setIsModalOpen(true)}>
             <Plus className="w-4 h-4 mr-2" />
             Nouveau Matériel
@@ -843,6 +1357,34 @@ export const PetitMaterielSection: React.FC = () => {
             Exporter
           </Button>
         </div>
+      </div>
+
+      {/* Onglets */}
+      <div className="border-b border-gray-200">
+        <nav className="-mb-px flex space-x-8">
+          <button
+            onClick={() => setActiveTab('materiel')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'materiel'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <Package className="w-4 h-4 inline mr-2" />
+            Matériel ({stats.total})
+          </button>
+          <button
+            onClick={() => setActiveTab('prets')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'prets'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <Truck className="w-4 h-4 inline mr-2" />
+            Prêts Actifs ({pretsStats.enCours})
+          </button>
+        </nav>
       </div>
 
       {/* Recherche par code-barres */}
@@ -899,7 +1441,7 @@ export const PetitMaterielSection: React.FC = () => {
               <p className="text-2xl font-bold text-orange-600">{stats.prete}</p>
             </div>
             <div className="p-3 rounded-full bg-orange-100">
-              <Truck className="w-6 h-6 text-orange-600" />
+              <Truck className="w-6 h-6 text-white" />
             </div>
           </div>
         </div>
@@ -1009,7 +1551,8 @@ export const PetitMaterielSection: React.FC = () => {
               )}
             </div>
 
-            <div className="overflow-x-auto">
+            {activeTab === 'materiel' ? (
+              <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
@@ -1024,6 +1567,9 @@ export const PetitMaterielSection: React.FC = () => {
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Stock
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Prêts Actifs
+                      </th>
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Statut
@@ -1031,6 +1577,8 @@ export const PetitMaterielSection: React.FC = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Valeur
                     </th>
+                      const activeLoans = getActiveLoansForMateriel(item.id);
+                      
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Actions
                     </th>
@@ -1104,8 +1652,36 @@ export const PetitMaterielSection: React.FC = () => {
                               className="text-blue-600 hover:text-blue-900"
                               title="Créer un prêt"
                             >
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {activeLoans.length > 0 ? (
+                              <div className="space-y-1">
+                                {activeLoans.slice(0, 2).map(pret => (
+                                  <div key={pret.id} className="text-xs">
+                                    <span className="font-medium">{pret.ouvrierNom}</span>
+                                    <span className="text-gray-500"> - {pret.quantite} unité(s)</span>
+                                  </div>
+                                ))}
+                                {activeLoans.length > 2 && (
+                                  <div className="text-xs text-blue-600">
+                                    +{activeLoans.length - 2} autre(s)
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-sm text-gray-500">-</span>
+                            )}
+                          </td>
                               <Truck className="w-4 h-4" />
                             </button>
+                              {item.quantiteDisponible > 0 && item.statut === 'disponible' && (
+                                <button
+                                  onClick={() => handlePret(item)}
+                                  className="text-blue-600 hover:text-blue-900"
+                                  title="Prêter"
+                                >
+                                  <ArrowRight className="w-4 h-4" />
+                                </button>
+                              )}
                           )}
                           <button
                             onClick={() => handleEdit(item)}
@@ -1129,14 +1705,138 @@ export const PetitMaterielSection: React.FC = () => {
                 {filteredMateriel.length === 0 && (
                   <tfoot>
                     <tr>
-                      <td colSpan={7} className="px-6 py-10 text-center text-gray-500 bg-gray-50">
+                        <td colSpan={8} className="px-6 py-10 text-center text-gray-500 bg-gray-50">
                         Aucun matériel trouvé
                       </td>
                     </tr>
                   </tfoot>
                 )}
               </table>
-            </div>
+              </div>
+            ) : (
+              <div className="p-6">
+                {pretsLoading ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+                    <p className="mt-4 text-gray-600">Chargement des prêts...</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Filtres pour les prêts */}
+                    <div className="flex gap-4">
+                      <div className="flex-1 relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                        <input
+                          type="text"
+                          placeholder="Rechercher un prêt..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <select
+                        value={pretFilter}
+                        onChange={(e) => setPretFilter(e.target.value)}
+                        className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="all">Tous les statuts</option>
+                        <option value="en_cours">En cours</option>
+                        <option value="retard">En retard</option>
+                        <option value="termine">Terminés</option>
+                        <option value="perdu">Perdus</option>
+                      </select>
+                    </div>
+                    
+                    {/* Prêts en retard - Alerte */}
+                    {pretsStats.enRetard > 0 && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <div className="flex items-center">
+                          <AlertTriangle className="w-5 h-5 text-red-600 mr-2" />
+                          <p className="text-sm text-red-800">
+                            <span className="font-medium">{pretsStats.enRetard}</span> prêt(s) en retard nécessitent votre attention
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Liste des prêts actifs */}
+                    <div className="grid grid-cols-1 gap-4">
+                      {filteredPrets
+                        .filter(p => p.statut === 'en_cours' || p.statut === 'retard')
+                        .map(pret => {
+                          const isOverdue = new Date(pret.dateRetourPrevue) < new Date() && pret.statut === 'en_cours';
+                          
+                          return (
+                            <div key={pret.id} className={`border rounded-lg p-4 ${isOverdue ? 'border-red-200 bg-red-50' : 'border-gray-200'}`}>
+                              <div className="flex justify-between items-start">
+                                <div className="flex-1">
+                                  <div className="flex items-center space-x-3 mb-2">
+                                    <Package className="w-5 h-5 text-blue-500" />
+                                    <h3 className="font-medium text-gray-900">{pret.petitMaterielNom}</h3>
+                                    <StatusBadge status={pret.statut} type="pret" />
+                                  </div>
+                                  
+                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                                    <div>
+                                      <div className="flex items-center text-gray-600">
+                                        <User className="w-4 h-4 mr-1" />
+                                        <span>{pret.ouvrierNom}</span>
+                                      </div>
+                                      {pret.chantierNom && (
+                                        <div className="flex items-center text-gray-600 mt-1">
+                                          <Building2 className="w-4 h-4 mr-1" />
+                                          <span>{pret.chantierNom}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                    
+                                    <div>
+                                      <p className="text-gray-600">Début: {new Date(pret.dateDebut).toLocaleDateString()}</p>
+                                      <p className={`${isOverdue ? 'text-red-600 font-medium' : 'text-gray-600'}`}>
+                                        Retour prévu: {new Date(pret.dateRetourPrevue).toLocaleDateString()}
+                                      </p>
+                                    </div>
+                                    
+                                    <div>
+                                      <p className="text-gray-600">Quantité: <span className="font-medium">{pret.quantite}</span></p>
+                                      <p className="text-gray-600">État: <span className="font-medium">{pret.etatDepart}</span></p>
+                                    </div>
+                                  </div>
+                                  
+                                  {pret.notes && (
+                                    <div className="mt-2 text-sm text-gray-600">
+                                      <FileText className="w-4 h-4 inline mr-1" />
+                                      {pret.notes}
+                                    </div>
+                                  )}
+                                </div>
+                                
+                                <div className="flex space-x-2">
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleRetour(pret)}
+                                    variant="success"
+                                  >
+                                    <ArrowLeft className="w-4 h-4 mr-2" />
+                                    Retour
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      
+                      {filteredPrets.filter(p => p.statut === 'en_cours' || p.statut === 'retard').length === 0 && (
+                        <div className="text-center py-8 text-gray-500">
+                          <Truck className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                          <p>Aucun prêt actif</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </>
         )}
       </div>
@@ -1252,6 +1952,42 @@ export const PetitMaterielSection: React.FC = () => {
         size="xl"
       >
         <MaterielForm />
+      </Modal>
+      
+      {/* Modal de prêt */}
+      <Modal
+        isOpen={isPretModalOpen}
+        onClose={() => {
+          setIsPretModalOpen(false);
+          setSelectedMaterielForPret(null);
+        }}
+        title={`Prêter - ${selectedMaterielForPret?.nom}`}
+        size="lg"
+      >
+        <PretForm />
+      </Modal>
+      
+      {/* Modal de retour */}
+      <Modal
+        isOpen={isRetourModalOpen}
+        onClose={() => {
+          setIsRetourModalOpen(false);
+          setSelectedPretForReturn(null);
+        }}
+        title="Retour de matériel"
+        size="lg"
+      >
+        <RetourForm />
+      </Modal>
+      
+      {/* Modal liste complète des prêts */}
+      <Modal
+        isOpen={isPretsListModalOpen}
+        onClose={() => setIsPretsListModalOpen(false)}
+        title="Gestion des Prêts"
+        size="xl"
+      >
+        <PretsListModal />
       </Modal>
 
       {/* Modal de prêt */}
