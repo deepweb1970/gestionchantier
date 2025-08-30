@@ -39,7 +39,7 @@ import { PetitMateriel, PretPetitMateriel, Ouvrier, Chantier } from '../../types
 import { Modal } from '../Common/Modal';
 import { Button } from '../Common/Button';
 import { StatusBadge } from '../Common/StatusBadge';
-import type { PetitMateriel as PetitMaterielType, PretPetitMateriel, Ouvrier, Chantier } from '../../types';
+import type { PetitMateriel as PetitMaterielType, PretPetitMateriel as PretPetitMaterielType, Ouvrier, Chantier } from '../../types';
 
 export const PetitMaterielManagement = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
