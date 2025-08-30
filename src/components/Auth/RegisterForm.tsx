@@ -27,11 +27,6 @@ export const RegisterForm: React.FC = () => {
       return;
     }
     
-    if (password.length < 6) {
-      setError('Le mot de passe doit contenir au moins 6 caractères.');
-      return;
-    }
-    
     setLoading(true);
     setError(null);
     
@@ -41,18 +36,9 @@ export const RegisterForm: React.FC = () => {
         prenom,
         role: 'employe', // Rôle par défaut
       });
-      
-      alert('Compte créé avec succès ! Vous pouvez maintenant vous connecter.');
+      // Redirection ou message de succès géré par AuthProvider
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Erreur lors de l\'inscription';
-      
-      if (errorMessage.includes('already registered')) {
-        setError('Cette adresse email est déjà utilisée.');
-      } else if (errorMessage.includes('Password should be')) {
-        setError('Le mot de passe ne respecte pas les critères de sécurité.');
-      } else {
-        setError('Erreur lors de l\'inscription. Veuillez réessayer.');
-      }
+      setError('Erreur lors de l\'inscription. Veuillez réessayer.');
       console.error('Erreur d\'inscription:', err);
     } finally {
       setLoading(false);

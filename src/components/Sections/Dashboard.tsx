@@ -16,11 +16,8 @@ import { saisieHeureService } from '../../services/saisieHeureService';
 import { ouvrierService } from '../../services/ouvrierService';
 import { materielService } from '../../services/materielService';
 import { factureService } from '../../services/factureService';
-import { useAuth } from '../Auth/AuthProvider';
 
 export const Dashboard: React.FC = () => {
-  const { utilisateur, hasPermission } = useAuth();
-  
   // État de connexion
   const [isOnline, setIsOnline] = React.useState(navigator.onLine);
 
@@ -145,34 +142,10 @@ export const Dashboard: React.FC = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-800">Tableau de Bord</h1>
-        <div className="text-right">
-          <div className="text-sm text-gray-500">
-            Dernière mise à jour: {new Date().toLocaleString()}
-          </div>
-          {utilisateur && (
-            <div className="text-xs text-gray-400">
-              Connecté en tant que {utilisateur.prenom} {utilisateur.nom} ({utilisateur.role})
-            </div>
-          )}
+        <div className="text-sm text-gray-500">
+          Dernière mise à jour: {new Date().toLocaleString()}
         </div>
       </div>
-
-      {/* Message de bienvenue personnalisé */}
-      {utilisateur && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h2 className="text-lg font-semibold text-blue-800">
-            Bienvenue, {utilisateur.prenom} !
-          </h2>
-          <p className="text-blue-700 mt-1">
-            {utilisateur.role === 'admin' 
-              ? 'Vous avez accès à toutes les fonctionnalités de l\'application.'
-              : utilisateur.role === 'manager'
-              ? 'Vous pouvez gérer les projets, ouvriers et matériel.'
-              : 'Vous pouvez consulter les données et créer des rapports.'
-            }
-          </p>
-        </div>
-      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -292,31 +265,6 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Section réservée aux administrateurs */}
-      {hasPermission('admin_settings') && (
-        <div className="bg-white rounded-lg shadow-sm border">
-          <div className="p-4 border-b">
-            <h2 className="text-lg font-semibold text-gray-800">Administration</h2>
-          </div>
-          <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-red-600">{utilisateurs?.filter(u => u.role === 'admin').length || 0}</div>
-                <div className="text-sm text-gray-600">Administrateurs</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">{utilisateurs?.filter(u => u.role === 'manager').length || 0}</div>
-                <div className="text-sm text-gray-600">Managers</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">{utilisateurs?.filter(u => u.role === 'employe').length || 0}</div>
-                <div className="text-sm text-gray-600">Employés</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Charts Preview */}
       <div className="bg-white rounded-lg shadow-sm border">
         <div className="p-4 border-b">
@@ -344,6 +292,14 @@ export const Dashboard: React.FC = () => {
               <div className="text-sm text-gray-600">Matériel utilisé</div>
               <div className="w-full bg-gray-200 rounded-full h-2 mt-2"> 
                 <div className="bg-orange-600 h-2 rounded-full" style={{ width: `${avgMaterielUtilization}%` }}></div>
+              </div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-indigo-600">{totalHeuresTravaillees.toFixed(1)}h</div>
+              <div className="text-sm text-gray-600">Heures travaillées ce mois</div>
+              <div className="flex items-center justify-center mt-2">
+                <Clock className="w-4 h-4 text-indigo-600 mr-1" />
+                <span className="text-sm text-indigo-600">+15h</span>
               </div>
             </div>
           </div>
