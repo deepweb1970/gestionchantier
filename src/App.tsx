@@ -17,7 +17,7 @@ import { RealtimeStatus } from './components/Common/RealtimeStatus';
 import { Planning } from './components/Sections/Planning';
 import { ParametresHeuresSup } from './components/Sections/ParametresHeuresSup';
 import { MaintenanceSection } from './components/Sections/Maintenance';
-import { PetitMaterielSection } from './components/Sections/PetitMateriel';
+import PetitMaterielSection from './components/Sections/PetitMateriel';
 
 function App() {
   const { user, loading } = useAuth();
