@@ -3,9 +3,7 @@ import {
   Mail, 
   Lock, 
   User, 
-  AlertTriangle,
-  Eye,
-  EyeOff
+  AlertTriangle 
 } from 'lucide-react';
 import { Button } from '../Common/Button';
 import { useAuth } from './AuthProvider';
@@ -16,7 +14,6 @@ export const RegisterForm: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [nom, setNom] = useState('');
   const [prenom, setPrenom] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -30,11 +27,6 @@ export const RegisterForm: React.FC = () => {
       return;
     }
     
-    if (password.length < 6) {
-      setError('Le mot de passe doit contenir au moins 6 caractères.');
-      return;
-    }
-    
     setLoading(true);
     setError(null);
     
@@ -42,26 +34,12 @@ export const RegisterForm: React.FC = () => {
       await signUp(email, password, {
         nom,
         prenom,
-        role: 'employe',
+        role: 'employe', // Rôle par défaut
       });
-      
-      alert('Compte créé avec succès ! Vous pouvez maintenant vous connecter.');
-    } catch (err: any) {
+      // Redirection ou message de succès géré par AuthProvider
+    } catch (err) {
+      setError('Erreur lors de l\'inscription. Veuillez réessayer.');
       console.error('Erreur d\'inscription:', err);
-      
-      let errorMessage = 'Erreur lors de l\'inscription. Veuillez réessayer.';
-      
-      if (err?.message) {
-        if (err.message.includes('already registered')) {
-          errorMessage = 'Cette adresse email est déjà utilisée.';
-        } else if (err.message.includes('Password should be')) {
-          errorMessage = 'Le mot de passe ne respecte pas les critères de sécurité.';
-        } else {
-          errorMessage = err.message;
-        }
-      }
-      
-      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -151,21 +129,14 @@ export const RegisterForm: React.FC = () => {
             <input
               id="password"
               name="password"
-              type={showPassword ? 'text' : 'password'}
+              type="password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="pl-10 pr-10 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="pl-10 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="••••••••"
               minLength={6}
             />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute inset-y-0 right-0 pr-3 flex items-center"
-            >
-              {showPassword ? <EyeOff className="h-4 w-4 text-gray-400" /> : <Eye className="h-4 w-4 text-gray-400" />}
-            </button>
           </div>
         </div>
 
@@ -180,7 +151,7 @@ export const RegisterForm: React.FC = () => {
             <input
               id="confirmPassword"
               name="confirmPassword"
-              type={showPassword ? 'text' : 'password'}
+              type="password"
               required
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
