@@ -10,191 +10,27 @@ import {
   Eye, 
   QrCode, 
   Scan,
-  AlertTriangle, 
-  CheckCircle, 
-  Clock, 
-  User, 
-  Building2, 
-  Calendar, 
-  ArrowRight,
-  ArrowLeft,
-  Truck,
-  MapPin,
-  Euro,
-  Hash,
-  Barcode,
-  Camera,
-  FileText,
-  TrendingDown,
-  TrendingUp,
-  Percent,
-  Archive,
-  RotateCcw
-} from 'lucide-react';
-import { PetitMateriel, PretPetitMateriel, Ouvrier, Chantier } from '../../types';
-import { useRealtimeSupabase } from '../../hooks/useRealtimeSupabase';
-import { ouvrierService } from '../../services/ouvrierService';
-import { chantierService } from '../../services/chantierService';
-import { Modal } from '../Common/Modal';
-import { Button } from '../Common/Button';
-import { StatusBadge } from '../Common/StatusBadge';
-import { exportToPDF } from '../../utils/pdfExport';
-
-// Mock data pour le petit matériel
-const mockPetitMateriel: PetitMateriel[] = [
-  {
-    id: '1',
-    nom: 'Perceuse sans fil Bosch',
-    type: 'Outillage électroportatif',
-    marque: 'Bosch',
-    modele: 'GSR 18V-60 C',
-    numeroSerie: 'BSH001234',
-    codeBarre: '3165140123456',
-    dateAchat: '2023-03-15',
-    valeur: 180,
-    statut: 'disponible',
-    localisation: 'Dépôt principal',
-    description: 'Perceuse-visseuse sans fil 18V avec 2 batteries',
-    quantiteStock: 5,
-    quantiteDisponible: 3,
-    seuilAlerte: 2,
-    poids: 1.2,
-    dimensions: '25x8x22 cm',
-    garantie: '2025-03-15',
-    fournisseur: 'Leroy Merlin',
-    prets: []
-  },
-  {
-    id: '2',
-    nom: 'Niveau laser Stabila',
-    type: 'Instrument de mesure',
-    marque: 'Stabila',
-    modele: 'LAX 50',
-    numeroSerie: 'STB567890',
-    codeBarre: '4007430123789',
-    dateAchat: '2023-06-20',
-    valeur: 95,
-    statut: 'prete',
-    localisation: 'Chantier Villa Moderne',
-    description: 'Niveau laser rotatif avec trépied',
-    quantiteStock: 2,
-    quantiteDisponible: 1,
-    seuilAlerte: 1,
-    poids: 0.8,
-    dimensions: '15x10x8 cm',
-    garantie: '2025-06-20',
-    fournisseur: 'Point P',
-    prets: [
-      {
-        id: '1',
-        petitMaterielId: '2',
-        ouvrierId: '1',
-        chantierId: '1',
-        dateDebut: '2024-01-15',
-        dateRetourPrevue: '2024-01-22',
-        quantite: 1,
-        statut: 'en_cours',
-        etatDepart: 'bon',
-        ouvrierNom: 'Jean Dubois',
-        chantierNom: 'Villa Moderne',
-        petitMaterielNom: 'Niveau laser Stabila'
-      }
-    ]
-  },
-  {
-    id: '3',
-    nom: 'Casque de sécurité',
-    type: 'EPI',
-    marque: 'Uvex',
-    modele: 'Pheos B-WR',
-    numeroSerie: 'UVX789012',
-    codeBarre: '4031101234567',
-    dateAchat: '2023-01-10',
-    valeur: 25,
-    statut: 'disponible',
-    localisation: 'Vestiaire',
-    description: 'Casque de protection avec visière',
-    quantiteStock: 20,
-    quantiteDisponible: 15,
-    seuilAlerte: 5,
-    poids: 0.4,
-    dimensions: 'Taille universelle',
-    garantie: '2026-01-10',
-    fournisseur: 'Würth',
-    prets: []
-  },
-  {
-    id: '4',
-    nom: 'Meuleuse d\'angle Makita',
-    type: 'Outillage électroportatif',
-    marque: 'Makita',
-    modele: 'DGA504Z',
-    numeroSerie: 'MAK345678',
-    codeBarre: '0088381234890',
-    dateAchat: '2023-08-12',
-    valeur: 220,
-    statut: 'maintenance',
-    localisation: 'Atelier',
-    description: 'Meuleuse sans fil 18V avec disques',
-    quantiteStock: 3,
-    quantiteDisponible: 2,
-    seuilAlerte: 1,
-    poids: 2.1,
-    dimensions: '30x12x15 cm',
-    garantie: '2025-08-12',
-    fournisseur: 'Brico Dépôt',
-    prets: []
-  }
-];
-
-const mockPrets: PretPetitMateriel[] = [
-  {
-    id: '1',
-    petitMaterielId: '2',
-    ouvrierId: '1',
-    chantierId: '1',
-    dateDebut: '2024-01-15',
-    dateRetourPrevue: '2024-01-22',
-    quantite: 1,
-    statut: 'en_cours',
-    etatDepart: 'bon',
-    ouvrierNom: 'Jean Dubois',
-    chantierNom: 'Villa Moderne',
-    petitMaterielNom: 'Niveau laser Stabila'
-  },
-  {
-    id: '2',
-    petitMaterielId: '1',
-    ouvrierId: '2',
-    chantierId: '2',
-    dateDebut: '2024-01-10',
-    dateRetourPrevue: '2024-01-17',
-    dateRetourEffective: '2024-01-16',
-    quantite: 2,
-    statut: 'termine',
-    etatDepart: 'bon',
-    etatRetour: 'bon',
-    ouvrierNom: 'Paul Martin',
-    chantierNom: 'Appartement Haussmannien',
-    petitMaterielNom: 'Perceuse sans fil Bosch'
-  },
-  {
-    id: '3',
-    petitMaterielId: '3',
-    ouvrierId: '3',
-    dateDebut: '2024-01-08',
-    dateRetourPrevue: '2024-01-15',
-    quantite: 5,
-    statut: 'retard',
-    etatDepart: 'neuf',
-    ouvrierNom: 'Michel Leroy',
-    petitMaterielNom: 'Casque de sécurité'
-  }
-];
-
 export const PetitMaterielSection: React.FC = () => {
-  const [petitMateriel, setPetitMateriel] = useState<PetitMateriel[]>(mockPetitMateriel);
-  const [prets, setPrets] = useState<PretPetitMateriel[]>(mockPrets);
+  const { data: petitMateriel, loading: materielLoading, error: materielError, refresh: refreshMateriel } = useRealtimeSupabase<PetitMateriel>({
+    table: 'petit_materiel',
+    fetchFunction: PetitMaterielService.getAll
+  });
+  
+  const { data: prets, loading: pretsLoading, error: pretsError, refresh: refreshPrets } = useRealtimeSupabase<PretPetitMateriel>({
+    table: 'prets_petit_materiel',
+    fetchFunction: PretPetitMaterielService.getAll
+  });
+  
+  const { data: ouvriers } = useRealtimeSupabase({
+    table: 'ouvriers',
+    fetchFunction: ouvrierService.getAll
+  });
+  
+  const { data: chantiers } = useRealtimeSupabase({
+    table: 'chantiers',
+    fetchFunction: chantierService.getAll
+  });
+  
   
   const { data: ouvriers } = useRealtimeSupabase<Ouvrier>({
     table: 'ouvriers',
@@ -220,7 +56,7 @@ export const PetitMaterielSection: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'materiel' | 'prets' | 'historique'>('materiel');
   const [scannedBarcode, setScannedBarcode] = useState('');
 
-  const filteredMateriel = petitMateriel.filter(item => {
+  const filteredMateriel = (petitMateriel || []).filter(item => {
     const matchesSearch = item.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          item.marque.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          item.codeBarre.includes(searchTerm) ||
@@ -230,7 +66,7 @@ export const PetitMaterielSection: React.FC = () => {
     return matchesSearch && matchesStatus && matchesType;
   });
 
-  const filteredPrets = prets.filter(pret => {
+  const filteredPrets = (prets || []).filter(pret => {
     const materiel = petitMateriel.find(m => m.id === pret.petitMaterielId);
     const matchesSearch = materiel?.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          pret.ouvrierNom?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -241,7 +77,7 @@ export const PetitMaterielSection: React.FC = () => {
   const handleEdit = (item: PetitMateriel) => {
     setEditingMateriel(item);
     setIsModalOpen(true);
-  };
+    (petitMateriel || []).forEach(item => {
 
   const handleViewDetails = (item: PetitMateriel) => {
     setSelectedMateriel(item);
@@ -250,21 +86,27 @@ export const PetitMaterielSection: React.FC = () => {
 
   const handlePret = (item: PetitMateriel) => {
     setSelectedMateriel(item);
-    setIsPretModalOpen(true);
-  };
+      try {
+        await PetitMaterielService.delete(id);
+        refreshMateriel();
+      } catch (error) {
+        console.error('Erreur lors de la suppression:', error);
+        alert('Erreur lors de la suppression du matériel');
+      }
+  }, [petitMateriel]);
 
   const handleRetour = (pret: PretPetitMateriel) => {
     setSelectedPret(pret);
     setIsRetourModalOpen(true);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Êtes-vous sûr de vouloir supprimer ce petit matériel ?')) {
       setPetitMateriel(petitMateriel.filter(m => m.id !== id));
     }
   };
 
-  const handleSave = (formData: FormData) => {
+  const handleSave = async (formData: FormData) => {
     const materielData: PetitMateriel = {
       id: editingMateriel?.id || Date.now().toString(),
       nom: formData.get('nom') as string,
@@ -287,26 +129,24 @@ export const PetitMaterielSection: React.FC = () => {
       fournisseur: formData.get('fournisseur') as string || undefined,
       prets: editingMateriel?.prets || [],
       createdAt: editingMateriel?.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-
-    if (editingMateriel) {
-      setPetitMateriel(petitMateriel.map(m => m.id === editingMateriel.id ? materielData : m));
-    } else {
-      setPetitMateriel([...petitMateriel, materielData]);
-    }
-    
-    setIsModalOpen(false);
-    setEditingMateriel(null);
+    try {
+      if (editingMateriel) {
+        await PetitMaterielService.update(editingMateriel.id, materielData);
+      } else {
+        await PetitMaterielService.create(materielData);
+      }
+      
+      refreshMateriel();
+      setIsModalOpen(false);
+      setEditingMateriel(null);
   };
 
-  const handleSavePret = (formData: FormData) => {
+  const handleSavePret = async (formData: FormData) => {
     if (!selectedMateriel) return;
 
     const quantitePretee = parseInt(formData.get('quantite') as string);
     
-    const pretData: PretPetitMateriel = {
-      id: Date.now().toString(),
+    const pretData = {
       petitMaterielId: selectedMateriel.id,
       ouvrierId: formData.get('ouvrierId') as string,
       chantierId: formData.get('chantierId') as string || undefined,
@@ -321,28 +161,26 @@ export const PetitMaterielSection: React.FC = () => {
       chantierNom: chantiers?.find(c => c.id === formData.get('chantierId'))?.nom,
       petitMaterielNom: selectedMateriel.nom
     };
-
-    // Mettre à jour les quantités
-    setPetitMateriel(petitMateriel.map(m => 
-      m.id === selectedMateriel.id 
-        ? { ...m, quantiteDisponible: m.quantiteDisponible - quantitePretee, statut: m.quantiteDisponible - quantitePretee === 0 ? 'prete' : m.statut }
-        : m
-    ));
-
-    setPrets([...prets, pretData]);
-    setIsPretModalOpen(false);
-    setSelectedMateriel(null);
+    try {
+      await PretPetitMaterielService.create(pretData);
+      refreshPrets();
+      refreshMateriel(); // Refresh pour mettre à jour les quantités
+      setIsPretModalOpen(false);
+      setSelectedMateriel(null);
+    } catch (error) {
+      console.error('Erreur lors de la création du prêt:', error);
+      alert('Erreur lors de la création du prêt');
+    }
   };
 
-  const handleSaveRetour = (formData: FormData) => {
+  const handleRetourConfirm = async (formData: FormData) => {
     if (!selectedPret) return;
 
     const quantiteRetournee = parseInt(formData.get('quantiteRetournee') as string);
     const etatRetour = formData.get('etatRetour') as PretPetitMateriel['etatRetour'];
     
     // Mettre à jour le prêt
-    const updatedPret: PretPetitMateriel = {
-      ...selectedPret,
+    const updateData = {
       dateRetourEffective: formData.get('dateRetourEffective') as string,
       etatRetour,
       statut: 'termine',
@@ -354,23 +192,19 @@ export const PetitMaterielSection: React.FC = () => {
     // Mettre à jour les quantités du matériel
     const materiel = petitMateriel.find(m => m.id === selectedPret.petitMaterielId);
     if (materiel) {
-      const nouvelleQuantiteDisponible = materiel.quantiteDisponible + quantiteRetournee;
-      const nouveauStatut = etatRetour === 'perdu' ? 'perdu' : 
-                           nouvelleQuantiteDisponible === materiel.quantiteStock ? 'disponible' : 
-                           materiel.statut;
-
-      setPetitMateriel(petitMateriel.map(m => 
-        m.id === selectedPret.petitMaterielId 
-          ? { ...m, quantiteDisponible: nouvelleQuantiteDisponible, statut: nouveauStatut }
-          : m
-      ));
+    try {
+      await PretPetitMaterielService.update(selectedPret.id, updateData);
+      refreshPrets();
+      refreshMateriel(); // Refresh pour mettre à jour les quantités
+      setIsRetourModalOpen(false);
+      setSelectedPret(null);
+    } catch (error) {
+      console.error('Erreur lors du retour:', error);
+      alert('Erreur lors du retour du matériel');
     }
-
-    setIsRetourModalOpen(false);
-    setSelectedPret(null);
   };
 
-  const generateBarcode = () => {
+  const handleBarcodeSearch = async () => {
     // Génération d'un code-barres EAN-13 simple
     const timestamp = Date.now().toString();
     return '31651' + timestamp.slice(-8);
@@ -380,12 +214,17 @@ export const PetitMaterielSection: React.FC = () => {
     // Simulation du scan de code-barres
     const foundMateriel = petitMateriel.find(m => m.codeBarre === scannedBarcode);
     if (foundMateriel) {
-      setSelectedMateriel(foundMateriel);
-      setIsDetailModalOpen(true);
-      setIsBarcodeModalOpen(false);
-      setScannedBarcode('');
-    } else {
-      alert('Matériel non trouvé avec ce code-barres');
+    try {
+      const found = await PetitMaterielService.getByBarcode(scannedBarcode);
+      if (found) {
+        setSearchTerm(found.nom);
+        setScannedBarcode('');
+      } else {
+        alert('Aucun matériel trouvé avec ce code-barres');
+      }
+    } catch (error) {
+      console.error('Erreur lors de la recherche par code-barres:', error);
+      alert('Erreur lors de la recherche');
     }
   };
 
@@ -1136,12 +975,12 @@ export const PetitMaterielSection: React.FC = () => {
 
       <div className="flex justify-end space-x-3">
         <Button variant="secondary" onClick={() => setIsBarcodeModalOpen(false)}>
-          Annuler
-        </Button>
-        <Button onClick={scanBarcode} disabled={!scannedBarcode}>
-          <Scan className="w-4 h-4 mr-2" />
-          Rechercher
-        </Button>
+    const total = (petitMateriel || []).length;
+    const disponible = (petitMateriel || []).filter(item => item.statut === 'disponible').length;
+    const prete = (petitMateriel || []).filter(item => item.statut === 'prete').length;
+    const maintenance = (petitMateriel || []).filter(item => item.statut === 'maintenance').length;
+    const lowStock = (petitMateriel || []).filter(item => item.quantiteDisponible <= item.seuilAlerte).length;
+    const totalValue = (petitMateriel || []).reduce((sum, item) => sum + (item.valeur * item.quantiteStock), 0);
       </div>
     </div>
   );
@@ -1419,7 +1258,11 @@ export const PetitMaterielSection: React.FC = () => {
                           title="Supprimer"
                         >
                           <Trash2 className="w-4 h-4" />
-                        </button>
+              {(ouvriers || []).filter(o => o.statut === 'actif').map(ouvrier => (
+                <option key={ouvrier.id} value={ouvrier.id}>
+                  {ouvrier.prenom} {ouvrier.nom} - {ouvrier.qualification}
+                </option>
+              ))}
                       </div>
                     </td>
                   </tr>
@@ -1429,7 +1272,11 @@ export const PetitMaterielSection: React.FC = () => {
           </div>
         )}
 
-        {activeTab === 'prets' && (
+              {(chantiers || []).filter(c => c.statut === 'actif' || c.statut === 'planifie').map(chantier => (
+                <option key={chantier.id} value={chantier.id}>
+                  {chantier.nom}
+                </option>
+              ))}
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50">
@@ -1609,6 +1456,7 @@ export const PetitMaterielSection: React.FC = () => {
           setSelectedMateriel(null);
         }}
         title="Nouveau prêt de matériel"
+        )}
         size="lg"
       >
         <PretForm />
@@ -1652,3 +1500,15 @@ export const PetitMaterielSection: React.FC = () => {
     </div>
   );
 };
+              Prêts ({(prets || []).length})
+        {(materielLoading || pretsLoading) ? (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Chargement des données...</p>
+          </div>
+        ) : (materielError || pretsError) ? (
+          <div className="text-center py-8 text-red-500">
+            <p>Erreur lors du chargement des données</p>
+            <p className="text-sm">{materielError?.message || pretsError?.message}</p>
+          </div>
+        ) : (
