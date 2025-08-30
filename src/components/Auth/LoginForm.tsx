@@ -23,7 +23,15 @@ export const LoginForm: React.FC = () => {
     try {
       await signIn(email, password);
     } catch (err) {
-      setError('Identifiants incorrects. Veuillez réessayer.');
+      const errorMessage = err instanceof Error ? err.message : 'Identifiants incorrects. Veuillez réessayer.';
+      
+      if (errorMessage.includes('Invalid login credentials')) {
+        setError('Email ou mot de passe incorrect. Veuillez vérifier vos identifiants.');
+      } else if (errorMessage.includes('Email not confirmed')) {
+        setError('Votre compte n\'est pas encore activé. Veuillez contacter un administrateur.');
+      } else {
+        setError('Erreur de connexion. Veuillez réessayer ou contacter un administrateur.');
+      }
       console.error('Erreur de connexion:', err);
     } finally {
       setLoading(false);
