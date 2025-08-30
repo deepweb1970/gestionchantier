@@ -1174,10 +1174,10 @@ export const PetitMaterielSection: React.FC = () => {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm">
                           <div className="flex items-center">
-                         {pret.date_debut ? new Date(pret.date_debut).toLocaleDateString('fr-FR') : 'Date non définie'}
+                            <span className="text-green-600 font-medium">{item.quantiteDisponible}</span>
                             <span className="text-gray-500 mx-1">/</span>
                             <span className="text-gray-600">{item.quantiteStock}</span>
-                         {pret.date_retour_prevue ? new Date(pret.date_retour_prevue).toLocaleDateString('fr-FR') : 'Date non définie'}
+                          </div>
                           {item.quantiteDisponible <= item.seuilAlerte && (
                             <div className="flex items-center text-orange-600 mt-1">
                               <AlertTriangle className="w-3 h-3 mr-1" />
